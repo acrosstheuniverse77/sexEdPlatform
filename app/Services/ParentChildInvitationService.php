@@ -8,7 +8,9 @@ use App\Models\ParentChildInvitation;
 use App\Models\User;
 use App\Notifications\Learner\ParentChildInvitationReceivedNotification;
 use App\Notifications\Parent\ParentChildInvitationRespondedNotification;
-use Carbon\Carbon;
+use App\Services\GuardianRelationshipVerificationService;
+use App\Support\GuardianRelationshipTypes;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -16,7 +18,18 @@ use InvalidArgumentException;
 
 class ParentChildInvitationService
 {
-    public function sendInvitation(User $parent, string $identifier, ?string $message = null): ParentChildInvitation
+    public function __construct(private readonly GuardianRelationshipVerificationService $relationshipVerificationService)
+    {
+    }
+
+    public function sendInvitation(
+        User $parent,
+        string $identifier,
+        string $relationshipType,
+        ?string $relationshipCustom = null,
+        ?string $message = null,
+        ?array $verificationPayload = null,
+    ): ParentChildInvitation
     {
         $child = $this->resolveChildFromIdentifier($identifier);
 
@@ -28,18 +41,13 @@ class ParentChildInvitationService
             throw new InvalidArgumentException('You cannot invite your own account.');
         }
 
-        $age = $this->resolveChildAge($child);
-        if ($age === null || $age < 5 || $age > 17) {
-            throw new InvalidArgumentException('Only learners aged 5 to 17 can receive a parent-link invitation.');
-        }
-
         $existingRelationship = ParentChildAccount::withTrashed()
             ->where('parent_user_id', $parent->id)
             ->where('child_user_id', $child->id)
             ->first();
 
         if ($existingRelationship && $existingRelationship->deleted_at === null && $existingRelationship->verification_status === 'approved') {
-            throw new InvalidArgumentException('This learner is already linked to your parent account.');
+            throw new InvalidArgumentException('This learner is already linked to your guardian account.');
         }
 
         if ($existingRelationship && $existingRelationship->deleted_at === null && $existingRelationship->verification_status === 'pending') {
@@ -61,14 +69,36 @@ class ParentChildInvitationService
             }
         }
 
-        $invitation = ParentChildInvitation::query()->create([
-            'inviter_parent_user_id' => $parent->id,
-            'child_user_id' => $child->id,
-            'invite_token' => (string) Str::uuid(),
-            'status' => ParentChildInvitationStatus::Pending->value,
-            'message' => $message ? trim($message) : null,
-            'expires_at' => now()->addDays(14),
-        ]);
+        $requiresVerification = GuardianRelationshipTypes::requiresVerification($relationshipType);
+        if ($requiresVerification && ! $verificationPayload) {
+            throw new InvalidArgumentException('Supporting documentation is required for this relationship.');
+        }
+
+        $invitation = DB::transaction(function () use ($parent, $child, $relationshipType, $relationshipCustom, $message, $requiresVerification, $verificationPayload): ParentChildInvitation {
+            $invitation = ParentChildInvitation::query()->create([
+                'inviter_parent_user_id' => $parent->id,
+                'child_user_id' => $child->id,
+                'relationship_type' => $relationshipType,
+                'relationship_custom' => $relationshipType === GuardianRelationshipTypes::OTHER ? trim((string) $relationshipCustom) : null,
+                'invite_token' => (string) Str::uuid(),
+                'status' => ParentChildInvitationStatus::Pending->value,
+                'message' => $message ? trim($message) : null,
+                'expires_at' => now()->addDays(14),
+            ]);
+
+            if ($requiresVerification) {
+                $document = $verificationPayload['document'];
+                $documents = [$this->stagedDocument($verificationPayload['document_type'], $document, $invitation)];
+
+                if (($verificationPayload['supporting_document'] ?? null) instanceof UploadedFile) {
+                    $documents[] = $this->stagedDocument('supporting_legal_document', $verificationPayload['supporting_document'], $invitation);
+                }
+
+                $invitation->update(['relationship_verification_documents' => $documents]);
+            }
+
+            return $invitation;
+        });
 
         $invitation->load(['inviterParent:id,name', 'child:id,name']);
         $child->notify(new ParentChildInvitationReceivedNotification($invitation));
@@ -104,17 +134,27 @@ class ParentChildInvitationService
                     ->where('parent_user_id', $invitation->inviter_parent_user_id)
                     ->where('child_user_id', $invitation->child_user_id)
                     ->first();
+                $relationshipType = $invitation->relationship_type ?: GuardianRelationshipTypes::LEGACY_PARENT;
+                $requiresVerification = GuardianRelationshipTypes::requiresVerification($relationshipType);
+                $relationshipStatus = $requiresVerification
+                    ? ($link?->relationship_verified_status ?: $this->relationshipVerificationService->initialStatus($relationshipType))
+                    : $this->relationshipVerificationService->initialStatus($relationshipType);
 
                 $payload = [
                     'can_view_progress' => true,
                     'can_view_quiz_answers' => true,
                     'can_approve_content' => true,
-                    'verification_status' => 'approved',
+                    'relationship_type' => $relationshipType,
+                    'relationship_custom' => $invitation->relationship_custom,
+                    'relationship_status' => 'pending',
+                    'relationship_verified_status' => $relationshipStatus,
+                    'is_legacy_relationship' => false,
+                    'verification_status' => 'pending',
                     'verification_rejection_reason' => null,
                     'verification_reviewed_by' => null,
-                    'verification_reviewed_at' => now(),
-                    'verification_approved_at' => now(),
-                    'relationship_verified_at' => now(),
+                    'verification_reviewed_at' => null,
+                    'verification_approved_at' => null,
+                    'relationship_verified_at' => null,
                 ];
 
                 if ($link) {
@@ -214,17 +254,16 @@ class ParentChildInvitationService
             ->first();
     }
 
-    private function resolveChildAge(User $child): ?int
+    private function stagedDocument(string $documentType, UploadedFile $file, ParentChildInvitation $invitation): array
     {
-        if ($child->birthdate) {
-            return Carbon::parse($child->birthdate)->age;
-        }
-
-        if ($child->learnerProfile?->birthdate) {
-            return Carbon::parse($child->learnerProfile->birthdate)->age;
-        }
-
-        return null;
+        return [
+            'document_type' => $documentType,
+            'disk' => 'local',
+            'path' => $file->store("guardian-relationship-invitations/{$invitation->id}", 'local'),
+            'original_name' => $file->getClientOriginalName(),
+            'mime_type' => $file->getMimeType() ?: 'application/octet-stream',
+            'size_bytes' => $file->getSize() ?: 0,
+        ];
     }
 
     private function expirePendingInvitations(Collection $invitations): void
