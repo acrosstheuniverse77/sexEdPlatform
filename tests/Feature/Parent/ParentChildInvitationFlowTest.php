@@ -101,6 +101,8 @@ class ParentChildInvitationFlowTest extends TestCase
         $this->seedLocationRows();
         Storage::fake('local');
 
+        $admin = User::factory()->create(['role' => 'admin']);
+        $admin->assignRole('admin');
         $parent = $this->createApprovedParent();
         $child = $this->createLearner('pendingaccesschild', 12);
 
@@ -114,6 +116,9 @@ class ParentChildInvitationFlowTest extends TestCase
             ])
             ->assertRedirect(route('parent.invitations.index'));
 
+        $this->assertSame(0, $admin->fresh()->notifications()
+            ->where('data->type', 'guardian_relationship_verification_submitted')
+            ->count());
         $this->assertDatabaseMissing('parent_child_accounts', [
             'parent_user_id' => $parent->id,
             'child_user_id' => $child->id,
@@ -144,6 +149,7 @@ class ParentChildInvitationFlowTest extends TestCase
             ->assertRedirect(route('parent.invitations.index'));
 
         $invitation = ParentChildInvitation::query()->sole();
+        $stagedDocument = $invitation->relationship_verification_documents[0];
 
         $this->actingAs($child)
             ->post(route('parent.invitations.respond', $invitation), ['decision' => 'accept'])
@@ -156,10 +162,17 @@ class ParentChildInvitationFlowTest extends TestCase
 
         $this->assertSame('under_review', $relationship->relationship_verified_status);
         $this->assertSame('pending', $relationship->verification_status);
-        $this->assertSame(1, $relationship->verificationDocuments()->count());
+        $verificationDocument = $relationship->verificationDocuments()->sole();
+        $this->assertSame($stagedDocument['document_type'], $verificationDocument->document_type);
+        $this->assertSame($stagedDocument['disk'], $verificationDocument->disk);
+        $this->assertSame($stagedDocument['path'], $verificationDocument->path);
+        $this->assertSame($stagedDocument['original_name'], $verificationDocument->original_name);
+        $this->assertSame($stagedDocument['mime_type'], $verificationDocument->mime_type);
+        $this->assertSame($stagedDocument['size_bytes'], $verificationDocument->size_bytes);
         $this->assertDatabaseHas('guardian_relationship_verification_documents', [
             'parent_child_account_id' => $relationship->id,
-            'document_type' => 'court_order',
+            'document_type' => $stagedDocument['document_type'],
+            'path' => $stagedDocument['path'],
         ]);
         $this->assertSame(1, $admin->fresh()->notifications()->where('data->type', 'guardian_relationship_verification_submitted')->count());
     }
