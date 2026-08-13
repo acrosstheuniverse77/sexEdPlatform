@@ -428,12 +428,39 @@ class AdminParentChildVerificationUiTest extends TestCase
         $frontUrl = route('admin.parent-verifications.parents.document', [$guardian, 'front']);
         $backUrl = route('admin.parent-verifications.parents.document', [$guardian, 'back']);
 
-        $this->actingAs($admin)
-            ->get(route('admin.parent-verifications.index'))
+        $parentTableMarkup = str($this->actingAs($admin)
+            ->get(route('admin.parent-verifications.index', ['type' => 'parents', 'status' => 'approved']))
             ->assertOk()
-            ->assertSee('h-9 w-9 rounded-full object-cover', false)
-            ->assertSee('alt="Ari Guardian avatar"', false)
-            ->assertSee('aria-label="Dina Dependent avatar fallback"', false);
+            ->getContent())
+            ->after('x-show="activeType === \'parents\'"')
+            ->before('x-show="activeType === \'children\'"')
+            ->toString();
+        $childTableMarkup = str($this->actingAs($admin)
+            ->get(route('admin.parent-verifications.index', ['type' => 'children', 'status' => 'pending']))
+            ->assertOk()
+            ->getContent())
+            ->after('x-show="activeType === \'children\'"')
+            ->before('x-show="activeType === \'relationships\'"')
+            ->toString();
+        $relationshipTableMarkup = str($this->actingAs($admin)
+            ->get(route('admin.parent-verifications.index', ['type' => 'relationships', 'status' => 'pending']))
+            ->assertOk()
+            ->getContent())
+            ->after('x-show="activeType === \'relationships\'"')
+            ->before('x-show="previewOpen"')
+            ->toString();
+
+        self::assertStringContainsString('>Guardian</th>', $parentTableMarkup);
+        self::assertStringContainsString('alt="Ari Guardian avatar"', $parentTableMarkup);
+        self::assertStringContainsString('h-9 w-9 rounded-full object-cover', $parentTableMarkup);
+
+        self::assertStringContainsString('>Child</th>', $childTableMarkup);
+        self::assertStringContainsString('aria-label="Dina Dependent avatar fallback"', $childTableMarkup);
+        self::assertStringContainsString('inline-flex h-9 w-9', $childTableMarkup);
+
+        self::assertStringContainsString('>Dependent</th>', $relationshipTableMarkup);
+        self::assertStringContainsString('alt="Ari Guardian avatar"', $relationshipTableMarkup);
+        self::assertStringContainsString('aria-label="Dina Dependent avatar fallback"', $relationshipTableMarkup);
 
         $this->actingAs($admin)
             ->get(route('admin.parent-verifications.relationships.show', $relationship))
