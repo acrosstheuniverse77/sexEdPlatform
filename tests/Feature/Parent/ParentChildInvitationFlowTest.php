@@ -256,6 +256,55 @@ class ParentChildInvitationFlowTest extends TestCase
         $this->assertSame($documents, $invitation->fresh()->relationship_verification_documents);
     }
 
+    public function test_acceptance_restores_staged_documents_when_document_creation_fails(): void
+    {
+        $this->seedLocationRows();
+        Storage::fake('local');
+
+        $parent = $this->createApprovedParent();
+        $child = $this->createLearner('rollbackstagedchild', 12);
+        $stagedPath = 'guardian-relationship-invitations/rollback/court-order.pdf';
+        Storage::disk('local')->put($stagedPath, 'court order');
+        $documents = [[
+            'document_type' => 'court_order',
+            'disk' => 'local',
+            'path' => $stagedPath,
+            'original_name' => 'court-order.pdf',
+            'mime_type' => 'application/pdf',
+            'size_bytes' => 11,
+        ]];
+        $invitation = ParentChildInvitation::query()->create([
+            'inviter_parent_user_id' => $parent->id,
+            'child_user_id' => $child->id,
+            'invite_token' => (string) \Illuminate\Support\Str::uuid(),
+            'relationship_type' => 'legal_guardian',
+            'relationship_verification_documents' => $documents,
+            'status' => 'pending',
+            'expires_at' => now()->addDays(3),
+        ]);
+        \App\Models\GuardianRelationshipVerificationDocument::creating(static function (): void {
+            throw new \RuntimeException('Unable to create verification document.');
+        });
+
+        try {
+            app(ParentChildInvitationService::class)->respondToInvitation($child, $invitation, 'accept');
+            $this->fail('Expected verification document creation to fail.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Unable to create verification document.', $exception->getMessage());
+        } finally {
+            \App\Models\GuardianRelationshipVerificationDocument::flushEventListeners();
+        }
+
+        Storage::disk('local')->assertExists($stagedPath);
+        Storage::disk('local')->assertDirectoryEmpty('guardian-relationship-verifications');
+        $this->assertDatabaseMissing('parent_child_accounts', [
+            'parent_user_id' => $parent->id,
+            'child_user_id' => $child->id,
+        ]);
+        $this->assertSame('pending', $invitation->fresh()->status->value);
+        $this->assertSame($documents, $invitation->fresh()->relationship_verification_documents);
+    }
+
     public function test_child_can_accept_invitation_and_create_parent_link(): void
     {
         $this->seedLocationRows();

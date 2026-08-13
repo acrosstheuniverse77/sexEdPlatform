@@ -40,12 +40,22 @@ class GuardianRelationshipVerificationService
     {
         return DB::transaction(function () use ($relationship, $guardian, $documents): ParentChildAccount {
             $this->assertStagedDocumentsExist($documents);
+            $movedDocuments = [];
 
-            foreach ($documents as $document) {
-                $this->moveStagedDocument($relationship, $guardian, $document);
+            try {
+                foreach ($documents as $document) {
+                    $destination = $this->moveStagedDocument($relationship, $document);
+                    $movedDocuments[] = ['source' => $document['path'], 'destination' => $destination];
+
+                    $this->createStagedDocument($relationship, $guardian, $document, $destination);
+                }
+
+                return $this->transitionToUnderReview($relationship, $guardian);
+            } catch (\Throwable $exception) {
+                $this->restoreStagedDocuments($movedDocuments);
+
+                throw $exception;
             }
-
-            return $this->transitionToUnderReview($relationship, $guardian);
         });
     }
 
@@ -126,7 +136,7 @@ class GuardianRelationshipVerificationService
         }
     }
 
-    private function moveStagedDocument(ParentChildAccount $relationship, User $guardian, array $document): void
+    private function moveStagedDocument(ParentChildAccount $relationship, array $document): string
     {
         $path = (string) $document['path'];
         $destination = 'guardian-relationship-verifications/'.$relationship->id.'/'.basename($path);
@@ -135,6 +145,11 @@ class GuardianRelationshipVerificationService
             throw new InvalidArgumentException('A staged verification document is missing.');
         }
 
+        return $destination;
+    }
+
+    private function createStagedDocument(ParentChildAccount $relationship, User $guardian, array $document, string $destination): void
+    {
         GuardianRelationshipVerificationDocument::query()->create([
             'parent_child_account_id' => $relationship->id,
             'uploaded_by_user_id' => $guardian->id,
@@ -145,6 +160,25 @@ class GuardianRelationshipVerificationService
             'mime_type' => (string) $document['mime_type'],
             'size_bytes' => (int) $document['size_bytes'],
         ]);
+    }
+
+    private function restoreStagedDocuments(array $movedDocuments): void
+    {
+        $disk = Storage::disk('local');
+
+        foreach (array_reverse($movedDocuments) as $document) {
+            if (! $disk->exists($document['destination'])) {
+                continue;
+            }
+
+            if ($disk->exists($document['source'])) {
+                $disk->delete($document['destination']);
+
+                continue;
+            }
+
+            $disk->move($document['destination'], $document['source']);
+        }
     }
 
     private function transitionToUnderReview(ParentChildAccount $relationship, User $guardian): ParentChildAccount
