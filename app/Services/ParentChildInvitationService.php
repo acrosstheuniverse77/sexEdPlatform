@@ -175,12 +175,21 @@ class ParentChildInvitationService
                     }
 
                     $link->update($payload);
+                    $relationship = $link;
                 } else {
-                    ParentChildAccount::query()->create([
+                    $relationship = ParentChildAccount::query()->create([
                         'parent_user_id' => $invitation->inviter_parent_user_id,
                         'child_user_id' => $invitation->child_user_id,
                         ...$payload,
                     ]);
+                }
+
+                if ($requiresVerification) {
+                    $this->relationshipVerificationService->submitStaged(
+                        $relationship,
+                        $invitation->inviterParent()->firstOrFail(),
+                        $invitation->relationship_verification_documents ?? [],
+                    );
                 }
             }
 
@@ -190,6 +199,7 @@ class ParentChildInvitationService
                     : ParentChildInvitationStatus::Rejected->value,
                 'decision_note' => $decisionNote,
                 'responded_at' => now(),
+                'relationship_verification_documents' => $normalizedDecision === 'accept' ? null : $invitation->relationship_verification_documents,
             ]);
 
             return $invitation->fresh(['inviterParent:id,name', 'child:id,name']);

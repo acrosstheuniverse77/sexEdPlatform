@@ -194,20 +194,66 @@ class ParentChildInvitationFlowTest extends TestCase
             ->sole();
 
         $this->assertSame('under_review', $relationship->relationship_verified_status);
+        $this->assertSame('pending', $relationship->relationship_status);
         $this->assertSame('pending', $relationship->verification_status);
+        $this->assertNull($relationship->relationship_verified_at);
         $verificationDocument = $relationship->verificationDocuments()->sole();
         $this->assertSame($stagedDocument['document_type'], $verificationDocument->document_type);
         $this->assertSame($stagedDocument['disk'], $verificationDocument->disk);
-        $this->assertSame($stagedDocument['path'], $verificationDocument->path);
+        $this->assertStringStartsWith("guardian-relationship-verifications/{$relationship->id}/", $verificationDocument->path);
+        $this->assertNotSame($stagedDocument['path'], $verificationDocument->path);
         $this->assertSame($stagedDocument['original_name'], $verificationDocument->original_name);
         $this->assertSame($stagedDocument['mime_type'], $verificationDocument->mime_type);
         $this->assertSame($stagedDocument['size_bytes'], $verificationDocument->size_bytes);
+        Storage::disk('local')->assertMissing($stagedDocument['path']);
+        Storage::disk('local')->assertExists($verificationDocument->path);
         $this->assertDatabaseHas('guardian_relationship_verification_documents', [
             'parent_child_account_id' => $relationship->id,
             'document_type' => $stagedDocument['document_type'],
-            'path' => $stagedDocument['path'],
+            'path' => $verificationDocument->path,
         ]);
+        $this->assertNull($invitation->fresh()->relationship_verification_documents);
         $this->assertSame(1, $admin->fresh()->notifications()->where('data->type', 'guardian_relationship_verification_submitted')->count());
+    }
+
+    public function test_accepting_proof_required_invitation_with_missing_staged_document_leaves_state_unchanged(): void
+    {
+        $this->seedLocationRows();
+        Storage::fake('local');
+
+        $parent = $this->createApprovedParent();
+        $child = $this->createLearner('missingstagedchild', 12);
+        $documents = [[
+            'document_type' => 'court_order',
+            'disk' => 'local',
+            'path' => 'guardian-relationship-invitations/missing/court-order.pdf',
+            'original_name' => 'court-order.pdf',
+            'mime_type' => 'application/pdf',
+            'size_bytes' => 64,
+        ]];
+        $invitation = ParentChildInvitation::query()->create([
+            'inviter_parent_user_id' => $parent->id,
+            'child_user_id' => $child->id,
+            'invite_token' => (string) \Illuminate\Support\Str::uuid(),
+            'relationship_type' => 'legal_guardian',
+            'relationship_verification_documents' => $documents,
+            'status' => 'pending',
+            'expires_at' => now()->addDays(3),
+        ]);
+
+        try {
+            app(ParentChildInvitationService::class)->respondToInvitation($child, $invitation, 'accept');
+            $this->fail('Expected missing staged verification document to prevent acceptance.');
+        } catch (\InvalidArgumentException $exception) {
+            $this->assertSame('A staged verification document is missing.', $exception->getMessage());
+        }
+
+        $this->assertDatabaseMissing('parent_child_accounts', [
+            'parent_user_id' => $parent->id,
+            'child_user_id' => $child->id,
+        ]);
+        $this->assertSame('pending', $invitation->fresh()->status->value);
+        $this->assertSame($documents, $invitation->fresh()->relationship_verification_documents);
     }
 
     public function test_child_can_accept_invitation_and_create_parent_link(): void
