@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Closure;
 use App\Models\GuardianRelationshipVerificationAudit;
 use App\Models\GuardianRelationshipVerificationDocument;
 use App\Models\ParentChildAccount;
@@ -37,9 +38,9 @@ class GuardianRelationshipVerificationService
         });
     }
 
-    public function submitStaged(ParentChildAccount $relationship, User $guardian, array $documents): ParentChildAccount
+    public function submitStaged(ParentChildAccount $relationship, User $guardian, array $documents, ?Closure $onSubmitted = null): ParentChildAccount
     {
-        return DB::transaction(function () use ($relationship, $guardian, $documents): ParentChildAccount {
+        return DB::transaction(function () use ($relationship, $guardian, $documents, $onSubmitted): ParentChildAccount {
             $this->assertStagedDocumentsExist($documents);
             $movedDocuments = [];
 
@@ -51,7 +52,10 @@ class GuardianRelationshipVerificationService
                     $this->createStagedDocument($relationship, $guardian, $document, $destination);
                 }
 
-                return $this->transitionToUnderReview($relationship, $guardian);
+                $submittedRelationship = $this->transitionToUnderReview($relationship, $guardian);
+                $onSubmitted?->__invoke($submittedRelationship);
+
+                return $submittedRelationship;
             } catch (\Throwable $exception) {
                 $this->restoreStagedDocuments($movedDocuments);
 
@@ -130,6 +134,10 @@ class GuardianRelationshipVerificationService
 
     private function assertStagedDocumentsExist(array $documents): void
     {
+        if ($documents === []) {
+            throw new InvalidArgumentException('A staged verification document is missing.');
+        }
+
         foreach ($documents as $document) {
             $path = is_array($document) ? (string) ($document['path'] ?? '') : '';
 

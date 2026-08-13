@@ -53,3 +53,55 @@ All commands were run sequentially.
 - `git diff --check -- app/Services/Chat/ChatAuthorizationService.php tests/Feature/Chat/ChatChannelAuthorizationTest.php` exited 0.
 - Final code review traced the regression test through `evaluateStart()` to `hasApprovedParentChildRelation()`. The change affects only learner-to-learner direct-chat eligibility and requires the same two fields used by `ParentChildAccount::isVerified()`.
 - Pre-existing dirty changes were preserved. Only the Task 7 regression test, its necessary production correction, and this report are intended for the Task 7 commit.
+
+## Follow-up review fixes
+
+### Scope and behavior
+
+- `GuardianRelationshipVerificationService::submitStaged()` now accepts an optional typed `Closure` executed after the under-review transition, inside its transaction and restoration `try` block.
+- Proof-required invitation acceptance updates its accepted status and clears staged metadata through that callback. A thrown invitation update now restores moved files before the outer transaction rolls back.
+- Acceptance reloads the invitation with `lockForUpdate()`, revalidates pending/expiry state, locks the learner before link lookup, and locks the existing link lookup.
+- Empty or null staged proof metadata now raises `A staged verification document is missing.` before any relationship creation attempt, under-review transition, or notification.
+- Restored/deleted links clear `verification_document_path` with the other child-verification state.
+- Failure-injection tests now install a temporary model event dispatcher and restore the saved dispatcher in `finally`; no test calls `flushEventListeners()`.
+
+### TDD evidence
+
+Initial RED — `vendor\\bin\\phpunit --do-not-cache-result tests\\Feature\\Parent\\ParentChildInvitationFlowTest.php`
+
+```text
+There were 4 failures:
+1) empty staged proof metadata was accepted.
+2) accepted invitation update failure left the source staged file missing.
+3) a stale invitation decision was accepted.
+4) a restored deleted link retained child-verifications/legacy-child.pdf.
+FAILURES!
+Tests: 19, Assertions: 113, Failures: 4.
+```
+
+Strengthened empty-proof ordering RED:
+
+```text
+1) Tests\Feature\Parent\ParentChildInvitationFlowTest::test_accepting_proof_required_invitation_with_empty_staged_documents_leaves_state_unchanged
+Failed asserting that true is false.
+FAILURES!
+Tests: 1, Assertions: 7, Failures: 1.
+```
+
+The final strengthened focused regression passed: `OK (1 test, 7 assertions)`.
+
+### Follow-up verification
+
+All PHPUnit invocations were direct and sequential with `--do-not-cache-result`.
+
+| Command | Exit | Exact result |
+| --- | ---: | --- |
+| Each of the four focused regressions | 0 | `OK (1 test, 6 assertions)`, `OK (1 test, 6 assertions)`, `OK (1 test, 3 assertions)`, and `OK (1 test, 2 assertions)` |
+| `vendor\\bin\\phpunit --do-not-cache-result tests\\Feature\\Parent\\ParentChildInvitationFlowTest.php` | 0 | Final run: `OK (19 tests, 126 assertions)`; `Time: 00:29.772` |
+| Task 7 affected suites via direct PHPUnit | 0 | `OK (99 tests, 598 assertions)`; `Time: 00:37.667` |
+| `vendor\\bin\\phpunit --do-not-cache-result` | 0 | Final run: `OK (921 tests, 4129 assertions)`; `Time: 02:17.957, Memory: 250.00 MB` |
+| `vendor\\bin\\pint --test tests\\Feature\\Parent\\ParentChildInvitationFlowTest.php` | 0 | `PASS ... 1 file` |
+| Final scoped Pint for both services plus the test | 1 | `FAIL ... 3 files, 2 style issues`; the test passed, while both services retain pre-existing style issue groups. |
+| `git diff --check --` for the two services and invitation-flow test | 0 | No whitespace errors. |
+
+The first multi-name `--filter` attempt did not execute PHPUnit because the shell parsed `|` as a pipeline; it exited 1 before tests started. It was replaced by sequential direct PHPUnit commands above.

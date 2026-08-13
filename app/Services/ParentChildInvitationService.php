@@ -124,15 +124,6 @@ class ParentChildInvitationService
             throw new InvalidArgumentException('You are not allowed to respond to this invitation.');
         }
 
-        if (($invitation->status instanceof ParentChildInvitationStatus ? $invitation->status->value : (string) $invitation->status) !== ParentChildInvitationStatus::Pending->value) {
-            throw new InvalidArgumentException('This invitation is no longer pending.');
-        }
-
-        if ($invitation->isExpired()) {
-            $invitation->update(['status' => ParentChildInvitationStatus::Expired->value]);
-            throw new InvalidArgumentException('This invitation has already expired.');
-        }
-
         $normalizedDecision = trim(strtolower($decision));
         if (! in_array($normalizedDecision, ['accept', 'reject'], true)) {
             throw new InvalidArgumentException('Invalid invitation decision.');
@@ -140,14 +131,41 @@ class ParentChildInvitationService
 
         $decisionNote = $note ? trim($note) : null;
 
-        $updatedInvitation = DB::transaction(function () use ($invitation, $normalizedDecision, $decisionNote) {
+        [$updatedInvitation, $wasExpired] = DB::transaction(function () use ($child, $invitation, $normalizedDecision, $decisionNote): array {
+            $invitation = ParentChildInvitation::query()
+                ->lockForUpdate()
+                ->findOrFail($invitation->id);
+
+            if (($invitation->status instanceof ParentChildInvitationStatus ? $invitation->status->value : (string) $invitation->status) !== ParentChildInvitationStatus::Pending->value) {
+                throw new InvalidArgumentException('This invitation is no longer pending.');
+            }
+
+            if ($invitation->isExpired()) {
+                $invitation->update(['status' => ParentChildInvitationStatus::Expired->value]);
+
+                return [$invitation->fresh(), true];
+            }
+
+            $lockedChild = User::query()->lockForUpdate()->findOrFail($child->id);
+
+            if ((int) $invitation->child_user_id !== (int) $lockedChild->id) {
+                throw new InvalidArgumentException('You are not allowed to respond to this invitation.');
+            }
+
             if ($normalizedDecision === 'accept') {
                 $link = ParentChildAccount::withTrashed()
+                    ->lockForUpdate()
                     ->where('parent_user_id', $invitation->inviter_parent_user_id)
                     ->where('child_user_id', $invitation->child_user_id)
                     ->first();
                 $relationshipType = $invitation->relationship_type ?: GuardianRelationshipTypes::LEGACY_PARENT;
                 $requiresVerification = GuardianRelationshipTypes::requiresVerification($relationshipType);
+                $documents = $requiresVerification ? $invitation->relationship_verification_documents : null;
+
+                if ($requiresVerification && (! is_array($documents) || $documents === [])) {
+                    throw new InvalidArgumentException('A staged verification document is missing.');
+                }
+
                 $relationshipStatus = $requiresVerification
                     ? ($link?->relationship_verified_status ?: $this->relationshipVerificationService->initialStatus($relationshipType))
                     : $this->relationshipVerificationService->initialStatus($relationshipType);
@@ -166,6 +184,7 @@ class ParentChildInvitationService
                     'verification_reviewed_by' => null,
                     'verification_reviewed_at' => null,
                     'verification_approved_at' => null,
+                    'verification_document_path' => null,
                     'relationship_verified_at' => null,
                 ];
 
@@ -188,22 +207,40 @@ class ParentChildInvitationService
                     $this->relationshipVerificationService->submitStaged(
                         $relationship,
                         $invitation->inviterParent()->firstOrFail(),
-                        $invitation->relationship_verification_documents ?? [],
+                        $documents,
+                        function () use ($invitation, $decisionNote): void {
+                            $invitation->update([
+                                'status' => ParentChildInvitationStatus::Accepted->value,
+                                'decision_note' => $decisionNote,
+                                'responded_at' => now(),
+                                'relationship_verification_documents' => null,
+                            ]);
+                        },
                     );
+                } else {
+                    $invitation->update([
+                        'status' => ParentChildInvitationStatus::Accepted->value,
+                        'decision_note' => $decisionNote,
+                        'responded_at' => now(),
+                        'relationship_verification_documents' => null,
+                    ]);
                 }
+
+            } else {
+                $invitation->update([
+                    'status' => ParentChildInvitationStatus::Rejected->value,
+                    'decision_note' => $decisionNote,
+                    'responded_at' => now(),
+                    'relationship_verification_documents' => $invitation->relationship_verification_documents,
+                ]);
             }
 
-            $invitation->update([
-                'status' => $normalizedDecision === 'accept'
-                    ? ParentChildInvitationStatus::Accepted->value
-                    : ParentChildInvitationStatus::Rejected->value,
-                'decision_note' => $decisionNote,
-                'responded_at' => now(),
-                'relationship_verification_documents' => $normalizedDecision === 'accept' ? null : $invitation->relationship_verification_documents,
-            ]);
-
-            return $invitation->fresh(['inviterParent:id,name', 'child:id,name']);
+            return [$invitation->fresh(['inviterParent:id,name', 'child:id,name']), false];
         });
+
+        if ($wasExpired) {
+            throw new InvalidArgumentException('This invitation has already expired.');
+        }
 
         $updatedInvitation->inviterParent?->notify(new ParentChildInvitationRespondedNotification($updatedInvitation));
 

@@ -2,11 +2,13 @@
 
 namespace Tests\Feature\Parent;
 
+use App\Models\GuardianRelationshipVerificationDocument;
 use App\Models\LearnerProfile;
 use App\Models\ParentChildAccount;
 use App\Models\ParentChildInvitation;
 use App\Models\User;
 use App\Services\ParentChildInvitationService;
+use Illuminate\Events\Dispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -105,6 +107,8 @@ class ParentChildInvitationFlowTest extends TestCase
 
         $parent = $this->createApprovedParent();
         $child = $this->createLearner('stagingcleanupchild', 12);
+        $originalDispatcher = ParentChildInvitation::getEventDispatcher();
+        ParentChildInvitation::setEventDispatcher(new Dispatcher(app()));
         ParentChildInvitation::updating(static function (): void {
             throw new \RuntimeException('Unable to persist staged documents.');
         });
@@ -123,7 +127,7 @@ class ParentChildInvitationFlowTest extends TestCase
         } catch (\RuntimeException $exception) {
             $this->assertSame('Unable to persist staged documents.', $exception->getMessage());
         } finally {
-            ParentChildInvitation::flushEventListeners();
+            ParentChildInvitation::setEventDispatcher($originalDispatcher);
         }
 
         Storage::disk('local')->assertDirectoryEmpty('guardian-relationship-invitations');
@@ -310,6 +314,163 @@ class ParentChildInvitationFlowTest extends TestCase
         $this->assertSame($documents, $invitation->fresh()->relationship_verification_documents);
     }
 
+    public function test_accepting_proof_required_invitation_with_empty_staged_documents_leaves_state_unchanged(): void
+    {
+        $this->seedLocationRows();
+
+        $parent = $this->createApprovedParent();
+        $relationshipCreationAttempted = false;
+        $originalDispatcher = ParentChildAccount::getEventDispatcher();
+        ParentChildAccount::setEventDispatcher(new Dispatcher(app()));
+        ParentChildAccount::creating(static function () use (&$relationshipCreationAttempted): void {
+            $relationshipCreationAttempted = true;
+        });
+
+        try {
+            foreach ([null, []] as $documents) {
+                $child = $this->createLearner('emptystagedchild'.count((array) $documents), 12);
+                $invitation = ParentChildInvitation::query()->create([
+                    'inviter_parent_user_id' => $parent->id,
+                    'child_user_id' => $child->id,
+                    'invite_token' => (string) \Illuminate\Support\Str::uuid(),
+                    'relationship_type' => 'legal_guardian',
+                    'relationship_verification_documents' => $documents,
+                    'status' => 'pending',
+                    'expires_at' => now()->addDays(3),
+                ]);
+
+                try {
+                    app(ParentChildInvitationService::class)->respondToInvitation($child, $invitation, 'accept');
+                    $this->fail('Expected empty staged verification documents to prevent acceptance.');
+                } catch (\InvalidArgumentException $exception) {
+                    $this->assertSame('A staged verification document is missing.', $exception->getMessage());
+                }
+
+                $this->assertDatabaseMissing('parent_child_accounts', [
+                    'parent_user_id' => $parent->id,
+                    'child_user_id' => $child->id,
+                ]);
+                $this->assertSame('pending', $invitation->fresh()->status->value);
+            }
+        } finally {
+            ParentChildAccount::setEventDispatcher($originalDispatcher);
+        }
+
+        $this->assertFalse($relationshipCreationAttempted);
+    }
+
+    public function test_acceptance_restores_staged_documents_when_accepted_invitation_update_fails(): void
+    {
+        $this->seedLocationRows();
+        Storage::fake('local');
+
+        $parent = $this->createApprovedParent();
+        $child = $this->createLearner('rollbackinvitationchild', 12);
+        $stagedPath = 'guardian-relationship-invitations/rollback/invitation-update.pdf';
+        Storage::disk('local')->put($stagedPath, 'court order');
+        $documents = [[
+            'document_type' => 'court_order',
+            'disk' => 'local',
+            'path' => $stagedPath,
+            'original_name' => 'court-order.pdf',
+            'mime_type' => 'application/pdf',
+            'size_bytes' => 11,
+        ]];
+        $invitation = ParentChildInvitation::query()->create([
+            'inviter_parent_user_id' => $parent->id,
+            'child_user_id' => $child->id,
+            'invite_token' => (string) \Illuminate\Support\Str::uuid(),
+            'relationship_type' => 'legal_guardian',
+            'relationship_verification_documents' => $documents,
+            'status' => 'pending',
+            'expires_at' => now()->addDays(3),
+        ]);
+        $originalDispatcher = ParentChildInvitation::getEventDispatcher();
+        ParentChildInvitation::setEventDispatcher(new Dispatcher(app()));
+        ParentChildInvitation::updating(static function (ParentChildInvitation $model): void {
+            if (($model->getAttributes()['status'] ?? null) === 'accepted') {
+                throw new \RuntimeException('Unable to accept invitation.');
+            }
+        });
+
+        try {
+            app(ParentChildInvitationService::class)->respondToInvitation($child, $invitation, 'accept');
+            $this->fail('Expected accepted invitation update to fail.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Unable to accept invitation.', $exception->getMessage());
+        } finally {
+            ParentChildInvitation::setEventDispatcher($originalDispatcher);
+        }
+
+        Storage::disk('local')->assertExists($stagedPath);
+        Storage::disk('local')->assertDirectoryEmpty('guardian-relationship-verifications');
+        $this->assertDatabaseMissing('parent_child_accounts', [
+            'parent_user_id' => $parent->id,
+            'child_user_id' => $child->id,
+        ]);
+        $this->assertSame('pending', $invitation->fresh()->status->value);
+        $this->assertSame($documents, $invitation->fresh()->relationship_verification_documents);
+    }
+
+    public function test_stale_invitation_decision_is_revalidated_inside_the_transaction(): void
+    {
+        $this->seedLocationRows();
+
+        $parent = $this->createApprovedParent();
+        $child = $this->createLearner('staledecisionchild', 12);
+        $invitation = ParentChildInvitation::query()->create([
+            'inviter_parent_user_id' => $parent->id,
+            'child_user_id' => $child->id,
+            'invite_token' => (string) \Illuminate\Support\Str::uuid(),
+            'relationship_type' => 'parent',
+            'status' => 'pending',
+            'expires_at' => now()->addDays(3),
+        ]);
+        $staleInvitation = $invitation->fresh();
+        $invitation->update(['status' => 'rejected', 'responded_at' => now()]);
+
+        try {
+            app(ParentChildInvitationService::class)->respondToInvitation($child, $staleInvitation, 'accept');
+            $this->fail('Expected stale invitation decision to be rejected.');
+        } catch (\InvalidArgumentException $exception) {
+            $this->assertSame('This invitation is no longer pending.', $exception->getMessage());
+        }
+
+        $this->assertDatabaseMissing('parent_child_accounts', [
+            'parent_user_id' => $parent->id,
+            'child_user_id' => $child->id,
+        ]);
+        $this->assertSame('rejected', $invitation->fresh()->status->value);
+    }
+
+    public function test_accepting_invitation_restores_deleted_link_without_legacy_verification_document(): void
+    {
+        $this->seedLocationRows();
+
+        $parent = $this->createApprovedParent();
+        $child = $this->createLearner('restorelegacychild', 12);
+        $link = ParentChildAccount::query()->create([
+            'parent_user_id' => $parent->id,
+            'child_user_id' => $child->id,
+            'verification_status' => 'rejected',
+            'verification_document_path' => 'child-verifications/legacy-child.pdf',
+        ]);
+        $link->delete();
+        $invitation = ParentChildInvitation::query()->create([
+            'inviter_parent_user_id' => $parent->id,
+            'child_user_id' => $child->id,
+            'invite_token' => (string) \Illuminate\Support\Str::uuid(),
+            'relationship_type' => 'parent',
+            'status' => 'pending',
+            'expires_at' => now()->addDays(3),
+        ]);
+
+        app(ParentChildInvitationService::class)->respondToInvitation($child, $invitation, 'accept');
+
+        $this->assertNull($link->fresh()->verification_document_path);
+        $this->actingAs($child)->get(route('learner.dashboard'))->assertOk();
+    }
+
     public function test_acceptance_restores_staged_documents_when_document_creation_fails(): void
     {
         $this->seedLocationRows();
@@ -336,7 +497,9 @@ class ParentChildInvitationFlowTest extends TestCase
             'status' => 'pending',
             'expires_at' => now()->addDays(3),
         ]);
-        \App\Models\GuardianRelationshipVerificationDocument::creating(static function (): void {
+        $originalDispatcher = GuardianRelationshipVerificationDocument::getEventDispatcher();
+        GuardianRelationshipVerificationDocument::setEventDispatcher(new Dispatcher(app()));
+        GuardianRelationshipVerificationDocument::creating(static function (): void {
             throw new \RuntimeException('Unable to create verification document.');
         });
 
@@ -346,7 +509,7 @@ class ParentChildInvitationFlowTest extends TestCase
         } catch (\RuntimeException $exception) {
             $this->assertSame('Unable to create verification document.', $exception->getMessage());
         } finally {
-            \App\Models\GuardianRelationshipVerificationDocument::flushEventListeners();
+            GuardianRelationshipVerificationDocument::setEventDispatcher($originalDispatcher);
         }
 
         Storage::disk('local')->assertExists($stagedPath);
@@ -400,7 +563,9 @@ class ParentChildInvitationFlowTest extends TestCase
                 'Unable to restore staged verification document after submission failure.',
                 \Mockery::on(static fn (array $context): bool => $context['source'] === $source && $context['destination'] !== $source),
             );
-        \App\Models\GuardianRelationshipVerificationDocument::creating(static function (): void {
+        $originalDispatcher = GuardianRelationshipVerificationDocument::getEventDispatcher();
+        GuardianRelationshipVerificationDocument::setEventDispatcher(new Dispatcher(app()));
+        GuardianRelationshipVerificationDocument::creating(static function (): void {
             throw new \RuntimeException('Unable to create verification document.');
         });
 
@@ -410,7 +575,7 @@ class ParentChildInvitationFlowTest extends TestCase
         } catch (\RuntimeException $exception) {
             $this->assertSame('Unable to create verification document.', $exception->getMessage());
         } finally {
-            \App\Models\GuardianRelationshipVerificationDocument::flushEventListeners();
+            GuardianRelationshipVerificationDocument::setEventDispatcher($originalDispatcher);
             Storage::swap($filesystems);
             Log::swap($logger);
         }
@@ -604,7 +769,7 @@ class ParentChildInvitationFlowTest extends TestCase
 
         LearnerProfile::query()->create([
             'user_id' => $parent->id,
-            'username' => 'parent' . $parent->id,
+            'username' => 'parent'.$parent->id,
             'birthdate' => now()->subYears(35)->toDateString(),
             'gender' => 'female',
             'city_code' => '402101000',
@@ -631,7 +796,7 @@ class ParentChildInvitationFlowTest extends TestCase
 
         LearnerProfile::query()->create([
             'user_id' => $learner->id,
-            'username' => $username . $learner->id,
+            'username' => $username.$learner->id,
             'birthdate' => now()->subYears($age)->toDateString(),
             'gender' => 'male',
             'city_code' => '402101000',
