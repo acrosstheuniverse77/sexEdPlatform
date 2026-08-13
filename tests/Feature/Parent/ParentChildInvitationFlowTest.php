@@ -223,6 +223,53 @@ class ParentChildInvitationFlowTest extends TestCase
         $this->assertSame(1, $admin->fresh()->notifications()->where('data->type', 'guardian_relationship_verification_submitted')->count());
     }
 
+    public function test_final_relationship_rejection_notifies_guardian_and_dependent(): void
+    {
+        $this->seedLocationRows();
+        Storage::fake('local');
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $admin->assignRole('admin');
+        $parent = $this->createApprovedParent();
+        $child = $this->createLearner('rejectedrelationshipchild', 12);
+
+        $relationship = ParentChildAccount::query()->create([
+            'parent_user_id' => $parent->id,
+            'child_user_id' => $child->id,
+            'relationship_type' => 'legal_guardian',
+            'relationship_status' => 'pending',
+            'relationship_verified_status' => 'under_review',
+            'verification_status' => 'pending',
+            'can_view_progress' => true,
+            'can_view_quiz_answers' => true,
+            'can_approve_content' => true,
+        ]);
+
+        $this->actingAs($admin)
+            ->postJson(route('admin.parent-verifications.relationships.reject', $relationship), [
+                'reason_code' => 'unclear_document',
+                'allow_resubmission' => false,
+            ])
+            ->assertOk()
+            ->assertJson([
+                'status' => 'rejected',
+            ]);
+
+        $guardianNotification = $parent->fresh()->notifications()
+            ->where('data->type', 'guardian_relationship_verification_rejected')
+            ->latest()
+            ->first();
+        $dependentNotification = $child->fresh()->notifications()
+            ->where('data->type', 'guardian_relationship_verification_rejected')
+            ->latest()
+            ->first();
+
+        $this->assertNotNull($guardianNotification);
+        $this->assertSame(route('parent.relationship-verifications.show', $relationship), data_get($guardianNotification->data, 'action_url'));
+        $this->assertNotNull($dependentNotification);
+        $this->assertSame(route('learner.parent.index'), data_get($dependentNotification->data, 'action_url'));
+    }
+
     public function test_accepting_proof_required_invitation_with_missing_staged_document_leaves_state_unchanged(): void
     {
         $this->seedLocationRows();

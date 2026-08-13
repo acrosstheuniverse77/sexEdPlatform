@@ -104,9 +104,11 @@ class GuardianRelationshipVerificationService
             ]);
 
             $this->audit($relationship, $actor, $action, $previous, $newStatus, $reasonCode, $note);
-            $relationship->parent?->notify(new RelationshipVerificationStatusNotification($relationship->fresh(['child']), $action));
+            $freshRelationship = $relationship->fresh(['parent', 'child', 'verificationDocuments']);
+            $freshRelationship->parent?->notify(new RelationshipVerificationStatusNotification($freshRelationship, $action));
+            $freshRelationship->child?->notify(new RelationshipVerificationStatusNotification($freshRelationship, $action));
 
-            return $relationship->fresh(['parent', 'child', 'verificationDocuments']);
+            return $freshRelationship;
         });
     }
 

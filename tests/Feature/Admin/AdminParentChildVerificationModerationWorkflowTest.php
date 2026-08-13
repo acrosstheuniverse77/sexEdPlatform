@@ -44,6 +44,33 @@ class AdminParentChildVerificationModerationWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_relationship_approval_notifies_guardian_and_dependent(): void
+    {
+        $admin = $this->createAdmin();
+        $relationship = $this->createRelationshipVerification('under_review');
+
+        $this->actingAs($admin)
+            ->postJson(route('admin.parent-verifications.relationships.approve', $relationship))
+            ->assertOk()
+            ->assertJson([
+                'status' => 'approved',
+            ]);
+
+        $guardianNotification = $relationship->parent->fresh()->notifications()
+            ->where('data->type', 'guardian_relationship_verification_approved')
+            ->latest()
+            ->first();
+        $dependentNotification = $relationship->child->fresh()->notifications()
+            ->where('data->type', 'guardian_relationship_verification_approved')
+            ->latest()
+            ->first();
+
+        $this->assertNotNull($guardianNotification);
+        $this->assertSame(route('parent.relationship-verifications.show', $relationship), data_get($guardianNotification->data, 'action_url'));
+        $this->assertNotNull($dependentNotification);
+        $this->assertSame(route('learner.parent.index'), data_get($dependentNotification->data, 'action_url'));
+    }
+
     public function test_non_pending_approval_returns_conflict_as_before(): void
     {
         $admin = $this->createAdmin();
@@ -194,5 +221,18 @@ class AdminParentChildVerificationModerationWorkflowTest extends TestCase
             'verification_status' => $status,
             'verification_document_path' => 'child-verifications/temp/linked-child-doc.pdf',
         ]);
+    }
+
+    private function createRelationshipVerification(string $status): ParentChildAccount
+    {
+        $relationship = $this->createChildVerification('pending');
+
+        $relationship->update([
+            'relationship_type' => 'legal_guardian',
+            'relationship_status' => 'pending',
+            'relationship_verified_status' => $status,
+        ]);
+
+        return $relationship;
     }
 }
