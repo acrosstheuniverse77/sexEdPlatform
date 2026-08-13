@@ -10,6 +10,7 @@ use App\Services\ParentChildInvitationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -301,6 +302,66 @@ class ParentChildInvitationFlowTest extends TestCase
             'parent_user_id' => $parent->id,
             'child_user_id' => $child->id,
         ]);
+        $this->assertSame('pending', $invitation->fresh()->status->value);
+        $this->assertSame($documents, $invitation->fresh()->relationship_verification_documents);
+    }
+
+    public function test_acceptance_logs_failed_staged_document_compensation_without_masking_the_original_exception(): void
+    {
+        $this->seedLocationRows();
+
+        $parent = $this->createApprovedParent();
+        $child = $this->createLearner('rollbackfailurechild', 12);
+        $source = 'guardian-relationship-invitations/rollback/court-order.pdf';
+        $documents = [[
+            'document_type' => 'court_order',
+            'disk' => 'local',
+            'path' => $source,
+            'original_name' => 'court-order.pdf',
+            'mime_type' => 'application/pdf',
+            'size_bytes' => 11,
+        ]];
+        $invitation = ParentChildInvitation::query()->create([
+            'inviter_parent_user_id' => $parent->id,
+            'child_user_id' => $child->id,
+            'invite_token' => (string) \Illuminate\Support\Str::uuid(),
+            'relationship_type' => 'legal_guardian',
+            'relationship_verification_documents' => $documents,
+            'status' => 'pending',
+            'expires_at' => now()->addDays(3),
+        ]);
+        $filesystems = app('filesystem');
+        $logger = app('log');
+        $disk = \Mockery::mock(\Illuminate\Contracts\Filesystem\Filesystem::class);
+        $disk->shouldReceive('exists')->with($source)->twice()->andReturn(true, false);
+        $disk->shouldReceive('exists')
+            ->with(\Mockery::on(static fn (string $path): bool => $path !== $source))
+            ->once()
+            ->andReturn(true);
+        $disk->shouldReceive('move')->with($source, \Mockery::type('string'))->once()->andReturn(true);
+        $disk->shouldReceive('move')->with(\Mockery::type('string'), $source)->once()->andReturn(false);
+        Storage::shouldReceive('disk')->with('local')->andReturn($disk);
+        Log::shouldReceive('error')
+            ->once()
+            ->with(
+                'Unable to restore staged verification document after submission failure.',
+                \Mockery::on(static fn (array $context): bool => $context['source'] === $source && $context['destination'] !== $source),
+            );
+        \App\Models\GuardianRelationshipVerificationDocument::creating(static function (): void {
+            throw new \RuntimeException('Unable to create verification document.');
+        });
+
+        try {
+            app(ParentChildInvitationService::class)->respondToInvitation($child, $invitation, 'accept');
+            $this->fail('Expected verification document creation to fail.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Unable to create verification document.', $exception->getMessage());
+        } finally {
+            \App\Models\GuardianRelationshipVerificationDocument::flushEventListeners();
+            Storage::swap($filesystems);
+            Log::swap($logger);
+        }
+
         $this->assertSame('pending', $invitation->fresh()->status->value);
         $this->assertSame($documents, $invitation->fresh()->relationship_verification_documents);
     }

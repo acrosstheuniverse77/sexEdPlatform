@@ -11,6 +11,7 @@ use App\Notifications\RelationshipVerificationStatusNotification;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 
@@ -177,7 +178,12 @@ class GuardianRelationshipVerificationService
                 continue;
             }
 
-            $disk->move($document['destination'], $document['source']);
+            if (! $disk->move($document['destination'], $document['source'])) {
+                Log::error('Unable to restore staged verification document after submission failure.', [
+                    'source' => $document['source'],
+                    'destination' => $document['destination'],
+                ]);
+            }
         }
     }
 
