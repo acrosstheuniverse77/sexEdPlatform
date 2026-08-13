@@ -455,10 +455,12 @@ class AdminParentChildVerificationUiTest extends TestCase
         self::assertStringContainsString('h-9 w-9 rounded-full object-cover', $parentTableMarkup);
 
         self::assertStringContainsString('>Child</th>', $childTableMarkup);
+        self::assertStringContainsString('h-9 w-9 rounded-full object-cover', $childTableMarkup);
         self::assertStringContainsString('aria-label="Dina Dependent avatar fallback"', $childTableMarkup);
         self::assertStringContainsString('inline-flex h-9 w-9', $childTableMarkup);
 
         self::assertStringContainsString('>Dependent</th>', $relationshipTableMarkup);
+        self::assertStringContainsString('h-9 w-9 rounded-full object-cover', $relationshipTableMarkup);
         self::assertStringContainsString('alt="Ari Guardian avatar"', $relationshipTableMarkup);
         self::assertStringContainsString('aria-label="Dina Dependent avatar fallback"', $relationshipTableMarkup);
 
