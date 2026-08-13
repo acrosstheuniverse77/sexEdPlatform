@@ -144,6 +144,7 @@ class ChatAuthorizationService
     {
         return ParentChildAccount::query()
             ->where('verification_status', 'approved')
+            ->whereNotNull('relationship_verified_at')
             ->whereNull('deleted_at')
             ->where(function ($query) use ($firstUserId, $secondUserId) {
                 $query->where(function ($innerQuery) use ($firstUserId, $secondUserId) {

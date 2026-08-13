@@ -4,6 +4,7 @@ namespace Tests\Feature\Chat;
 
 use App\Models\Conversation;
 use App\Models\MessageRequest;
+use App\Models\ParentChildAccount;
 use App\Models\User;
 use App\Services\Chat\ChatAuthorizationService;
 use Tests\TestCase;
@@ -73,6 +74,30 @@ class ChatChannelAuthorizationTest extends TestCase
         $this->assertTrue($service->canSubscribeToConversation($observerAdmin, $conversation));
         $this->assertTrue($service->canSendMessage($observerAdmin, $conversation));
         $this->assertFalse($service->canSubscribeToConversation($outsiderLearner, $conversation));
+    }
+
+    public function test_learner_direct_chat_requires_a_fully_verified_parent_child_relationship(): void
+    {
+        $service = app(ChatAuthorizationService::class);
+
+        $parent = User::factory()->create(['role' => 'learner']);
+        $child = User::factory()->create(['role' => 'learner']);
+
+        $relationship = ParentChildAccount::create([
+            'parent_user_id' => $parent->id,
+            'child_user_id' => $child->id,
+            'verification_status' => 'pending',
+        ]);
+
+        $this->assertFalse($service->evaluateStart($parent, $child)['allowed']);
+
+        $relationship->update(['verification_status' => 'approved']);
+
+        $this->assertFalse($service->evaluateStart($parent, $child)['allowed']);
+
+        $relationship->update(['relationship_verified_at' => now()]);
+
+        $this->assertTrue($service->evaluateStart($parent, $child)['allowed']);
     }
 
     private function canAccessRequestsUserChannel(User $authUser, int $channelUserId): bool
