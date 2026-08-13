@@ -13,6 +13,7 @@ use App\Support\GuardianRelationshipTypes;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
@@ -74,31 +75,42 @@ class ParentChildInvitationService
             throw new InvalidArgumentException('Supporting documentation is required for this relationship.');
         }
 
-        $invitation = DB::transaction(function () use ($parent, $child, $relationshipType, $relationshipCustom, $message, $requiresVerification, $verificationPayload): ParentChildInvitation {
-            $invitation = ParentChildInvitation::query()->create([
-                'inviter_parent_user_id' => $parent->id,
-                'child_user_id' => $child->id,
-                'relationship_type' => $relationshipType,
-                'relationship_custom' => $relationshipType === GuardianRelationshipTypes::OTHER ? trim((string) $relationshipCustom) : null,
-                'invite_token' => (string) Str::uuid(),
-                'status' => ParentChildInvitationStatus::Pending->value,
-                'message' => $message ? trim($message) : null,
-                'expires_at' => now()->addDays(14),
-            ]);
+        $stagedPaths = [];
 
-            if ($requiresVerification) {
-                $document = $verificationPayload['document'];
-                $documents = [$this->stagedDocument($verificationPayload['document_type'], $document, $invitation)];
+        try {
+            $invitation = DB::transaction(function () use ($parent, $child, $relationshipType, $relationshipCustom, $message, $requiresVerification, $verificationPayload, &$stagedPaths): ParentChildInvitation {
+                $invitation = ParentChildInvitation::query()->create([
+                    'inviter_parent_user_id' => $parent->id,
+                    'child_user_id' => $child->id,
+                    'relationship_type' => $relationshipType,
+                    'relationship_custom' => $relationshipType === GuardianRelationshipTypes::OTHER ? trim((string) $relationshipCustom) : null,
+                    'invite_token' => (string) Str::uuid(),
+                    'status' => ParentChildInvitationStatus::Pending->value,
+                    'message' => $message ? trim($message) : null,
+                    'expires_at' => now()->addDays(14),
+                ]);
 
-                if (($verificationPayload['supporting_document'] ?? null) instanceof UploadedFile) {
-                    $documents[] = $this->stagedDocument('supporting_legal_document', $verificationPayload['supporting_document'], $invitation);
+                if ($requiresVerification) {
+                    $document = $this->stagedDocument($verificationPayload['document_type'], $verificationPayload['document'], $invitation);
+                    $documents = [$document];
+                    $stagedPaths[] = $document['path'];
+
+                    if (($verificationPayload['supporting_document'] ?? null) instanceof UploadedFile) {
+                        $supportingDocument = $this->stagedDocument('supporting_legal_document', $verificationPayload['supporting_document'], $invitation);
+                        $documents[] = $supportingDocument;
+                        $stagedPaths[] = $supportingDocument['path'];
+                    }
+
+                    $invitation->update(['relationship_verification_documents' => $documents]);
                 }
 
-                $invitation->update(['relationship_verification_documents' => $documents]);
-            }
+                return $invitation;
+            });
+        } catch (\Throwable $exception) {
+            Storage::disk('local')->delete($stagedPaths);
 
-            return $invitation;
-        });
+            throw $exception;
+        }
 
         $invitation->load(['inviterParent:id,name', 'child:id,name']);
         $child->notify(new ParentChildInvitationReceivedNotification($invitation));

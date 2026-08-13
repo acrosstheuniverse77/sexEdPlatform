@@ -6,6 +6,7 @@ use App\Models\LearnerProfile;
 use App\Models\ParentChildAccount;
 use App\Models\ParentChildInvitation;
 use App\Models\User;
+use App\Services\ParentChildInvitationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -94,6 +95,38 @@ class ParentChildInvitationFlowTest extends TestCase
         ]);
         $this->assertDatabaseCount('guardian_relationship_verification_documents', 0);
         $this->assertNotEmpty(ParentChildInvitation::query()->sole()->relationship_verification_documents);
+    }
+
+    public function test_failed_invitation_staging_removes_uploaded_documents(): void
+    {
+        $this->seedLocationRows();
+        Storage::fake('local');
+
+        $parent = $this->createApprovedParent();
+        $child = $this->createLearner('stagingcleanupchild', 12);
+        ParentChildInvitation::updating(static function (): void {
+            throw new \RuntimeException('Unable to persist staged documents.');
+        });
+
+        try {
+            app(ParentChildInvitationService::class)->sendInvitation(
+                $parent,
+                $child->learnerProfile->username,
+                'legal_guardian',
+                verificationPayload: [
+                    'document_type' => 'court_order',
+                    'document' => UploadedFile::fake()->create('court-order.pdf', 64, 'application/pdf'),
+                ],
+            );
+            $this->fail('Expected staged document persistence to fail.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Unable to persist staged documents.', $exception->getMessage());
+        } finally {
+            ParentChildInvitation::flushEventListeners();
+        }
+
+        Storage::disk('local')->assertDirectoryEmpty('guardian-relationship-invitations');
+        $this->assertDatabaseCount('parent_child_invitations', 0);
     }
 
     public function test_pending_existing_learner_can_access_dashboard_and_chat(): void
