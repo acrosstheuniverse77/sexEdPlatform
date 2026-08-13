@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Auth;
 use App\Enums\VerificationStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\ResubmitChildVerificationRequest;
-use App\Http\Requests\Auth\ResubmitParentVerificationRequest;
 use App\Http\Requests\Auth\RemoveTempUploadRequest;
 use App\Http\Requests\Auth\UploadChildTempDocumentRequest;
 use App\Http\Requests\Auth\UploadParentTempDocumentRequest;
@@ -14,8 +13,10 @@ use App\Notifications\Admin\ParentVerificationRequestSubmittedNotification;
 use App\Models\User;
 use App\Models\ParentChildAccount;
 use App\Services\Auth\RegistrationTempUploadService;
+use App\Services\GuardianRelationshipVerificationService;
 use App\Services\ParentChildInvitationService;
 use App\Services\ParentChildVerificationService;
+use App\Support\GuardianRelationshipTypes;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -26,6 +27,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Carbon\Carbon;
 use InvalidArgumentException;
@@ -46,15 +48,10 @@ class ParentRegistrationController extends Controller
      */
     public function create(): View
     {
-        $tempUpload = app(RegistrationTempUploadService::class)->get('parent', 'government_id');
-        if (is_array($tempUpload) && !empty($tempUpload['path'])) {
-            $tempUpload['preview_url'] = asset('storage/'.$tempUpload['path']);
-        }
-
         return view('auth.parent-register', [
             'parentInfo' => session('pending_parent_info', []),
-            'hasGovernmentIdUpload' => !empty($tempUpload['path']) || !empty(session('pending_parent_info.government_id_path')),
-            'tempGovernmentIdUpload' => $tempUpload,
+            'hasGovernmentIdUpload' => false,
+            'tempGovernmentIdUpload' => null,
         ]);
     }
 
@@ -125,10 +122,6 @@ class ParentRegistrationController extends Controller
      */
     public function storePersonal(Request $request): RedirectResponse
     {
-        $tempUploadService = app(RegistrationTempUploadService::class);
-        $tempUpload = $tempUploadService->get('parent', 'government_id');
-        $hasExistingGovernmentId = !empty(session('pending_parent_info.government_id_path')) || !empty($tempUpload['path']);
-
         $validated = $request->validate([
             'first_name'   => ['required', 'string', 'max:255', 'regex:/^[a-zA-Z\s]+$/'],
             'middle_initial' => ['nullable', 'string', 'max:10', 'regex:/^[a-zA-Z.\s]+$/'],
@@ -139,26 +132,7 @@ class ParentRegistrationController extends Controller
                 'date',
                 'before:' . now()->subYears(18)->format('Y-m-d'),
             ],
-            'government_id' => [
-                $hasExistingGovernmentId ? 'nullable' : 'required',
-                'file',
-                'mimes:jpg,jpeg,png,pdf',
-                'max:5120',
-            ],
         ]);
-
-        $existingPath = session('pending_parent_info.government_id_path');
-
-        if ($request->hasFile('government_id')) {
-            $upload = $tempUploadService->store('parent', 'government_id', $request->file('government_id'));
-            $validated['government_id_path'] = $upload['path'];
-        } elseif (is_array($tempUpload) && !empty($tempUpload['path'])) {
-            $validated['government_id_path'] = (string) $tempUpload['path'];
-        } elseif ($existingPath) {
-            $validated['government_id_path'] = $existingPath;
-        }
-
-        unset($validated['government_id']);
 
         session(['pending_parent_info' => $validated]);
 
@@ -183,8 +157,6 @@ class ParentRegistrationController extends Controller
     public function storeAccount(Request $request): RedirectResponse
     {
         $personalInfo = session('pending_parent_info');
-        $tempUploadService = app(RegistrationTempUploadService::class);
-
         if (!$personalInfo) {
             return redirect()->route('parent.register')
                 ->with('error', 'Session expired. Please start over.');
@@ -215,7 +187,7 @@ class ParentRegistrationController extends Controller
         if ($birthdate->age < 18) {
             session()->forget('pending_parent_info');
             return redirect()->route('parent.register')
-                ->with('error', 'You must be at least 18 years old to register as a parent.');
+                ->with('error', 'You must be at least 18 years old to register as a guardian.');
         }
 
         $parent = User::create([
@@ -229,22 +201,7 @@ class ParentRegistrationController extends Controller
             'age'            => $birthdate->age,
             'password'       => Hash::make($validated['password']),
             'is_parent_registration' => true,
-            'parent_verification_status' => 'pending',
-            'parent_id_document_path' => $personalInfo['government_id_path'] ?? null,
         ]);
-
-        $finalizedPath = $tempUploadService->finalize('parent', 'government_id', 'parent-verifications/' . $parent->id, 'government-id');
-
-        if ($finalizedPath !== null) {
-            $parent->update(['parent_id_document_path' => $finalizedPath]);
-        } elseif (!empty($personalInfo['government_id_path']) && Storage::disk('public')->exists($personalInfo['government_id_path'])) {
-            $extension = pathinfo($personalInfo['government_id_path'], PATHINFO_EXTENSION);
-            $finalPath = 'parent-verifications/' . $parent->id . '/government-id-' . now()->format('YmdHis') . '.' . $extension;
-            Storage::disk('public')->move($personalInfo['government_id_path'], $finalPath);
-            $parent->update(['parent_id_document_path' => $finalPath]);
-        }
-
-        $this->notifyAdminsSafely(new ParentVerificationRequestSubmittedNotification($parent));
 
         Role::findOrCreate('learner', 'web');
         $parent->assignRole('learner');
@@ -256,7 +213,7 @@ class ParentRegistrationController extends Controller
         } catch (\Throwable $e) {
             $verificationDispatchFailed = true;
 
-            Log::warning('Verification email dispatch failed during parent registration.', [
+            Log::warning('Verification email dispatch failed during guardian registration.', [
                 'user_id' => $parent->id,
                 'email' => $parent->email,
                 'error' => $e->getMessage(),
@@ -270,11 +227,11 @@ class ParentRegistrationController extends Controller
 
         if ($verificationDispatchFailed) {
             return redirect()->route('verification.notice')
-                ->with('warning', 'Parent account submitted and pending admin review, but verification email could not be sent yet. Please click "Resend verification email".');
+                ->with('warning', 'Guardian account submitted and pending admin review, but verification email could not be sent yet. Please click "Resend verification email".');
         }
 
         return redirect()->route('verification.notice')
-            ->with('success', 'Parent account submitted! Please verify your email. After verification, your application will remain pending admin review until approved.');
+            ->with('success', 'Guardian account created! Please verify your email, then submit identity verification.');
     }
 
     /**
@@ -300,6 +257,7 @@ class ParentRegistrationController extends Controller
 
         return view('auth.create-child-account', [
             'pendingChild' => session('pending_child_registration', []),
+            'relationshipOptions' => GuardianRelationshipTypes::options(),
         ]);
     }
 
@@ -320,19 +278,14 @@ class ParentRegistrationController extends Controller
             'birthdate'     => [
                 'required',
                 'date',
-                'before_or_equal:' . now()->subYears(5)->format('Y-m-d'),
-                'after_or_equal:' . now()->subYears(17)->format('Y-m-d'),
+                'before_or_equal:today',
             ],
             'gender'        => ['required', 'in:male,female,prefer_not_to_say'],
+            'relationship_type' => ['required', Rule::in(GuardianRelationshipTypes::values())],
+            'relationship_custom' => ['nullable', 'required_if:relationship_type,other', 'string', 'max:120'],
         ]);
 
         $birthdate = Carbon::parse($validated['birthdate']);
-        if ($birthdate->age < 5 || $birthdate->age > 17) {
-            return back()->withErrors([
-                'birthdate' => 'Child age must be between 5 and 17 years old.'
-            ])->withInput();
-        }
-
         session(['child_step1' => array_merge($validated, ['age' => $birthdate->age])]);
 
         return redirect()->route('parent.create-child.location');
@@ -424,16 +377,9 @@ class ParentRegistrationController extends Controller
             }
         }
 
-        $tempUpload = app(RegistrationTempUploadService::class)->get('child', 'verification_document');
-        if (is_array($tempUpload) && !empty($tempUpload['path'])) {
-            $tempUpload['preview_url'] = asset('storage/'.$tempUpload['path']);
-        }
-
         return view('auth.child.step3-credentials', [
             'step1' => $step1,
             'suggestedEmail' => $suggestedEmail,
-            'tempChildVerificationUpload' => $tempUpload,
-            'hasChildVerificationUpload' => !empty($tempUpload['path']),
         ]);
     }
 
@@ -464,12 +410,54 @@ class ParentRegistrationController extends Controller
                     ->symbols()
                     ->uncompromised(),
             ],
-            'verification_document' => ['nullable', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
         ]);
+
+        session(['child_step3' => [
+            'username' => $validated['username'],
+            'password' => $validated['password'],
+        ]]);
+
+        return redirect()->route('parent.create-child.validation');
+    }
+
+    public function childValidationForm(): View|RedirectResponse
+    {
+        if ($redirect = $this->ensureApprovedParent()) {
+            return $redirect;
+        }
+
+        if (!session('child_step1') || !session('child_step2') || !session('child_step3')) {
+            return redirect()->route('parent.create-child');
+        }
+
+        $tempUpload = app(RegistrationTempUploadService::class)->get('child', 'verification_document');
+        if (is_array($tempUpload) && !empty($tempUpload['path'])) {
+            $tempUpload['preview_url'] = asset('storage/'.$tempUpload['path']);
+        }
+
+        return view('auth.child.step4-validation', [
+            'tempChildVerificationUpload' => $tempUpload,
+            'hasChildVerificationUpload' => !empty($tempUpload['path']),
+        ]);
+    }
+
+    public function storeChildValidation(Request $request): RedirectResponse
+    {
+        if ($redirect = $this->ensureApprovedParent()) {
+            return $redirect;
+        }
+
+        $step1 = session('child_step1');
+        if (! $step1 || ! session('child_step2') || ! session('child_step3')) {
+            return redirect()->route('parent.create-child');
+        }
 
         $tempUploadService = app(RegistrationTempUploadService::class);
 
         if ($request->hasFile('verification_document')) {
+            $request->validate([
+                'verification_document' => ['file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+            ]);
             $tempUploadService->store('child', 'verification_document', $request->file('verification_document'));
         }
 
@@ -477,15 +465,85 @@ class ParentRegistrationController extends Controller
         if (!is_array($tempUpload) || empty($tempUpload['path'])) {
             return back()
                 ->withErrors(['verification_document' => 'Please upload a PSA birth certificate before continuing.'])
-                ->withInput($request->except(['password', 'password_confirmation']));
+                ->withInput();
         }
+
+        if (GuardianRelationshipTypes::requiresVerification($step1['relationship_type'] ?? null)) {
+            return redirect()->route('parent.create-child.relationship-verification');
+        }
+
+        return $this->createChildAccountFromSession($request, $tempUploadService);
+    }
+
+    public function childRelationshipVerificationForm(): View|RedirectResponse
+    {
+        if ($redirect = $this->ensureApprovedParent()) {
+            return $redirect;
+        }
+
+        $step1 = session('child_step1');
+        if (! $step1 || ! session('child_step2') || ! session('child_step3')) {
+            return redirect()->route('parent.create-child');
+        }
+
+        if (! GuardianRelationshipTypes::requiresVerification($step1['relationship_type'] ?? null)) {
+            return redirect()->route('parent.create-child.validation');
+        }
+
+        return view('auth.child.step5-relationship-verification', [
+            'step1' => $step1,
+            'relationshipDocumentTypes' => GuardianRelationshipTypes::documentTypeOptions($step1['relationship_type'] ?? null),
+        ]);
+    }
+
+    public function storeChildRelationshipVerification(Request $request): RedirectResponse
+    {
+        if ($redirect = $this->ensureApprovedParent()) {
+            return $redirect;
+        }
+
+        $step1 = session('child_step1');
+        if (! $step1 || ! session('child_step2') || ! session('child_step3')) {
+            return redirect()->route('parent.create-child');
+        }
+
+        abort_unless(GuardianRelationshipTypes::requiresVerification($step1['relationship_type'] ?? null), 404);
+
+        $validated = $request->validate([
+            'relationship_document_type' => ['required', Rule::in(GuardianRelationshipTypes::acceptedDocumentTypes($step1['relationship_type'] ?? null))],
+            'relationship_document' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:5120'],
+            'relationship_supporting_document' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:5120'],
+            'confirm_relationship_verification' => ['accepted'],
+        ]);
+
+        return $this->createChildAccountFromSession($request, app(RegistrationTempUploadService::class), [
+            'document_type' => (string) $validated['relationship_document_type'],
+            'document' => $request->file('relationship_document'),
+            'supporting_document' => $request->file('relationship_supporting_document'),
+        ]);
+    }
+
+    private function createChildAccountFromSession(
+        Request $request,
+        RegistrationTempUploadService $tempUploadService,
+        ?array $relationshipVerificationPayload = null,
+    ): RedirectResponse {
+        $step1 = session('child_step1');
+        $step2 = session('child_step2');
+        $step3 = session('child_step3');
+
+        if (!$step1 || !$step2 || !$step3) {
+            return redirect()->route('parent.create-child');
+        }
+
+        $requiresRelationshipVerification = GuardianRelationshipTypes::requiresVerification($step1['relationship_type'] ?? null);
 
         $parent = Auth::user();
         $parentEmail = $parent->email;
-        $childEmail = $validated['username'] . '@child.sexed-platform.local';
+        $childEmail = $step3['username'] . '@child.sexed-platform.local';
 
         if (preg_match('/^(.+)@gmail\.com$/i', $parentEmail, $matches)) {
-            $childEmail = $matches[1] . '+' . $validated['username'] . '@gmail.com';
+            $childEmail = $matches[1] . '+' . $step3['username'] . '@gmail.com';
         }
 
         $barangay = \Schoolees\Psgc\Models\Barangay::query()
@@ -520,7 +578,7 @@ class ParentRegistrationController extends Controller
             'email'          => $childEmail,
             'birthdate'      => $step1['birthdate'],
             'age'            => $step1['age'],
-            'password'       => Hash::make($validated['password']),
+            'password'       => Hash::make($step3['password']),
             'email_verified_at' => now(),
         ]);
 
@@ -528,7 +586,7 @@ class ParentRegistrationController extends Controller
         $child->assignRole('learner');
 
         $child->learnerProfile()->create([
-            'username'                 => $validated['username'],
+            'username'                 => $step3['username'],
             'birthdate'                => $child->birthdate,
             'gender'                   => $step1['gender'],
             'city_code'                => $step2['city_code'],
@@ -544,14 +602,27 @@ class ParentRegistrationController extends Controller
             'can_view_progress'       => true,
             'can_view_quiz_answers'   => true,
             'can_approve_content'     => true,
+            'relationship_type'        => $step1['relationship_type'],
+            'relationship_custom'      => ($step1['relationship_type'] ?? null) === GuardianRelationshipTypes::OTHER ? ($step1['relationship_custom'] ?? null) : null,
+            'relationship_status'      => $requiresRelationshipVerification ? 'pending' : 'active',
+            'relationship_verified_status' => app(GuardianRelationshipVerificationService::class)->initialStatus($step1['relationship_type']),
+            'is_legacy_relationship'   => false,
             'verification_status'     => VerificationStatus::Pending->value,
             'verification_document_path' => $verificationDocumentPath,
             'relationship_verified_at'=> null,
         ]);
 
+        if ($requiresRelationshipVerification) {
+            app(GuardianRelationshipVerificationService::class)->submit($verification, $parent, [
+                'document_type' => (string) $relationshipVerificationPayload['document_type'],
+                'document' => $relationshipVerificationPayload['document'],
+                'supporting_document' => $relationshipVerificationPayload['supporting_document'] ?? null,
+            ]);
+        }
+
         $this->notifyAdminsSafely(new ChildVerificationRequestSubmittedNotification($parent, $child, $verification));
 
-        session()->forget(['child_step1', 'child_step2', 'pending_child_registration']);
+        session()->forget(['child_step1', 'child_step2', 'child_step3', 'pending_child_registration']);
         session([
             'child_created_name' => $step1['first_name'],
             'child_registration_result' => [
@@ -624,9 +695,12 @@ class ParentRegistrationController extends Controller
             return redirect()->route('verification.notice');
         }
 
-        if ($user->isParentVerificationApproved() && !$user->hasCompletedProfile()) {
-            return redirect()->route('profile.complete')
-                ->with('success', 'Your parent verification is approved. Please complete your profile.');
+        if (! $user->parent_verification_status) {
+            return redirect()->route('guardian.verification.create');
+        }
+
+        if ($user->isParentVerificationApproved() && ! $user->hasCompletedGuardianOnboarding()) {
+            return redirect()->route('guardian.onboarding.show');
         }
 
         return view('auth.parent-verification-status', [
@@ -636,9 +710,7 @@ class ParentRegistrationController extends Controller
     }
 
     public function resubmitParentVerification(
-        ResubmitParentVerificationRequest $request,
-        RegistrationTempUploadService $tempUploadService,
-        ParentChildVerificationService $verificationService,
+        Request $request,
     ): RedirectResponse {
         $parent = $request->user();
 
@@ -653,38 +725,20 @@ class ParentRegistrationController extends Controller
 
         if (! $parent->isParentVerificationRejected()) {
             return redirect()->route('parent.verification.status')
-                ->with('error', 'Only rejected parent verification records can be resubmitted.');
+                ->with('error', 'Only rejected guardian verification records can be resubmitted.');
         }
 
-        $tempUploadService->store('parent', 'government_id', $request->file('government_id'));
-        $finalizedPath = $tempUploadService->finalize(
-            'parent',
-            'government_id',
-            'parent-verifications/' . $parent->id,
-            'government-id'
-        );
-
-        if ($finalizedPath === null) {
-            return back()->withErrors([
-                'government_id' => 'The uploaded government ID could not be processed. Please upload again.',
-            ]);
-        }
-
-        try {
-            $verificationService->resubmitParent($parent, $finalizedPath);
-        } catch (InvalidArgumentException $exception) {
-            return redirect()->route('parent.verification.status')
-                ->with('error', $exception->getMessage());
-        }
-
-        return redirect()->route('parent.verification.status')
-            ->with('success', 'Parent verification resubmitted successfully. We will review your updated document.');
+        return redirect()->route('guardian.verification.create')
+            ->with('error', 'Please resubmit through the Guardian verification form.');
     }
 
     public function childVerificationStatus(): View|RedirectResponse
     {
+        $user = Auth::user();
         $verification = ParentChildAccount::query()
-            ->where('child_user_id', Auth::id())
+            ->where('child_user_id', $user->id)
+            ->whereNotNull('verification_document_path')
+            ->latest('id')
             ->with('parent')
             ->first();
 
@@ -758,7 +812,7 @@ class ParentRegistrationController extends Controller
                 ->get()
                 ->each(fn (User $admin) => $admin->notify($notification));
         } catch (\Throwable $exception) {
-            Log::warning('Failed to send admin parent-child verification submission notification.', [
+            Log::warning('Failed to send admin guardian-child verification submission notification.', [
                 'notification' => $notification::class,
                 'message' => $exception->getMessage(),
             ]);
@@ -780,12 +834,12 @@ class ParentRegistrationController extends Controller
 
         if (! $parent->isParentRegistration() || ! $parent->isParentVerificationApproved()) {
             return redirect()->route('parent.verification.status')
-                ->with('warning', 'Your parent account is still under admin review.');
+                ->with('warning', 'Your guardian account is still under admin review.');
         }
 
-        if (! $parent->hasCompletedProfile()) {
-            return redirect()->route('profile.complete')
-                ->with('warning', 'Please complete your profile before creating a child account.');
+        if (! $parent->hasCompletedGuardianOnboarding()) {
+            return redirect()->route('guardian.onboarding.show')
+                ->with('warning', 'Please complete Guardian onboarding before creating a child account.');
         }
 
         return null;
@@ -809,13 +863,13 @@ class ParentRegistrationController extends Controller
 
         if (!$parent->isParentRegistration() || !$parent->isParentVerificationApproved()) {
             return response()->json([
-                'message' => 'Parent verification is required before child registration uploads.',
+                'message' => 'Guardian verification is required before child registration uploads.',
             ], 403);
         }
 
-        if (!$parent->hasCompletedProfile()) {
+        if (!$parent->hasCompletedGuardianOnboarding()) {
             return response()->json([
-                'message' => 'Please complete your profile before creating a child account.',
+                'message' => 'Please complete Guardian onboarding before creating a child account.',
             ], 403);
         }
 

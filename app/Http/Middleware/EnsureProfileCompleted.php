@@ -19,14 +19,26 @@ class EnsureProfileCompleted
         $user = $request->user();
 
         if ($user && $user->isLearner() && $user->isParentRegistration()) {
+            if (! $user->parent_verification_status) {
+                return redirect()->route('guardian.verification.create');
+            }
+
             if ($user->isParentVerificationPending() || $user->isParentVerificationRejected()) {
-                return redirect()->route('parent.verification.status');
+                return redirect()->route('guardian.verification.status');
+            }
+
+            if ($user->isParentVerificationApproved() && ! $user->hasCompletedGuardianOnboarding()) {
+                if (! $request->routeIs('guardian.onboarding.*')) {
+                    return redirect()->route('guardian.onboarding.show');
+                }
             }
         }
 
         if ($user && $user->isLearner()) {
             $childVerification = ParentChildAccount::query()
                 ->where('child_user_id', $user->id)
+                ->whereNotNull('verification_document_path')
+                ->latest('id')
                 ->first();
 
             if ($childVerification && in_array($childVerification->verification_status, ['pending', 'rejected'], true)) {

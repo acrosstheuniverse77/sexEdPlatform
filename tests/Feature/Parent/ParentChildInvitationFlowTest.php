@@ -158,6 +158,12 @@ class ParentChildInvitationFlowTest extends TestCase
             'child_user_id' => $child->id,
         ]);
 
+        $invitation = ParentChildInvitation::query()->sole();
+
+        $this->actingAs($child)
+            ->post(route('parent.invitations.respond', $invitation), ['decision' => 'accept'])
+            ->assertRedirect(route('parent.invitations.show', $invitation));
+
         $this->actingAs($child)->get(route('learner.dashboard'))->assertOk();
         $this->actingAs($child)->get(route('chat.page'))->assertOk();
     }
