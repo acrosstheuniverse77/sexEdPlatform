@@ -8,7 +8,6 @@ use App\Models\ParentChildInvitation;
 use App\Models\User;
 use App\Notifications\Learner\ParentChildInvitationReceivedNotification;
 use App\Notifications\Parent\ParentChildInvitationRespondedNotification;
-use App\Services\GuardianRelationshipVerificationService;
 use App\Support\GuardianRelationshipTypes;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
@@ -19,9 +18,7 @@ use InvalidArgumentException;
 
 class ParentChildInvitationService
 {
-    public function __construct(private readonly GuardianRelationshipVerificationService $relationshipVerificationService)
-    {
-    }
+    public function __construct(private readonly GuardianRelationshipVerificationService $relationshipVerificationService) {}
 
     public function sendInvitation(
         User $parent,
@@ -30,8 +27,7 @@ class ParentChildInvitationService
         ?string $relationshipCustom = null,
         ?string $message = null,
         ?array $verificationPayload = null,
-    ): ParentChildInvitation
-    {
+    ): ParentChildInvitation {
         $child = $this->resolveChildFromIdentifier($identifier);
 
         if (! $child || ! $child->isLearner()) {
@@ -131,112 +127,121 @@ class ParentChildInvitationService
 
         $decisionNote = $note ? trim($note) : null;
 
-        [$updatedInvitation, $wasExpired] = DB::transaction(function () use ($child, $invitation, $normalizedDecision, $decisionNote): array {
-            $invitation = ParentChildInvitation::query()
-                ->lockForUpdate()
-                ->findOrFail($invitation->id);
+        $movedDocuments = [];
 
-            if (($invitation->status instanceof ParentChildInvitationStatus ? $invitation->status->value : (string) $invitation->status) !== ParentChildInvitationStatus::Pending->value) {
-                throw new InvalidArgumentException('This invitation is no longer pending.');
-            }
-
-            if ($invitation->isExpired()) {
-                $invitation->update(['status' => ParentChildInvitationStatus::Expired->value]);
-
-                return [$invitation->fresh(), true];
-            }
-
-            $lockedChild = User::query()->lockForUpdate()->findOrFail($child->id);
-
-            if ((int) $invitation->child_user_id !== (int) $lockedChild->id) {
-                throw new InvalidArgumentException('You are not allowed to respond to this invitation.');
-            }
-
-            if ($normalizedDecision === 'accept') {
-                $link = ParentChildAccount::withTrashed()
+        try {
+            [$updatedInvitation, $wasExpired] = DB::transaction(function () use ($child, $invitation, $normalizedDecision, $decisionNote, &$movedDocuments): array {
+                $invitation = ParentChildInvitation::query()
                     ->lockForUpdate()
-                    ->where('parent_user_id', $invitation->inviter_parent_user_id)
-                    ->where('child_user_id', $invitation->child_user_id)
-                    ->first();
-                $relationshipType = $invitation->relationship_type ?: GuardianRelationshipTypes::LEGACY_PARENT;
-                $requiresVerification = GuardianRelationshipTypes::requiresVerification($relationshipType);
-                $documents = $requiresVerification ? $invitation->relationship_verification_documents : null;
+                    ->findOrFail($invitation->id);
 
-                if ($requiresVerification && (! is_array($documents) || $documents === [])) {
-                    throw new InvalidArgumentException('A staged verification document is missing.');
+                if (($invitation->status instanceof ParentChildInvitationStatus ? $invitation->status->value : (string) $invitation->status) !== ParentChildInvitationStatus::Pending->value) {
+                    throw new InvalidArgumentException('This invitation is no longer pending.');
                 }
 
-                $relationshipStatus = $requiresVerification
-                    ? ($link?->relationship_verified_status ?: $this->relationshipVerificationService->initialStatus($relationshipType))
-                    : $this->relationshipVerificationService->initialStatus($relationshipType);
+                if ($invitation->isExpired()) {
+                    $invitation->update(['status' => ParentChildInvitationStatus::Expired->value]);
 
-                $payload = [
-                    'can_view_progress' => true,
-                    'can_view_quiz_answers' => true,
-                    'can_approve_content' => true,
-                    'relationship_type' => $relationshipType,
-                    'relationship_custom' => $invitation->relationship_custom,
-                    'relationship_status' => 'pending',
-                    'relationship_verified_status' => $relationshipStatus,
-                    'is_legacy_relationship' => false,
-                    'verification_status' => 'pending',
-                    'verification_rejection_reason' => null,
-                    'verification_reviewed_by' => null,
-                    'verification_reviewed_at' => null,
-                    'verification_approved_at' => null,
-                    'verification_document_path' => null,
-                    'relationship_verified_at' => null,
-                ];
+                    return [$invitation->fresh(), true];
+                }
 
-                if ($link) {
-                    if ($link->trashed()) {
-                        $link->restore();
+                $lockedChild = User::query()->lockForUpdate()->findOrFail($child->id);
+
+                if ((int) $invitation->child_user_id !== (int) $lockedChild->id) {
+                    throw new InvalidArgumentException('You are not allowed to respond to this invitation.');
+                }
+
+                if ($normalizedDecision === 'accept') {
+                    $link = ParentChildAccount::withTrashed()
+                        ->lockForUpdate()
+                        ->where('parent_user_id', $invitation->inviter_parent_user_id)
+                        ->where('child_user_id', $invitation->child_user_id)
+                        ->first();
+                    $relationshipType = $invitation->relationship_type ?: GuardianRelationshipTypes::LEGACY_PARENT;
+                    $requiresVerification = GuardianRelationshipTypes::requiresVerification($relationshipType);
+                    $documents = $requiresVerification ? $invitation->relationship_verification_documents : null;
+
+                    if ($requiresVerification && (! is_array($documents) || $documents === [])) {
+                        throw new InvalidArgumentException('A staged verification document is missing.');
                     }
 
-                    $link->update($payload);
-                    $relationship = $link;
-                } else {
-                    $relationship = ParentChildAccount::query()->create([
-                        'parent_user_id' => $invitation->inviter_parent_user_id,
-                        'child_user_id' => $invitation->child_user_id,
-                        ...$payload,
-                    ]);
-                }
+                    $relationshipStatus = $requiresVerification
+                        ? ($link?->relationship_verified_status ?: $this->relationshipVerificationService->initialStatus($relationshipType))
+                        : $this->relationshipVerificationService->initialStatus($relationshipType);
 
-                if ($requiresVerification) {
-                    $this->relationshipVerificationService->submitStaged(
-                        $relationship,
-                        $invitation->inviterParent()->firstOrFail(),
-                        $documents,
-                        function () use ($invitation, $decisionNote): void {
-                            $invitation->update([
-                                'status' => ParentChildInvitationStatus::Accepted->value,
-                                'decision_note' => $decisionNote,
-                                'responded_at' => now(),
-                                'relationship_verification_documents' => null,
-                            ]);
-                        },
-                    );
+                    $payload = [
+                        'can_view_progress' => true,
+                        'can_view_quiz_answers' => true,
+                        'can_approve_content' => true,
+                        'relationship_type' => $relationshipType,
+                        'relationship_custom' => $invitation->relationship_custom,
+                        'relationship_status' => 'pending',
+                        'relationship_verified_status' => $relationshipStatus,
+                        'is_legacy_relationship' => false,
+                        'verification_status' => 'pending',
+                        'verification_rejection_reason' => null,
+                        'verification_reviewed_by' => null,
+                        'verification_reviewed_at' => null,
+                        'verification_approved_at' => null,
+                        'verification_document_path' => null,
+                        'relationship_verified_at' => null,
+                    ];
+
+                    if ($link) {
+                        if ($link->trashed()) {
+                            $link->restore();
+                        }
+
+                        $link->update($payload);
+                        $relationship = $link;
+                    } else {
+                        $relationship = ParentChildAccount::query()->create([
+                            'parent_user_id' => $invitation->inviter_parent_user_id,
+                            'child_user_id' => $invitation->child_user_id,
+                            ...$payload,
+                        ]);
+                    }
+
+                    if ($requiresVerification) {
+                        $this->relationshipVerificationService->submitStaged(
+                            $relationship,
+                            $invitation->inviterParent()->firstOrFail(),
+                            $documents,
+                            function () use ($invitation, $decisionNote): void {
+                                $invitation->update([
+                                    'status' => ParentChildInvitationStatus::Accepted->value,
+                                    'decision_note' => $decisionNote,
+                                    'responded_at' => now(),
+                                    'relationship_verification_documents' => null,
+                                ]);
+                            },
+                            $movedDocuments,
+                        );
+                    } else {
+                        $invitation->update([
+                            'status' => ParentChildInvitationStatus::Accepted->value,
+                            'decision_note' => $decisionNote,
+                            'responded_at' => now(),
+                            'relationship_verification_documents' => null,
+                        ]);
+                    }
+
                 } else {
                     $invitation->update([
-                        'status' => ParentChildInvitationStatus::Accepted->value,
+                        'status' => ParentChildInvitationStatus::Rejected->value,
                         'decision_note' => $decisionNote,
                         'responded_at' => now(),
-                        'relationship_verification_documents' => null,
+                        'relationship_verification_documents' => $invitation->relationship_verification_documents,
                     ]);
                 }
 
-            } else {
-                $invitation->update([
-                    'status' => ParentChildInvitationStatus::Rejected->value,
-                    'decision_note' => $decisionNote,
-                    'responded_at' => now(),
-                    'relationship_verification_documents' => $invitation->relationship_verification_documents,
-                ]);
-            }
+                return [$invitation->fresh(['inviterParent:id,name', 'child:id,name']), false];
+            });
+        } catch (\Throwable $exception) {
+            $this->relationshipVerificationService->restoreStagedDocuments($movedDocuments);
 
-            return [$invitation->fresh(['inviterParent:id,name', 'child:id,name']), false];
-        });
+            throw $exception;
+        }
 
         if ($wasExpired) {
             throw new InvalidArgumentException('This invitation has already expired.');

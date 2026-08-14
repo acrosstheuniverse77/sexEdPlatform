@@ -412,6 +412,59 @@ class ParentChildInvitationFlowTest extends TestCase
         $this->assertSame($documents, $invitation->fresh()->relationship_verification_documents);
     }
 
+    public function test_acceptance_restores_staged_documents_when_outer_transaction_fails_after_submission(): void
+    {
+        $this->seedLocationRows();
+        Storage::fake('local');
+
+        $parent = $this->createApprovedParent();
+        $child = $this->createLearner('outerrollbackchild', 12);
+        $stagedPath = 'guardian-relationship-invitations/outer-rollback/invitation-fresh.pdf';
+        Storage::disk('local')->put($stagedPath, 'court order');
+        $documents = [[
+            'document_type' => 'court_order',
+            'disk' => 'local',
+            'path' => $stagedPath,
+            'original_name' => 'court-order.pdf',
+            'mime_type' => 'application/pdf',
+            'size_bytes' => 11,
+        ]];
+        $invitation = ParentChildInvitation::query()->create([
+            'inviter_parent_user_id' => $parent->id,
+            'child_user_id' => $child->id,
+            'invite_token' => (string) \Illuminate\Support\Str::uuid(),
+            'relationship_type' => 'legal_guardian',
+            'relationship_verification_documents' => $documents,
+            'status' => 'pending',
+            'expires_at' => now()->addDays(3),
+        ]);
+        $originalDispatcher = ParentChildInvitation::getEventDispatcher();
+        ParentChildInvitation::setEventDispatcher(new Dispatcher(app()));
+        ParentChildInvitation::retrieved(static function (ParentChildInvitation $model): void {
+            if (($model->getAttributes()['status'] ?? null) === 'accepted') {
+                throw new \RuntimeException('Unable to reload accepted invitation.');
+            }
+        });
+
+        try {
+            app(ParentChildInvitationService::class)->respondToInvitation($child, $invitation, 'accept');
+            $this->fail('Expected accepted invitation refresh to fail.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Unable to reload accepted invitation.', $exception->getMessage());
+        } finally {
+            ParentChildInvitation::setEventDispatcher($originalDispatcher);
+        }
+
+        Storage::disk('local')->assertExists($stagedPath);
+        Storage::disk('local')->assertDirectoryEmpty('guardian-relationship-verifications');
+        $this->assertDatabaseMissing('parent_child_accounts', [
+            'parent_user_id' => $parent->id,
+            'child_user_id' => $child->id,
+        ]);
+        $this->assertSame('pending', $invitation->fresh()->status->value);
+        $this->assertSame($documents, $invitation->fresh()->relationship_verification_documents);
+    }
+
     public function test_stale_invitation_decision_is_revalidated_inside_the_transaction(): void
     {
         $this->seedLocationRows();

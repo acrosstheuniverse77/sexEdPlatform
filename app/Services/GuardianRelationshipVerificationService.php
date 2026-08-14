@@ -2,13 +2,13 @@
 
 namespace App\Services;
 
-use Closure;
 use App\Models\GuardianRelationshipVerificationAudit;
 use App\Models\GuardianRelationshipVerificationDocument;
 use App\Models\ParentChildAccount;
 use App\Models\User;
 use App\Notifications\Admin\RelationshipVerificationSubmittedNotification;
 use App\Notifications\RelationshipVerificationStatusNotification;
+use Closure;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
@@ -38,11 +38,12 @@ class GuardianRelationshipVerificationService
         });
     }
 
-    public function submitStaged(ParentChildAccount $relationship, User $guardian, array $documents, ?Closure $onSubmitted = null): ParentChildAccount
+    public function submitStaged(ParentChildAccount $relationship, User $guardian, array $documents, ?Closure $onSubmitted = null, ?array &$movedDocuments = null): ParentChildAccount
     {
-        return DB::transaction(function () use ($relationship, $guardian, $documents, $onSubmitted): ParentChildAccount {
+        $movedDocuments ??= [];
+
+        return DB::transaction(function () use ($relationship, $guardian, $documents, $onSubmitted, &$movedDocuments): ParentChildAccount {
             $this->assertStagedDocumentsExist($documents);
-            $movedDocuments = [];
 
             try {
                 foreach ($documents as $document) {
@@ -173,28 +174,40 @@ class GuardianRelationshipVerificationService
         ]);
     }
 
-    private function restoreStagedDocuments(array $movedDocuments): void
+    public function restoreStagedDocuments(array &$movedDocuments): void
     {
         $disk = Storage::disk('local');
 
         foreach (array_reverse($movedDocuments) as $document) {
-            if (! $disk->exists($document['destination'])) {
-                continue;
-            }
+            try {
+                if (! $disk->exists($document['destination'])) {
+                    continue;
+                }
 
-            if ($disk->exists($document['source'])) {
-                $disk->delete($document['destination']);
+                if ($disk->exists($document['source'])) {
+                    $disk->delete($document['destination']);
 
-                continue;
-            }
+                    continue;
+                }
 
-            if (! $disk->move($document['destination'], $document['source'])) {
+                if ($disk->move($document['destination'], $document['source'])) {
+                    continue;
+                }
+
                 Log::error('Unable to restore staged verification document after submission failure.', [
                     'source' => $document['source'],
                     'destination' => $document['destination'],
                 ]);
+            } catch (\Throwable $exception) {
+                Log::error('Unable to restore staged verification document after submission failure.', [
+                    'source' => $document['source'],
+                    'destination' => $document['destination'],
+                    'exception' => $exception,
+                ]);
             }
         }
+
+        $movedDocuments = [];
     }
 
     private function transitionToUnderReview(ParentChildAccount $relationship, User $guardian): ParentChildAccount
