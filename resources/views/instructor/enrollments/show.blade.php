@@ -22,7 +22,7 @@
         default => 'bg-rose-100 text-rose-700 border-rose-200',
     };
     $statusLabel = match ($enrollmentStatus) {
-        'pending_parent_approval' => 'Pending Parent Approval',
+        'pending_parent_approval' => 'Pending Guardian Approval',
         default => ucfirst(str_replace('_', ' ', $enrollmentStatus)),
     };
 
@@ -193,7 +193,7 @@
                                 <svg class="w-5 h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5V9a2 2 0 00-2-2h-4m1 13V5a2 2 0 00-2-2H4a2 2 0 00-2 2v15h5m10 0H7"/>
                                 </svg>
-                                Parent-Child Connection
+                                Guardian-Child Connection
                             </h3>
 
                             @if(!empty($parentConnections))
@@ -229,7 +229,7 @@
                                     @endforeach
                                 </div>
                             @else
-                                <p class="text-sm text-gray-500">No linked parent account was found for this learner profile.</p>
+                                <p class="text-sm text-gray-500">No linked guardian account was found for this learner profile.</p>
                             @endif
                         </div>
                     </div>
@@ -427,4 +427,3 @@
             </div>
     </div>
 @endsection
-

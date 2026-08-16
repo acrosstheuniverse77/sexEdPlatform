@@ -85,6 +85,7 @@ class AdminUsersAuthorizationTest extends TestCase
             ->post(route('admin.users.relationships.attach'), [
                 'parent_user_id' => $parent->id,
                 'child_user_id' => $child->id,
+                'relationship_type' => 'legal_guardian',
             ])
             ->assertRedirect();
     }

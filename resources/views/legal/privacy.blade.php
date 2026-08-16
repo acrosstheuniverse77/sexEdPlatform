@@ -59,7 +59,7 @@
                         <h3 class="text-lg font-semibold mb-2" style="color:#730DB1;">COPPA Compliance Statement</h3>
                         <p class="text-gray-700 leading-relaxed">
                             We comply with the Children's Online Privacy Protection Act (COPPA). We do not knowingly collect personal 
-                            information from children under 13 without verifiable parental consent. Parents have full control over 
+                            information from children under 13 without verifiable guardian consent. Guardians have full control over
                             their child's account and can review, modify, or delete their child's information at any time.
                         </p>
                     </div>
@@ -87,13 +87,13 @@
                         <div>
                             <h3 class="text-lg font-medium mb-3" style="color:#A30EB2;">Additional Information for Users Under 13</h3>
                             <ul class="list-disc list-inside pl-4 space-y-2 text-gray-700">
-                                <li><strong>Parent Information:</strong> Parent's name, email, and verified relationship</li>
-                                <li><strong>Parental Consent:</strong> Timestamp of when parent created the child account</li>
-                                <li><strong>Monitoring Permissions:</strong> Parent's viewing and approval settings</li>
+                                <li><strong>Guardian Information:</strong> Guardian's name, email, and verified relationship</li>
+                                <li><strong>Guardian Consent:</strong> Timestamp of when guardian created the child account</li>
+                                <li><strong>Monitoring Permissions:</strong> Guardian's viewing and approval settings</li>
                             </ul>
                             <div class="rounded-xl p-4 mt-3 bg-amber-50 border border-amber-200">
                                 <p class="text-sm text-yellow-800">
-                                    <strong>Note:</strong> Children under 13 cannot create accounts independently. A parent or legal 
+                                    <strong>Note:</strong> Children under 13 cannot create accounts independently. A guardian or legal
                                     guardian must register, verify their email, and create a child account on their behalf.
                                 </p>
                             </div>
@@ -121,7 +121,7 @@
                             <li><strong>Account Management:</strong> Create and maintain user accounts, authenticate users</li>
                             <li><strong>Age-Appropriate Content:</strong> Display content suitable for the user's age bracket (5-12, 13-17, 18+)</li>
                             <li><strong>Educational Services:</strong> Track progress, generate certificates, manage quizzes</li>
-                            <li><strong>Parent Monitoring:</strong> Enable parents to view their child's learning activities</li>
+                            <li><strong>Guardian Monitoring:</strong> Enable guardians to view their child's learning activities</li>
                             <li><strong>Communication:</strong> Send email verification, important notifications, and updates</li>
                             <li><strong>Platform Improvement:</strong> Analyze usage patterns to improve educational content</li>
                         </ul>
@@ -134,11 +134,11 @@
                     </div>
                 </section>
 
-                <!-- Parent Rights (COPPA) -->
+                <!-- Guardian Rights (COPPA) -->
                 <section>
-                    <h2 class="text-xl font-semibold mb-4" style="color: #730DB1;">4. Parent Rights & Choices (For Children Under 13)</h2>
+                    <h2 class="text-xl font-semibold mb-4" style="color: #730DB1;">4. Guardian Rights & Choices (For Children Under 13)</h2>
                     <div class="space-y-3 text-gray-700">
-                        <p class="leading-relaxed">As a parent or legal guardian, you have the right to:</p>
+                        <p class="leading-relaxed">As a legal guardian, you have the right to:</p>
                         <ul class="list-disc list-inside pl-4 space-y-2">
                             <li><strong>Review:</strong> Access all personal information collected from your child</li>
                             <li><strong>Modify:</strong> Update or correct your child's information at any time</li>
@@ -155,7 +155,7 @@
                             <li><strong>Refuse Further Collection:</strong> Stop data collection by deleting the child's account</li>
                         </ul>
                         <p class="leading-relaxed mt-4">
-                            To exercise these rights, log in to your parent account and visit the "My Children" dashboard, or 
+                            To exercise these rights, log in to your guardian account and visit the "My Children" dashboard, or
                             contact us at support@example.com.
                         </p>
                     </div>
@@ -167,7 +167,7 @@
                     <div class="space-y-3 text-gray-700">
                         <p class="leading-relaxed">We DO NOT sell or rent personal information. We may share information only in these limited cases:</p>
                         <ul class="list-disc list-inside pl-4 space-y-2">
-                            <li><strong>With Parents:</strong> Parents can view their child's learning data and activity</li>
+                            <li><strong>With Guardians:</strong> Guardians can view their child's learning data and activity</li>
                             <li><strong>With Instructors:</strong> Instructors can view learner progress for courses they manage</li>
                             <li><strong>Service Providers:</strong> Email delivery (Gmail SMTP), hosting services - only as necessary to operate the platform</li>
                             <li><strong>Legal Requirements:</strong> If required by law, court order, or government request</li>
@@ -213,7 +213,7 @@
                             <li><strong>Legal Requirements:</strong> Some data may be retained longer if required by law</li>
                         </ul>
                         <p class="leading-relaxed mt-4">
-                            Parents can request immediate deletion of child accounts at any time.
+                            Guardians can request immediate deletion of child accounts at any time.
                         </p>
                     </div>
                 </section>
@@ -224,7 +224,7 @@
                     <div class="space-y-3 text-gray-700">
                         <p class="leading-relaxed">We send emails for:</p>
                         <ul class="list-disc list-inside pl-4 space-y-2">
-                            <li><strong>Account Verification:</strong> Required to verify email ownership (13+ users and parents)</li>
+                            <li><strong>Account Verification:</strong> Required to verify email ownership (13+ users and guardians)</li>
                             <li><strong>Important Notifications:</strong> Security alerts, policy changes, account issues</li>
                             <li><strong>Educational Updates:</strong> Course completion notifications, achievement unlocks</li>
                         </ul>
@@ -279,7 +279,7 @@
                     <div class="space-y-3 text-gray-700">
                         <p class="leading-relaxed">
                             Our platform may contain links to external websites or embedded videos (e.g., YouTube). We are not 
-                            responsible for the privacy practices of these third-party sites. We encourage parents to review the 
+                            responsible for the privacy practices of these third-party sites. We encourage guardians to review the
                             privacy policies of any sites their children visit.
                         </p>
                     </div>
@@ -302,7 +302,7 @@
                     <div class="space-y-3 text-gray-700">
                         <p class="leading-relaxed">
                             We may update this Privacy Policy from time to time. Significant changes will be communicated via email. 
-                            For changes affecting children's privacy, we will obtain new parental consent if required by law.
+                            For changes affecting children's privacy, we will obtain new guardian consent if required by law.
                         </p>
                         <p class="leading-relaxed">
                             The "Last Updated" date at the top of this page indicates when the policy was last revised.
@@ -324,7 +324,7 @@
                             <p class="text-gray-600 text-sm mt-1">Response Time: Within 48 hours</p>
                         </div>
                         <p class="leading-relaxed mt-4 text-sm">
-                            <strong>For Parents:</strong> To exercise your COPPA rights regarding your child's information, 
+                            <strong>For Guardians:</strong> To exercise your COPPA rights regarding your child's information,
                             include "COPPA Request" in your email subject line for priority handling.
                         </p>
                     </div>
@@ -337,7 +337,7 @@
                         and understood this Privacy Policy and agree to its terms.</strong>
                     </p>
                     <p class="text-sm text-purple-200 leading-relaxed text-center mt-2">
-                        <strong>For Parents:</strong> By creating a child account, you confirm that you have read this Privacy Policy
+                        <strong>For Guardians:</strong> By creating a child account, you confirm that you have read this Privacy Policy
                         and consent to the collection and use of your child's information as described.
                     </p>
                 </div>
@@ -353,5 +353,3 @@
 
 </body>
 </html>
-
-

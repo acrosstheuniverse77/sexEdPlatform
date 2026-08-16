@@ -8,11 +8,11 @@
         <div>
             <a href="{{ route('learner.modules.show', $module) }}" class="text-xs font-semibold text-purple-600 hover:text-purple-700">← Back to Module</a>
             <h1 class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{{ $module->title }} Reviews</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400">See learner feedback and module ratings.</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Module content reviews are shown separately from instructor reviews.</p>
         </div>
         <div class="text-right">
             <p class="text-3xl font-extrabold text-gray-900 dark:text-white">{{ number_format($summary['average'], 1) }}</p>
-            <p class="text-xs text-gray-500 dark:text-gray-400">Average from {{ $summary['count'] }} review{{ $summary['count'] === 1 ? '' : 's' }}</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Module average from {{ $summary['count'] }} review{{ $summary['count'] === 1 ? '' : 's' }}</p>
         </div>
     </div>
 
@@ -116,10 +116,11 @@
             </div>
 
             <div class="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
-                <h2 class="text-sm font-semibold text-gray-900 dark:text-white">Your Review</h2>
+                <h2 class="text-sm font-semibold text-gray-900 dark:text-white">Your Module Feedback</h2>
                 @if($canSubmitReview)
                     <form method="POST" action="{{ route('learner.modules.feedback.store', $module) }}" class="mt-3 space-y-3" data-review-form="true" x-data="{ selectedRating: {{ (int) old('rating', $userFeedback?->rating ?? 0) }} }">
                         @csrf
+                        <input type="hidden" name="feedback_type" value="module">
                         <div>
                             <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Rating</label>
                             <input type="hidden" name="rating" :value="selectedRating">
@@ -143,7 +144,7 @@
                             @enderror
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Review</label>
+                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Tell us about your experience with this module</label>
                             <textarea id="review_content" name="review_content" rows="6" class="js-learner-rich-editor w-full rounded-xl border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 text-sm" data-review-content="true">{!! old('review_content', $userFeedback?->review_html) !!}</textarea>
                             @error('review_content')
                                 <p class="mt-2 text-xs text-rose-600">{{ $message }}</p>
@@ -151,7 +152,39 @@
                             <p class="mt-2 text-xs text-rose-600 hidden" data-review-content-error="true">Please enter your review before submitting.</p>
                         </div>
                         <button type="submit" class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white rounded-xl hover:opacity-90 transition" style="background: linear-gradient(135deg, #A30EB2, #730DB1, #3B0CB1);">
-                            {{ $userFeedback ? 'Update Review' : 'Submit Review' }}
+                            {{ $userFeedback ? 'Module Feedback Submitted' : 'Submit Module Feedback' }}
+                        </button>
+                    </form>
+                @else
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ $reviewBlocker }}</p>
+                @endif
+            </div>
+
+            <div class="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+                <h2 class="text-sm font-semibold text-gray-900 dark:text-white">Your Instructor Feedback</h2>
+                @if($canSubmitReview)
+                    <form method="POST" action="{{ route('learner.modules.feedback.store', $module) }}" class="mt-3 space-y-3" x-data="{ selectedRating: {{ (int) old('rating', $userInstructorFeedback?->rating ?? 0) }} }">
+                        @csrf
+                        <input type="hidden" name="feedback_type" value="instructor">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Overall Instructor Rating</label>
+                            <input type="hidden" name="rating" :value="selectedRating">
+                            <div class="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 dark:border-gray-700">
+                                @foreach(range(1, 5) as $ratingOption)
+                                    <button type="button" aria-label="Select {{ $ratingOption }} hearts" @click="selectedRating = {{ $ratingOption }}" class="transition-transform duration-150 hover:scale-110 focus:outline-none">
+                                        <svg class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor" :class="selectedRating >= {{ $ratingOption }} ? 'text-rose-500' : 'text-gray-300 dark:text-gray-600'">
+                                            <path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" />
+                                        </svg>
+                                    </button>
+                                @endforeach
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Tell us about your experience with this instructor</label>
+                            <textarea name="review_content" rows="5" class="w-full rounded-xl border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 text-sm">{{ old('review_content', $userInstructorFeedback?->review_html) }}</textarea>
+                        </div>
+                        <button type="submit" @disabled($userInstructorFeedback) class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white rounded-xl hover:opacity-90 transition disabled:cursor-not-allowed disabled:opacity-50" style="background: linear-gradient(135deg, #A30EB2, #730DB1, #3B0CB1);">
+                            {{ $userInstructorFeedback ? 'Instructor Feedback Submitted' : 'Submit Instructor Feedback' }}
                         </button>
                     </form>
                 @else
@@ -160,6 +193,34 @@
             </div>
         </aside>
     </div>
+
+    <section class="space-y-3">
+        <div>
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white">Instructor Reviews</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Reviews about the instructor across their modules. Average: {{ number_format((float) ($instructorSummary['average'] ?? 0), 1) }} from {{ (int) ($instructorSummary['count'] ?? 0) }} review{{ (int) ($instructorSummary['count'] ?? 0) === 1 ? '' : 's' }}.</p>
+        </div>
+        @if($instructorReviews && $instructorReviews->count() > 0)
+            @foreach($instructorReviews as $review)
+                <article class="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ $review->learner?->full_name ?: ($review->learner?->name ?? 'Learner') }}</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ $review->created_at?->format('M d, Y') }}{{ $review->sourceModule ? ' / From ' . $review->sourceModule->title : '' }}</p>
+                        </div>
+                        <x-reviews.heart-rating :rating="$review->rating" size-class="h-4 w-4" text-class="text-sm font-semibold text-gray-600 dark:text-gray-300" />
+                    </div>
+                    <div class="mt-3 prose prose-sm max-w-none dark:prose-invert">
+                        {!! $review->review_html ?: '<p>No written feedback.</p>' !!}
+                    </div>
+                </article>
+            @endforeach
+            <div>{{ $instructorReviews->links() }}</div>
+        @else
+            <div class="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-8 text-center text-gray-500 dark:text-gray-400">
+                No instructor reviews yet.
+            </div>
+        @endif
+    </section>
 </div>
 @endsection
 
@@ -168,70 +229,12 @@
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         const reviewForm = document.querySelector('[data-review-form="true"]');
-        const reviewField = reviewForm?.querySelector('[data-review-content="true"]');
-        const reviewError = reviewForm?.querySelector('[data-review-content-error="true"]');
-
-        const htmlToPlainText = function (value) {
-            return String(value || '')
-                .replace(/<[^>]*>/g, ' ')
-                .replace(/&nbsp;/gi, ' ')
-                .replace(/\s+/g, ' ')
-                .trim();
-        };
-
-        const getReviewPlainText = function () {
-            if (!reviewField) {
-                return '';
-            }
-
-            if (typeof tinymce !== 'undefined') {
-                const editor = tinymce.get(reviewField.id);
-
-                if (editor) {
-                    return String(editor.getContent({ format: 'text' }) || '').trim();
-                }
-            }
-
-            return htmlToPlainText(reviewField.value);
-        };
-
-        const clearReviewError = function () {
-            if (reviewError) {
-                reviewError.classList.add('hidden');
-            }
-        };
-
-        if (reviewForm && reviewField) {
+        if (reviewForm) {
             reviewForm.addEventListener('submit', function (event) {
                 if (typeof tinymce !== 'undefined') {
                     tinymce.triggerSave();
                 }
-
-                if (getReviewPlainText().length > 0) {
-                    clearReviewError();
-                    return;
-                }
-
-                event.preventDefault();
-
-                if (reviewError) {
-                    reviewError.classList.remove('hidden');
-                }
-
-                if (typeof tinymce !== 'undefined') {
-                    const editor = tinymce.get(reviewField.id);
-
-                    if (editor) {
-                        editor.focus();
-                        return;
-                    }
-                }
-
-                reviewField.focus();
             });
-
-            reviewField.addEventListener('input', clearReviewError);
-            reviewField.addEventListener('change', clearReviewError);
         }
 
         if (typeof tinymce === 'undefined') {
@@ -247,12 +250,6 @@
             branding: false,
             plugins: 'lists link',
             toolbar: 'undo redo | bold italic underline | bullist numlist | link | removeformat',
-            setup: function (editor) {
-                editor.on('change keyup undo redo input setcontent', function () {
-                    tinymce.triggerSave();
-                    clearReviewError();
-                });
-            },
         });
     });
 </script>

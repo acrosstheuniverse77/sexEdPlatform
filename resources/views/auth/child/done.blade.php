@@ -11,12 +11,12 @@
                 <p class="text-white/90 font-semibold tracking-wide text-sm uppercase">Conscious Connections</p>
             </div>
             <h2 class="text-4xl font-bold text-white mb-4 leading-tight">
-                {{ $isApproved ? 'Child account activated!' : 'Application submitted!' }}
+                {{ $isApproved ? 'Dependent account activated!' : 'Application submitted!' }}
             </h2>
             <p class="text-white/80 text-lg max-w-xs">
                 {{ $isApproved
                     ? 'Monitoring access is now active.'
-                    : 'Your child account is now pending admin verification.' }}
+                    : 'Your dependent account is now pending admin verification.' }}
             </p>
         </div>
     </x-slot>
@@ -42,7 +42,7 @@
         <p class="mt-2 text-sm text-gray-600">
             {{ $isApproved
                 ? 'You can monitor progress and manage content approvals right away.'
-                : 'We will notify you when this child account is approved or rejected by the administrator.' }}
+                : 'We will notify you when this dependent account is approved or rejected by the administrator.' }}
         </p>
     </div>
 
@@ -83,7 +83,7 @@
             </div>
             <div>
                 <p class="text-sm font-semibold text-purple-900">Content Approval</p>
-                <p class="text-xs text-purple-700 mt-0.5">Review and approve modules before your child can access them.</p>
+                <p class="text-xs text-purple-700 mt-0.5">Review and approve modules before your dependent can access them.</p>
             </div>
         </div>
     </div>
@@ -93,7 +93,7 @@
         <a href="{{ route('parent.children.index') }}"
            style="background: linear-gradient(135deg, #A30EB2, #730DB1, #3B0CB1);"
            class="inline-block text-white font-semibold py-3 px-8 rounded-xl hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition shadow-lg text-sm">
-            Go to My Children
+            Go to My Dependents
         </a>
     </div>
 

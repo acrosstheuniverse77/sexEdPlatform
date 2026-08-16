@@ -49,7 +49,7 @@ class RegisteredUserController extends Controller
             ]);
 
             return redirect()->route('parent.registration.required')
-                ->with('info', 'Children under 13 require a parent or guardian to create their account.');
+                ->with('info', 'Children under 13 require a guardian to create their account.');
         }
 
         // Store personal info in session and advance to account info step
@@ -125,4 +125,3 @@ class RegisteredUserController extends Controller
             ->with('success', 'Registration successful! Please verify your email address.');
     }
 }
-

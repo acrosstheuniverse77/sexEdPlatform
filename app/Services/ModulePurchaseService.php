@@ -45,8 +45,15 @@ class ModulePurchaseService
     /**
      * @return array{status:string, checkout_url?:string, payment_id?:int, message:string}
      */
-    public function createCheckout(User $user, Module $module, string $paymentMethod, array $billing = []): array
+    public function createCheckout(User $user, Module $module, ?string $paymentMethod, array $billing = []): array
     {
+        if ($module->isOwnedBy($user)) {
+            return [
+                'status' => 'owned_by_user',
+                'message' => 'You cannot purchase a module that you own.',
+            ];
+        }
+
         if (!$this->canReceivePaidEnrollments($module)) {
             return [
                 'status' => 'paid_enrollment_unavailable',
@@ -66,6 +73,8 @@ class ModulePurchaseService
                 $billingName = (string) ($billing['name'] ?? $user->name);
                 $billingEmail = (string) ($billing['email'] ?? $user->email ?? '');
                 $billingPhone = (string) ($billing['phone'] ?? '');
+
+                $storedPaymentMethod = $paymentMethod ?: 'gcash';
 
                 $purchase = ModulePurchase::query()
                     ->firstOrCreate(
@@ -95,12 +104,12 @@ class ModulePurchaseService
                         'user_id' => $user->id,
                         'subscription_id' => null,
                         'amount' => (float) ($module->price_amount ?? 0),
-                        'method' => $paymentMethod,
+                        'method' => $storedPaymentMethod,
                         'status' => PaymentStatus::Pending,
                         'transaction_id' => 'MOD-' . strtoupper(uniqid()),
                         'payment_details' => [
                             'payment_scope' => 'module_purchase',
-                            'payment_method' => $paymentMethod,
+                            'payment_method' => $storedPaymentMethod,
                             'module_id' => $module->id,
                             'module_title' => $module->title,
                             'module_purchase_id' => $purchase->id,
@@ -114,10 +123,10 @@ class ModulePurchaseService
                 } else {
                     $payment->update([
                         'amount' => (float) ($module->price_amount ?? 0),
-                        'method' => $paymentMethod,
+                        'method' => $storedPaymentMethod,
                         'payment_details' => array_merge($payment->payment_details ?? [], [
                             'payment_scope' => 'module_purchase',
-                            'payment_method' => $paymentMethod,
+                            'payment_method' => $storedPaymentMethod,
                             'module_id' => $module->id,
                             'module_title' => $module->title,
                             'module_purchase_id' => $purchase->id,
@@ -168,7 +177,7 @@ class ModulePurchaseService
                     'payment_details' => array_merge($payment->payment_details ?? [], [
                         'paymongo_checkout_session_id' => $checkoutSessionId,
                         'checkout_url' => $checkoutUrl,
-                        'payment_method' => $paymentMethod,
+                        'payment_method' => $storedPaymentMethod,
                         'billing' => [
                             'name' => $billingName,
                             'email' => $billingEmail,
@@ -229,7 +238,12 @@ class ModulePurchaseService
             return false;
         }
 
-        return DB::transaction(function () use ($payment, $paymentMethod, $paymongoPaymentId, $moduleId, $purchaseId) {
+        $module = Module::query()->find($moduleId);
+        if ($module && $module->isOwnedBy($payment->user)) {
+            return false;
+        }
+
+        return DB::transaction(function () use ($payment, $paymentMethod, $paymongoPaymentId, $moduleId, $purchaseId, $module) {
             if ($payment->status !== PaymentStatus::Completed) {
                 $payment->update([
                     'status' => PaymentStatus::Completed,
@@ -275,7 +289,6 @@ class ModulePurchaseService
                 ]);
             }
 
-            $module = Module::query()->find($moduleId);
             if ($module) {
                 $this->ensureEnrollmentAfterPurchase($payment->user_id, $module);
             }

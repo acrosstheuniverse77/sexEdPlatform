@@ -271,6 +271,13 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
 
     Route::prefix('parent-verifications')->name('parent-verifications.')->group(function () {
         Route::get('/', [Admin\ParentChildVerificationController::class, 'index'])->name('index');
+        Route::get('/parents/{user}', [Admin\ParentChildVerificationController::class, 'showParent'])
+            ->name('parents.show');
+        Route::get('/parents/{user}/document/{side}', [Admin\ParentChildVerificationController::class, 'parentDocument'])
+            ->whereIn('side', ['front', 'back'])
+            ->name('parents.document');
+        Route::post('/parents/{user}/reset-onboarding', [Admin\ParentChildVerificationController::class, 'resetGuardianOnboarding'])
+            ->name('parents.reset-onboarding');
 
         Route::post('/parents/{user}/approve', [Admin\ParentChildVerificationController::class, 'approveParent'])
             ->name('parents.approve');
@@ -289,6 +296,17 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
             ->name('children.archive');
         Route::delete('/children/{parentChildAccount}', [Admin\ParentChildVerificationController::class, 'destroyChild'])
             ->name('children.destroy');
+
+        Route::get('/relationships/{parentChildAccount}', [Admin\ParentChildVerificationController::class, 'showRelationship'])
+            ->name('relationships.show');
+        Route::post('/relationships/{parentChildAccount}/approve', [Admin\ParentChildVerificationController::class, 'approveRelationship'])
+            ->name('relationships.approve');
+        Route::post('/relationships/{parentChildAccount}/reject', [Admin\ParentChildVerificationController::class, 'rejectRelationship'])
+            ->name('relationships.reject');
+        Route::post('/relationships/{parentChildAccount}/revoke', [Admin\ParentChildVerificationController::class, 'revokeRelationship'])
+            ->name('relationships.revoke');
+        Route::get('/relationships/{parentChildAccount}/documents/{document}', [Admin\ParentChildVerificationController::class, 'relationshipDocument'])
+            ->name('relationships.documents.show');
     });
 
     Route::post('/subscribers/{subscription}/archive', [Admin\SubscriberAdminController::class, 'archive'])

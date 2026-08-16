@@ -19,16 +19,25 @@ class ModuleFeedbackController extends Controller
     public function store(StoreModuleFeedbackRequest $request, Module $module): RedirectResponse
     {
         try {
-            $this->moduleFeedbackService->upsertLearnerFeedback(
-                $request->user(),
-                $module,
-                (int) $request->integer('rating'),
-                (string) $request->string('review_content')
-            );
+            if ((string) $request->input('feedback_type') === 'instructor') {
+                $this->moduleFeedbackService->storeInstructorFeedback(
+                    $request->user(),
+                    $module,
+                    (int) $request->integer('rating'),
+                    (string) $request->input('review_content', '')
+                );
+            } else {
+                $this->moduleFeedbackService->upsertLearnerFeedback(
+                    $request->user(),
+                    $module,
+                    (int) $request->integer('rating'),
+                    (string) $request->input('review_content', '')
+                );
+            }
         } catch (RuntimeException $exception) {
             return back()->withInput()->with('error', $exception->getMessage());
         }
 
-        return back()->with('success', 'Your review has been saved. Thank you for your feedback.');
+        return back()->with('success', 'Your feedback has been saved. Thank you.');
     }
 }

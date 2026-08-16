@@ -2,7 +2,7 @@
     $canUseChat = auth()->user()?->can('access chat') ?? false;
 @endphp
 
-<h3 class="mb-4 text-sm font-semibold tracking-wide text-gray-700 uppercase">Parent-Child Information</h3> 
+<h3 class="mb-4 text-sm font-semibold tracking-wide text-gray-700 uppercase">Guardian-Dependent Information</h3>
 
 @if($parentRelationships->isNotEmpty())
     <div class="mb-4 space-y-3">
@@ -23,7 +23,7 @@
                 <div class="flex items-start justify-between gap-3">
                     <div class="flex items-start min-w-0 gap-3">
                         @if($parentAvatarUrl)
-                            <img src="{{ $parentAvatarUrl }}" alt="{{ $parent?->name ?? 'Parent' }} avatar" class="object-cover w-10 h-10 border rounded-full border-sky-200">
+                            <img src="{{ $parentAvatarUrl }}" alt="{{ $parent?->name ?? 'Guardian' }} avatar" class="object-cover w-10 h-10 border rounded-full border-sky-200">
                         @else
                             <div class="flex items-center justify-center w-10 h-10 text-xs font-bold border rounded-full bg-sky-100 text-sky-700 border-sky-200">
                                 {{ strtoupper(substr((string) ($parent?->name ?? 'P'), 0, 1)) }}
@@ -31,12 +31,13 @@
                         @endif
 
                         <div class="min-w-0">
-                            <p class="text-xs font-semibold tracking-wide text-gray-500 uppercase">Parent Account</p>
-                            <p class="text-sm font-semibold text-gray-900 break-words">{{ $parent?->name ?? 'Unknown Parent' }}</p>
+                            <p class="text-xs font-semibold tracking-wide text-gray-500 uppercase">Guardian Account</p>
+                            <p class="text-sm font-semibold text-gray-900 break-words">{{ $parent?->name ?? 'Unknown Guardian' }}</p>
                             <p class="text-xs text-gray-600 break-words">{{ $parent?->email }}</p>
                             @if(!is_null($parentAge))
                                 <p class="text-xs text-gray-600">{{ $parentAge }} years old</p>
                             @endif
+                            <p class="text-[11px] text-indigo-700 mt-1">Relationship: {{ $relationship->relationshipLabel() }}</p>
                             <p class="text-[11px] text-gray-500 mt-1">Verification: {{ $relationship->relationship_verified_at ? 'Verified' : 'Unverified' }}</p>
                         </div>
                     </div>
@@ -97,6 +98,7 @@
                             @if(!is_null($childAge))
                                 <p class="text-xs text-gray-600">{{ $childAge }} years old</p>
                             @endif
+                            <p class="text-[11px] text-indigo-700 mt-1">Relationship: {{ $relationship->relationshipLabel() }}</p>
                             <p class="text-[11px] text-gray-500 mt-1">Verification: {{ $relationship->relationship_verified_at ? 'Verified' : 'Unverified' }}</p>
                         </div>
                     </div>

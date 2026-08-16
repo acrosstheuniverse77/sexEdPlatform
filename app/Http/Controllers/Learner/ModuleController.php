@@ -12,6 +12,7 @@ use App\Models\ParentChildAccount;
 use App\Models\QuizAttempt;
 use App\Models\LessonTopicProgress;
 use App\Models\ContentReport;
+use App\Models\InstructorFeedback;
 use App\Models\ModuleFeedback;
 use App\Models\User;
 use App\Models\UserDailyShield;
@@ -176,6 +177,7 @@ class ModuleController extends Controller
         $enrollmentStatus = $enrollment?->status?->value;
 
         $isPaidModule = $module->isPaidAccess();
+        $isOwnedByCurrentUser = $module->isOwnedBy($user);
         $modulePurchase = $this->modulePurchaseService->getCompletedPurchase($user, $module);
 
         if ($isPaidModule && !$modulePurchase) {
@@ -219,14 +221,17 @@ class ModuleController extends Controller
             } elseif ($isAtCapacity) {
                 $checkoutUnavailableReason = 'Enrollment capacity has been reached for this module.';
             } elseif ($needsParentApproval && !$isParentApprovedForPurchase) {
-                $checkoutUnavailableReason = 'Parent approval is required before checkout.';
+                $checkoutUnavailableReason = 'Guardian approval is required before checkout.';
             } elseif ($enrollment && $enrollment->status === EnrollmentStatus::Rejected) {
                 $checkoutUnavailableReason = 'Your enrollment request was rejected, so checkout is unavailable right now.';
+            } elseif ($isOwnedByCurrentUser) {
+                $checkoutUnavailableReason = 'You cannot purchase a module that you own.';
             }
         }
 
         $canPurchase = $isPaidModule
             && !$hasPurchased
+            && !$isOwnedByCurrentUser
             && $this->canReceivePaidEnrollments($module)
             && !$isAtCapacity
             && $isParentApprovedForPurchase
@@ -354,11 +359,31 @@ class ModuleController extends Controller
             ->limit(3)
             ->get();
 
+        $instructorReviewSummary = [
+            'average' => $creator ? round((float) (InstructorFeedback::query()->where('instructor_id', $creator->id)->avg('rating') ?? 0), 1) : 0,
+            'count' => $creator ? (int) InstructorFeedback::query()->where('instructor_id', $creator->id)->count() : 0,
+        ];
+
+        $recentInstructorReviews = $creator
+            ? InstructorFeedback::query()
+                ->where('instructor_id', $creator->id)
+                ->with(['learner.learnerProfile', 'sourceModule:id,title'])
+                ->latest('created_at')
+                ->limit(3)
+                ->get()
+            : collect();
+
         $reviewEligibility = $this->completionService->reviewEligibility($user, $module);
         $userFeedback = ModuleFeedback::query()
             ->where('module_id', $module->id)
             ->where('learner_id', $user->id)
             ->first();
+        $userInstructorFeedback = $creator
+            ? InstructorFeedback::query()
+                ->where('instructor_id', $creator->id)
+                ->where('learner_id', $user->id)
+                ->first()
+            : null;
 
         $activeModuleReport = ContentReport::query()
             ->activeForTarget($user->id, 'module', $module->id)
@@ -382,6 +407,7 @@ class ModuleController extends Controller
             'isPaidModule',
             'modulePurchase',
             'hasPurchased',
+            'isOwnedByCurrentUser',
             'approvedEnrollmentsCount',
             'isAtCapacity',
             'needsParentApproval',
@@ -398,8 +424,11 @@ class ModuleController extends Controller
             'shieldsRemaining',
             'reviewSummary',
             'recentReviews',
+            'instructorReviewSummary',
+            'recentInstructorReviews',
             'reviewEligibility',
             'userFeedback',
+            'userInstructorFeedback',
             'activeModuleReport',
             'activeInstructorReport',
             'ownershipDisplay'
@@ -453,7 +482,7 @@ class ModuleController extends Controller
                 return back()->with('info', 'You are already enrolled in this module.');
             }
             if ($existingEnrollment->status === EnrollmentStatus::PendingParentApproval) {
-                return back()->with('info', 'Your enrollment request is awaiting parental approval.');
+                return back()->with('info', 'Your enrollment request is awaiting guardian approval.');
             }
             if ($existingEnrollment->status === EnrollmentStatus::Rejected) {
                 return back()->with('error', 'Your enrollment request was rejected by the instructor.');
@@ -494,7 +523,7 @@ class ModuleController extends Controller
             }
 
             return redirect()->route('learner.modules.index')
-                ->with('success', 'Your enrollment request has been submitted. Please wait for parental approval.');
+                ->with('success', 'Your enrollment request has been submitted. Please wait for guardian approval.');
         }
 
         $effectiveEnrollmentLimit = $this->resolveEffectiveEnrollmentLimit($module);
@@ -562,6 +591,11 @@ class ModuleController extends Controller
                 ->with('info', 'This module does not require payment.');
         }
 
+        if ($module->isOwnedBy($user)) {
+            return redirect()->route('learner.modules.show', $module)
+                ->with('error', 'You cannot purchase a module that you own.');
+        }
+
         if (!$this->canReceivePaidEnrollments($module)) {
             return redirect()->route('learner.modules.show', $module)
                 ->with('error', 'Paid enrollment is currently unavailable for this module.');
@@ -592,12 +626,12 @@ class ModuleController extends Controller
         if ($needsParentApproval) {
             if ($existingEnrollment?->status === EnrollmentStatus::PendingParentApproval) {
                 return redirect()->route('learner.modules.show', $module)
-                    ->with('info', 'Waiting for parent approval before payment.');
+                    ->with('info', 'Waiting for guardian approval before payment.');
             }
 
             if ($existingEnrollment?->status === EnrollmentStatus::Rejected) {
                 return redirect()->route('learner.modules.show', $module)
-                    ->with('error', 'Parent approval was not granted for this module.');
+                    ->with('error', 'Guardian approval was not granted for this module.');
             }
 
             if (!$existingEnrollment) {
@@ -627,7 +661,7 @@ class ModuleController extends Controller
                 }
 
                 return redirect()->route('learner.modules.show', $module)
-                    ->with('info', 'Request sent for parent approval. Complete payment after approval.');
+                    ->with('info', 'Request sent for guardian approval. Complete payment after approval.');
             }
         }
 
@@ -664,6 +698,11 @@ class ModuleController extends Controller
                 ->with('info', 'This module does not require payment.');
         }
 
+        if ($module->isOwnedBy($user)) {
+            return redirect()->route('learner.modules.show', $module)
+                ->with('error', 'You cannot purchase a module that you own.');
+        }
+
         if (!$this->canReceivePaidEnrollments($module)) {
             return redirect()->route('learner.modules.show', $module)
                 ->with('error', 'Paid enrollment is currently unavailable for this module.');
@@ -696,7 +735,7 @@ class ModuleController extends Controller
 
         if ($needsParentApproval && !$isParentApprovedForPurchase) {
             return redirect()->route('learner.modules.show', $module)
-                ->with('info', 'Parent approval is required before payment.');
+                ->with('info', 'Guardian approval is required before payment.');
         }
 
         $effectiveEnrollmentLimit = $this->resolveEffectiveEnrollmentLimit($module);
@@ -761,6 +800,11 @@ class ModuleController extends Controller
                 ->with('info', 'This module does not require payment.');
         }
 
+        if ($module->isOwnedBy($user)) {
+            return redirect()->route('learner.modules.show', $module)
+                ->with('error', 'You cannot purchase a module that you own.');
+        }
+
         if (!$this->canReceivePaidEnrollments($module)) {
             return redirect()->route('learner.modules.show', $module)
                 ->with('error', 'Paid enrollment is currently unavailable for this module.');
@@ -793,7 +837,7 @@ class ModuleController extends Controller
 
         if ($needsParentApproval && !$isParentApprovedForPurchase) {
             return redirect()->route('learner.modules.show', $module)
-                ->with('info', 'Parent approval is required before payment.');
+                ->with('info', 'Guardian approval is required before payment.');
         }
 
         $effectiveEnrollmentLimit = $this->resolveEffectiveEnrollmentLimit($module);
@@ -805,9 +849,9 @@ class ModuleController extends Controller
                 ->with('error', 'Enrollment Closed: this module is already full.');
         }
 
-        $selectedMethod = (string) ($request->input('payment_method') ?: 'gcash');
-        if (!in_array($selectedMethod, ['gcash', 'paymaya', 'grab_pay', 'card'], true)) {
-            $selectedMethod = 'gcash';
+        $selectedMethod = $request->filled('payment_method') ? (string) $request->input('payment_method') : null;
+        if ($selectedMethod !== null && !in_array($selectedMethod, ['gcash', 'paymaya', 'grab_pay', 'card'], true)) {
+            $selectedMethod = null;
         }
 
         $checkout = $this->modulePurchaseService->createCheckout(

@@ -205,6 +205,7 @@ class ModuleController extends Controller
         }
 
         $module = Module::create($payload);
+        $module->syncLearnerCategories($this->learnerCategoriesFromValidated($validated));
 
         $message = 'Module saved as draft. Submit it for admin review when it is ready.';
 
@@ -348,6 +349,7 @@ class ModuleController extends Controller
         $module->save();
 
         $module->update($payload);
+        $module->syncLearnerCategories($this->learnerCategoriesFromValidated($validated));
 
         return redirect()->route($this->routeName('modules.index'))
             ->with('success', 'Module updated successfully!');
@@ -458,7 +460,10 @@ class ModuleController extends Controller
         }
 
         if ($action === 'publish') {
-            return $this->contentGovernanceService->createAdminOwnedModule($payload, $request->user());
+            $module = $this->contentGovernanceService->createAdminOwnedModule($payload, $request->user());
+            $module->syncLearnerCategories($this->learnerCategoriesFromValidated($validated));
+
+            return $module;
         }
 
         $module = Module::query()->create($payload + [
@@ -473,6 +478,8 @@ class ModuleController extends Controller
         if ($action === 'archive') {
             $module->delete();
         }
+
+        $module->syncLearnerCategories($this->learnerCategoriesFromValidated($validated));
 
         return $module->fresh(['creator']);
     }
@@ -495,6 +502,7 @@ class ModuleController extends Controller
                 'is_published' => true,
                 'published_by_admin_id' => (int) $request->user()->id,
             ]);
+            $module->syncLearnerCategories($this->learnerCategoriesFromValidated($validated));
 
             return;
         }
@@ -509,5 +517,18 @@ class ModuleController extends Controller
         if ($action === 'archive') {
             $module->delete();
         }
+
+        $module->syncLearnerCategories($this->learnerCategoriesFromValidated($validated));
+    }
+
+    /**
+     * @param array<string, mixed> $validated
+     * @return array<int, string>
+     */
+    private function learnerCategoriesFromValidated(array $validated): array
+    {
+        return Module::normalizeLearnerCategories(
+            (array) ($validated['age_brackets'] ?? [($validated['age_bracket'] ?? 'teens')])
+        );
     }
 }

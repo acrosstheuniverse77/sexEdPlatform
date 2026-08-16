@@ -23,7 +23,7 @@ class TestUserSeederTest extends TestCase
         $teenLearner = User::query()->where('email', 'teen@test.local')->first();
         $adultLearner = User::query()->where('email', 'adult@test.local')->first();
         $premiumLearner = User::query()->where('email', 'premium.learner@test.local')->first();
-        $parent = User::query()->where('email', 'parent@test.local')->first();
+        $parent = User::query()->where('email', 'guardian@test.local')->first();
         $linkedChild = User::query()->where('email', 'linked.child@test.local')->first();
 
         $this->assertNotNull($admin);
@@ -75,6 +75,7 @@ class TestUserSeederTest extends TestCase
         $this->assertSame(User::ACCOUNT_TYPE_LEARNER_ADULT, $premiumLearner->account_type);
 
         $this->assertTrue($parent->hasRole('learner'));
+        $this->assertSame('Guardian Account Test', $parent->name);
         $this->assertTrue($parent->hasRole('parent'));
         $this->assertTrue($parent->isParentRegistration());
         $this->assertTrue($parent->isParentVerificationApproved());
@@ -129,13 +130,13 @@ class TestUserSeederTest extends TestCase
             'teen@test.local',
             'adult@test.local',
             'premium.learner@test.local',
-            'parent@test.local',
+            'guardian@test.local',
             'linked.child@test.local',
         ];
 
         $this->assertSame(10, User::query()->whereIn('email', $emails)->count());
 
-        $parent = User::query()->where('email', 'parent@test.local')->firstOrFail();
+        $parent = User::query()->where('email', 'guardian@test.local')->firstOrFail();
         $linkedChild = User::query()->where('email', 'linked.child@test.local')->firstOrFail();
 
         $this->assertSame(

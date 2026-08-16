@@ -12,7 +12,7 @@
         : (string) $enrollment->status;
 
     $statusMeta = [
-        'pending_parent_approval' => ['label' => 'Pending Parent Approval', 'class' => 'bg-amber-100 text-amber-800 border-amber-200'],
+        'pending_parent_approval' => ['label' => 'Pending Guardian Approval', 'class' => 'bg-amber-100 text-amber-800 border-amber-200'],
         'pending' => ['label' => 'Pending Instructor Review', 'class' => 'bg-blue-100 text-blue-800 border-blue-200'],
         'approved' => ['label' => 'Approved', 'class' => 'bg-emerald-100 text-emerald-800 border-emerald-200'],
         'rejected' => ['label' => 'Rejected', 'class' => 'bg-rose-100 text-rose-800 border-rose-200'],
@@ -122,7 +122,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                 </svg>
-                Back to Child Dashboard
+                Back to Dependent Dashboard
             </a>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Lesson Details</h1>
             <p class="text-sm text-gray-500 mt-1">
@@ -139,7 +139,7 @@
                     onclick='window.dispatchEvent(new CustomEvent("open-global-chat", { detail: { target_user_id: {{ (int) $child->id }}, conversation_type: "direct", name: @json($child->full_name ?: $child->name) } }))'
                     class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
                     style="background: linear-gradient(135deg, #A30EB2, #730DB1, #3B0CB1);">
-                Message Child
+                Message Dependent
             </button>
         </div>
     </div>
@@ -264,7 +264,7 @@
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Request Timeline</h3>
                 <ul class="mt-3 space-y-2 text-xs text-gray-600 dark:text-gray-300">
                     <li class="flex items-start justify-between gap-3">
-                        <span>Child submitted request</span>
+                        <span>Dependent submitted request</span>
                         <span class="font-semibold text-gray-800 dark:text-gray-200">{{ $enrollment->created_at?->format('M d, Y') ?? 'N/A' }}</span>
                     </li>
                     <li class="flex items-start justify-between gap-3">
@@ -409,7 +409,7 @@
                     }
                  "
                  @keydown.escape.window="approveModalOpen = false; rejectModalOpen = false">
-            <h3 class="text-base font-semibold text-gray-900 dark:text-white">Parent Decision</h3>
+            <h3 class="text-base font-semibold text-gray-900 dark:text-white">Guardian Decision</h3>
             <p class="text-sm text-gray-500 mt-1">
                 Choose whether {{ $child->full_name ?: $child->name }} can proceed with this module request.
             </p>
@@ -483,7 +483,7 @@
                                     name="reason_code"
                                     x-model="reasonCode"
                                     class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100">
-                                <option value="">Select appropriate rejection reason for parent content approval</option>
+                                <option value="">Select appropriate rejection reason for guardian content approval</option>
                                 @foreach($rejectionReasonOptions as $reasonCode => $reasonLabel)
                                     <option value="{{ $reasonCode }}">{{ $reasonLabel }}</option>
                                 @endforeach
@@ -498,7 +498,7 @@
                             <textarea id="custom_reason"
                                       name="custom_reason"
                                       x-ref="customReasonEditor"
-                                      class="js-parent-enrollment-reason-editor w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100"
+                                      class="js-guardian-enrollment-reason-editor w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100"
                                       rows="6">{{ old('custom_reason') }}</textarea>
                             @error('custom_reason')
                                 <p class="mt-1 text-xs text-rose-600">{{ $message }}</p>
@@ -528,7 +528,7 @@
                 @elseif($statusValue === 'rejected')
                     This request was already rejected.
                 @elseif(!$canApproveContent)
-                    You have monitoring access for this child, but content approval permission is disabled.
+                    You have monitoring access for this dependent, but content approval permission is disabled.
                 @else
                     This request is currently waiting for the next review stage.
                 @endif
@@ -752,7 +752,7 @@
 
             window.addEventListener('beforeunload', function () {
                 if (typeof tinymce !== 'undefined') {
-                    tinymce.remove('textarea.js-parent-enrollment-reason-editor');
+                    tinymce.remove('textarea.js-guardian-enrollment-reason-editor');
                 }
             });
         })();

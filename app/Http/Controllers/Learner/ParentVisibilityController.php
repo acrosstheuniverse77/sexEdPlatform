@@ -50,7 +50,7 @@ class ParentVisibilityController extends Controller
 
         if ($parentLinks->isEmpty()) {
             return redirect()->route('learner.dashboard')
-                ->with('info', 'No linked parent account found.');
+                ->with('info', 'No linked guardian account found.');
         }
 
         return view('learner.parent.index', [

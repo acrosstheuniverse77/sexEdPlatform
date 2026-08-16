@@ -40,7 +40,7 @@ class ModuleOverviewLayoutTest extends DatabaseTestCase
                 'Your Progress',
                 'Instructor Information',
                 'Module Info',
-                'Learner Reviews',
+                'Module Reviews',
             ], false);
     }
 

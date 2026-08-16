@@ -20,6 +20,7 @@ class AdminModuleAuthoringTest extends DatabaseTestCase
                 'description' => 'Admin-owned content',
                 'age_bracket' => 'teens',
                 'enrollment_mode' => 'auto',
+                'enrollment_limit' => 50,
                 'is_published' => 1,
             ])
             ->assertRedirect();

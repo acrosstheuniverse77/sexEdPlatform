@@ -306,14 +306,16 @@ class TestUserSeeder extends Seeder
             sourceReference: 'seed-premium-learner',
         );
 
+        $this->renameSeedEmail('parent@test.local', 'guardian@test.local');
+
         $parent = $this->upsertUser(
             roleSyncService: $roleSyncService,
-            email: 'parent@test.local',
+            email: 'guardian@test.local',
             primaryRole: 'learner',
             additionalRoles: ['parent'],
             attributes: [
-                'name' => 'Parent Account Test',
-                'first_name' => 'Parent',
+                'name' => 'Guardian Account Test',
+                'first_name' => 'Guardian',
                 'last_name' => 'Tester',
                 'birthdate' => $this->birthdateForAge(38),
                 'status' => User::STATUS_ACTIVE,
@@ -329,14 +331,14 @@ class TestUserSeeder extends Seeder
         );
 
         $this->upsertLearnerProfile($parent, [
-            'username' => 'seed_parent_account',
+            'username' => 'seed_guardian_account',
             'birthdate' => $parent->birthdate,
             'gender' => 'female',
             'province_code' => $location['province_code'],
             'city_code' => $location['city_code'],
             'barangay_code' => $location['barangay_code'],
             'barangay' => $location['barangay_name'],
-            'bio' => 'Parent test account for guardian monitoring and approvals.',
+            'bio' => 'Guardian test account for monitoring and approvals.',
             'requires_parental_consent' => false,
             'is_parent_account' => true,
         ]);
@@ -379,7 +381,7 @@ class TestUserSeeder extends Seeder
                 'can_view_quiz_answers' => true,
                 'can_approve_content' => true,
                 'verification_status' => 'approved',
-                'verification_document_path' => 'seed/parent-child/linked-child-verification.pdf',
+                'verification_document_path' => 'seed/guardian-child/linked-child-verification.pdf',
                 'verification_rejection_reason' => null,
                 'verification_reviewed_by' => $admin->id,
                 'verification_reviewed_at' => now(),
@@ -415,7 +417,7 @@ class TestUserSeeder extends Seeder
             $this->command->line('Learner (teen): teen@test.local');
             $this->command->line('Learner (adult): adult@test.local');
             $this->command->line('Learner (premium active plan): premium.learner@test.local');
-            $this->command->line('Parent: parent@test.local');
+            $this->command->line('Guardian: guardian@test.local');
             $this->command->line('Linked child: linked.child@test.local');
         }
     }
@@ -519,6 +521,17 @@ class TestUserSeeder extends Seeder
         }
 
         return $user->refresh();
+    }
+
+    private function renameSeedEmail(string $from, string $to): void
+    {
+        if (User::query()->where('email', $to)->exists()) {
+            return;
+        }
+
+        User::query()
+            ->where('email', $from)
+            ->update(['email' => $to]);
     }
 
     /**

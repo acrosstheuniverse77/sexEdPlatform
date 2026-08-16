@@ -105,3 +105,64 @@ All PHPUnit invocations were direct and sequential with `--do-not-cache-result`.
 | `git diff --check --` for the two services and invitation-flow test | 0 | No whitespace errors. |
 
 The first multi-name `--filter` attempt did not execute PHPUnit because the shell parsed `|` as a pipeline; it exited 1 before tests started. It was replaced by sequential direct PHPUnit commands above.
+
+## Final reviewer compensation fix
+
+### Scope and behavior
+
+- `GuardianRelationshipVerificationService::submitStaged()` now accepts an optional by-reference moved-file ledger and exposes narrowly scoped `restoreStagedDocuments()` compensation.
+- `respondToInvitation()` owns the ledger for its outer transaction, passes it during proof acceptance, and compensates after any outer transaction failure.
+- Inner `submitStaged()` compensation remains active. It clears the shared ledger after restoration, so outer compensation is a no-op on already-restored moves; individual restoration failures are logged without masking the original exception.
+- Moved staged proofs are therefore restored when the final accepted invitation `fresh()` retrieval fails after `submitStaged()` returns and the outer database transaction rolls back.
+- `Closure` import ordering in `GuardianRelationshipVerificationService` is corrected.
+
+### TDD evidence
+
+RED — `vendor\\bin\\phpunit --do-not-cache-result tests\\Feature\\Parent\\ParentChildInvitationFlowTest.php --filter test_acceptance_restores_staged_documents_when_outer_transaction_fails_after_submission`
+
+```text
+FAILURES!
+Tests: 1, Assertions: 2, Failures: 1.
+Unable to find a file or directory at path [guardian-relationship-invitations/outer-rollback/invitation-fresh.pdf].
+```
+
+The temporary `ParentChildInvitation` retrieved listener throws only for the accepted final `fresh()` model. The regression asserts the source file is restored, the destination directory is empty, no relationship exists, and the pending invitation retains its staged metadata. The saved model event dispatcher is restored in `finally`.
+
+GREEN — same command after implementation and again after scoped Pint:
+
+```text
+OK (1 test, 6 assertions)
+```
+
+### Final verification
+
+All PHPUnit commands were direct and sequential with `--do-not-cache-result`.
+
+| Command | Exit | Exact result |
+| --- | ---: | --- |
+| Focused outer-transaction regression | 0 | `OK (1 test, 6 assertions)`; final post-Pint rerun: `OK (1 test, 6 assertions)` |
+| `vendor\\bin\\phpunit --do-not-cache-result tests\\Feature\\Parent\\ParentChildInvitationFlowTest.php` | 0 | `OK (20 tests, 132 assertions)` |
+| Invitation affected suites (`ParentChildInvitationFlowTest`, parent-child resubmission, both admin verification suites, and `tests\\Feature\\Chat`) | 0 | `OK (100 tests, 605 assertions)` |
+| `vendor\\bin\\phpunit --do-not-cache-result` | 0 | `OK (922 tests, 4135 assertions)`; `Time: 02:28.716` |
+| `vendor\\bin\\pint` then `vendor\\bin\\pint --test` for the two services and invitation-flow test | 0 | Pint fixed one scoped formatting issue; final scoped check passed all 3 files. |
+| `php -l` for both services and the test | 0 | No syntax errors in all 3 files. |
+| `git diff --check --` for both services and the invitation-flow test | 0 | No whitespace errors. |
+
+## Final review isolation fix
+
+The final review identified two interaction gaps. Legacy child-verification lists/counts and mutation endpoints now require a non-null `verification_document_path`, so invitation-created relationships remain exclusively in the relationship-verification workflow. Invitation creation now locks the learner row before duplicate relationship/invitation checks; acceptance uses the same lock order and rejects an already approved/pending active link.
+
+Added regression coverage for invitation relationships being absent from the child queue and blocked from legacy child approval. Updated the avatar UI fixture to keep child-registration and relationship rows distinct.
+
+Final verification:
+
+| Command | Exit | Exact result |
+| --- | ---: | --- |
+| Affected suites (invitation, child resubmission, admin verification/dashboard, chat) | 0 | `OK (105 tests, 637 assertions)` |
+| `vendor\\bin\\phpunit --do-not-cache-result` | 0 | `OK (923 tests, 4141 assertions)`; `Time: 02:27.111` |
+| `php -l` for all final touched PHP files | 0 | No syntax errors in all 7 files |
+| Scoped `vendor\\bin\\pint --test` (invitation service + two admin tests) | 0 | `PASS ... 3 files` |
+| Scoped `git diff --check` | 0 | No whitespace errors |
+| PHPStan | unavailable | `vendor\\bin\\phpstan` and `.bat` do not exist |
+
+The final fix could not be staged/committed because `.git` is read-only in the sandbox and the escalated Git write request was rejected after the session authentication changed. All code remains applied on the current main working tree; prior Task 7 commits remain at `6872c68`.

@@ -28,7 +28,7 @@
              editModuleId: null,
              title: '',
              description: '',
-             ageBracket: '',
+             ageBrackets: [],
              enrollmentMode: 'auto',
              accessType: 'free',
              priceAmount: '',
@@ -47,7 +47,7 @@
                      this.editModuleId = null;
                      this.title = '';
                      this.description = '';
-                     this.ageBracket = '';
+                     this.ageBrackets = [];
                      this.enrollmentMode = 'auto';
                      this.accessType = 'free';
                      this.priceAmount = '';
@@ -63,7 +63,9 @@
                  this.editModuleId = draft.id;
                  this.title = draft.title || '';
                  this.description = draft.description || '';
-                 this.ageBracket = draft.age_bracket || '';
+                 this.ageBrackets = Array.isArray(draft.age_brackets)
+                     ? draft.age_brackets
+                     : (draft.age_bracket ? [draft.age_bracket] : []);
                  this.enrollmentMode = draft.enrollment_mode || 'auto';
                  this.accessType = draft.access_type || 'free';
                  this.priceAmount = draft.price_amount ?? '';
@@ -202,20 +204,30 @@
                 @enderror
             </div>
 
-            {{-- Age Group + Enrollment Mode (2-col) --}}
+            {{-- Learner Categories + Enrollment Mode (2-col) --}}
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-widest mb-1.5">
-                        Age Group <span class="text-red-500">*</span>
+                        Eligible Learner Categories <span class="text-red-500">*</span>
                     </label>
-                    <select name="age_bracket" x-model="ageBracket" required
-                            class="block w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-purple-400/50 focus:border-purple-400 transition-colors">
-                        <option value="">— Select —</option>
-                        <option value="kids">Kids (5–12)</option>
-                        <option value="teens">Teens (13–17)</option>
-                        <option value="adults">Adults (18+)</option>
-                    </select>
-                    @error('age_bracket')
+                    <div class="grid gap-2">
+                        @foreach(\App\Models\Module::learnerCategoryLabelsMap() as $category => $label)
+                            <label class="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-purple-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                                <input
+                                    type="checkbox"
+                                    name="age_brackets[]"
+                                    value="{{ $category }}"
+                                    x-model="ageBrackets"
+                                    class="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                >
+                                <span>{{ $label }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                    @error('age_brackets')
+                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                    @enderror
+                    @error('age_brackets.*')
                         <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                     @enderror
                 </div>

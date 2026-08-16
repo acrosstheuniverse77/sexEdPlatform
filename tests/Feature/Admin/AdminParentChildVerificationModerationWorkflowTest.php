@@ -44,6 +44,56 @@ class AdminParentChildVerificationModerationWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_invitation_relationships_are_excluded_from_child_moderation(): void
+    {
+        $admin = $this->createAdmin();
+        $parent = User::factory()->create([
+            'first_name' => 'Invitation',
+            'last_name' => 'Guardian',
+        ]);
+        $parent->assignRole('learner');
+
+        $child = User::factory()->create([
+            'first_name' => 'Invitation',
+            'last_name' => 'Dependent',
+        ]);
+        $child->assignRole('learner');
+
+        $relationship = ParentChildAccount::create([
+            'parent_user_id' => $parent->id,
+            'child_user_id' => $child->id,
+            'relationship_type' => 'legal_guardian',
+            'relationship_status' => 'pending',
+            'relationship_verified_status' => 'under_review',
+            'relationship_verification_submitted_at' => now(),
+            'verification_status' => 'pending',
+            'verification_document_path' => null,
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->get(route('admin.parent-verifications.index', [
+                'type' => 'children',
+                'status' => 'pending',
+            ]));
+
+        $response->assertOk();
+        $this->assertFalse($response->viewData('childApplications')->contains('id', $relationship->id));
+        $this->assertTrue($response->viewData('relationshipApplications')->contains('id', $relationship->id));
+
+        $this->actingAs($admin)
+            ->postJson(route('admin.parent-verifications.children.approve', $relationship))
+            ->assertStatus(409)
+            ->assertJson([
+                'message' => 'Invitation relationships must be reviewed through the relationship verification queue.',
+            ]);
+
+        $this->assertDatabaseHas('parent_child_accounts', [
+            'id' => $relationship->id,
+            'verification_status' => 'pending',
+            'relationship_verified_at' => null,
+        ]);
+    }
+
     public function test_relationship_approval_notifies_guardian_and_dependent(): void
     {
         $admin = $this->createAdmin();
@@ -92,20 +142,35 @@ class AdminParentChildVerificationModerationWorkflowTest extends TestCase
             ]);
     }
 
-    public function test_ui_exposes_direct_approval_action_without_confirm_modal(): void
+    public function test_guardian_index_links_to_details_instead_of_review_modal(): void
     {
         $admin = $this->createAdmin();
-        $this->createParentApplicant('pending');
+        $parentApplicant = $this->createParentApplicant('pending');
         $this->createChildVerification('pending');
 
         $this->actingAs($admin)
-            ->get(route('admin.parent-verifications.index'))
+            ->get(route('admin.parent-verifications.index', ['type' => 'parents']))
             ->assertOk()
-            ->assertSee('data-testid="submit-approval-action"', false)
-            ->assertDontSee('data-testid="approval-confirm-modal"', false)
-            ->assertDontSee('Are you sure you want to approve this verification?', false)
-            ->assertDontSee('Confirm Parent Approval', false)
-            ->assertDontSee('Confirm Child Approval', false);
+            ->assertSee(route('admin.parent-verifications.parents.show', $parentApplicant), false)
+            ->assertSee('View Details', false)
+            ->assertDontSee('Guardian Verification - '.$parentApplicant->full_name, false);
+    }
+
+    public function test_guardian_details_page_uses_approval_and_rejection_confirmation_modals(): void
+    {
+        $admin = $this->createAdmin();
+        $parentApplicant = $this->createParentApplicant('pending');
+
+        $this->actingAs($admin)
+            ->get(route('admin.parent-verifications.parents.show', $parentApplicant))
+            ->assertOk()
+            ->assertSee('data-testid="guardian-approval-confirm-modal"', false)
+            ->assertSee('data-testid="guardian-rejection-confirm-modal"', false)
+            ->assertSee('Confirm Guardian Approval', false)
+            ->assertSee('Confirm Guardian Rejection', false)
+            ->assertSee('Identity matches submitted account details', false)
+            ->assertSee('Invalid Government ID', false)
+            ->assertSee('Cancel', false);
     }
 
     public function test_reject_parent_with_others_requires_meaningful_custom_reason_content(): void
@@ -165,7 +230,7 @@ class AdminParentChildVerificationModerationWorkflowTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.parent-verifications.index'))
             ->assertOk()
-            ->assertSee('js-parent-child-moderation-editor', false)
+            ->assertSee('js-guardian-child-moderation-editor', false)
             ->assertSee('build/tinymce/tinymce.min.js', false)
             ->assertDontSee('Issue warning to account holder', false);
     }

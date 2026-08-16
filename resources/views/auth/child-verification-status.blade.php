@@ -14,14 +14,14 @@
                 <img src="{{ asset('/media/Logo.png') }}" alt="Conscious Connections" class="h-20 w-auto mx-auto mb-3 drop-shadow-lg">
                 <p class="text-white/90 font-semibold tracking-wide text-sm uppercase">Conscious Connections</p>
             </div>
-            <h2 class="text-4xl font-bold text-white mb-4 leading-tight">Child Verification</h2>
-            <p class="text-white/80 text-lg max-w-xs">This child account is under moderation review.</p>
+            <h2 class="text-4xl font-bold text-white mb-4 leading-tight">Dependent Verification</h2>
+            <p class="text-white/80 text-lg max-w-xs">This dependent account is under moderation review.</p>
         </div>
     </x-slot>
 
     <div class="mb-6">
         <h2 class="text-2xl font-bold text-purple-900">Account Status</h2>
-        <p class="mt-1 text-sm text-gray-600">A platform administrator must approve this child account before access is granted.</p>
+        <p class="mt-1 text-sm text-gray-600">A platform administrator must approve this dependent account before access is granted.</p>
     </div>
 
     @if(($verification->verification_status ?? 'pending') === 'rejected')
@@ -37,12 +37,12 @@
             </div>
         </div>
         <p class="text-sm text-gray-600 mb-6">
-            Please ask your parent/guardian to resubmit your verification document from their My Children page.
+            Please ask your guardian to resubmit your verification document from their My Dependents page.
         </p>
     @else
         <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 mb-4">
             <p class="font-semibold">Verification result: Pending Review</p>
-            <p class="mt-1">Your parent/guardian will be notified once this account is approved.</p>
+            <p class="mt-1">Your guardian will be notified once this account is approved.</p>
         </div>
         <p class="text-sm text-gray-600 mb-6">
             Learning modules are temporarily unavailable until verification is complete.

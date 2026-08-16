@@ -50,11 +50,18 @@ class User extends Authenticatable implements MustVerifyEmail
         'verified',
         'is_parent_registration',
         'parent_verification_status',
+        'parent_id_type',
+        'parent_id_type_other',
         'parent_id_document_path',
+        'parent_id_document_back_path',
         'parent_verification_rejection_reason',
+        'parent_verification_submitted_at',
         'parent_verification_reviewed_by',
         'parent_verification_reviewed_at',
         'parent_verification_approved_at',
+        'guardian_onboarding_status',
+        'guardian_onboarding_started_at',
+        'guardian_onboarding_completed_at',
     ];
 
     /**
@@ -80,8 +87,11 @@ class User extends Authenticatable implements MustVerifyEmail
             'verified' => 'boolean',
             'birthdate' => 'date',
             'is_parent_registration' => 'boolean',
+            'parent_verification_submitted_at' => 'datetime',
             'parent_verification_reviewed_at' => 'datetime',
             'parent_verification_approved_at' => 'datetime',
+            'guardian_onboarding_started_at' => 'datetime',
+            'guardian_onboarding_completed_at' => 'datetime',
         ];
     }
 
@@ -326,6 +336,16 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(ModuleFeedback::class, 'learner_id');
     }
 
+    public function instructorFeedbackReceived()
+    {
+        return $this->hasMany(InstructorFeedback::class, 'instructor_id');
+    }
+
+    public function instructorFeedbackSubmitted()
+    {
+        return $this->hasMany(InstructorFeedback::class, 'learner_id');
+    }
+
     public function contentReports()
     {
         return $this->hasMany(ContentReport::class, 'reporter_id');
@@ -534,9 +554,22 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->belongsToMany(User::class, 'parent_child_accounts', 'parent_user_id', 'child_user_id')
             ->withPivot([
+                'id',
                 'can_view_progress',
                 'can_view_quiz_answers',
                 'can_approve_content',
+                'relationship_type',
+                'relationship_custom',
+                'relationship_status',
+                'relationship_verified_status',
+                'relationship_verification_submitted_at',
+                'relationship_verification_reviewed_by',
+                'relationship_verification_reviewed_at',
+                'relationship_verification_rejection_reason',
+                'relationship_verification_rejection_note',
+                'relationship_verification_revoked_at',
+                'relationship_notes',
+                'is_legacy_relationship',
                 'relationship_verified_at',
                 'verification_status',
                 'verification_document_path',
@@ -556,9 +589,22 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->belongsToMany(User::class, 'parent_child_accounts', 'child_user_id', 'parent_user_id')
             ->withPivot([
+                'id',
                 'can_view_progress',
                 'can_view_quiz_answers',
                 'can_approve_content',
+                'relationship_type',
+                'relationship_custom',
+                'relationship_status',
+                'relationship_verified_status',
+                'relationship_verification_submitted_at',
+                'relationship_verification_reviewed_by',
+                'relationship_verification_reviewed_at',
+                'relationship_verification_rejection_reason',
+                'relationship_verification_rejection_note',
+                'relationship_verification_revoked_at',
+                'relationship_notes',
+                'is_legacy_relationship',
                 'relationship_verified_at',
                 'verification_status',
                 'verification_document_path',
@@ -589,12 +635,22 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function isParentVerificationPending(): bool
     {
-        return ($this->parent_verification_status ?? 'pending') === 'pending';
+        return $this->parent_verification_status === 'pending';
     }
 
     public function isParentVerificationRejected(): bool
     {
         return $this->parent_verification_status === 'rejected';
+    }
+
+    public function hasCompletedGuardianOnboarding(): bool
+    {
+        if (! $this->isParentRegistration() || ! $this->isParentVerificationApproved()) {
+            return true;
+        }
+
+        return $this->guardian_onboarding_status === 'completed'
+            || ($this->guardian_onboarding_status === null && $this->hasCompletedProfile());
     }
 
     /**

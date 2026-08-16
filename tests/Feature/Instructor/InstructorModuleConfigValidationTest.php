@@ -27,6 +27,7 @@ class InstructorModuleConfigValidationTest extends TestCase
                 'enrollment_mode' => 'auto',
                 'access_type' => 'paid',
                 'price_currency' => 'PHP',
+                'enrollment_limit' => 50,
             ])
             ->assertSessionHasErrors(['price_amount']);
     }
@@ -48,6 +49,7 @@ class InstructorModuleConfigValidationTest extends TestCase
                 'access_type' => 'free',
                 'price_amount' => 100,
                 'price_currency' => 'PHP',
+                'enrollment_limit' => 50,
             ])
             ->assertRedirect();
 

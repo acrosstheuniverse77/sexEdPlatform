@@ -28,7 +28,7 @@ class ParentEnrollmentRejectedNotification extends Notification
         $module = $this->enrollment->module;
         $reason = $this->reason ? trim($this->reason) : null;
 
-        $message = 'Your parent rejected your enrollment request for "' . $module->title . '".';
+        $message = 'Your guardian rejected your enrollment request for "' . $module->title . '".';
 
         if ($reason) {
             $message .= ' Reason: ' . $reason;
@@ -36,7 +36,7 @@ class ParentEnrollmentRejectedNotification extends Notification
 
         return [
             'type' => 'parent_enrollment_rejected',
-            'title' => 'Enrollment Rejected by Parent',
+            'title' => 'Enrollment Rejected by Guardian',
             'message' => $message,
             'module_id' => $module->id,
             'module_title' => $module->title,

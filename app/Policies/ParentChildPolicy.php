@@ -16,9 +16,18 @@ class ParentChildPolicy
             return false;
         }
 
-        return $parent->children()
+        $relationship = $parent->children()
             ->where('child_user_id', $child->id)
             ->wherePivot('verification_status', 'approved')
-            ->exists();
+            ->first();
+
+        if (! $relationship) {
+            return false;
+        }
+
+        $status = (string) ($relationship->pivot->relationship_verified_status ?? 'not_required');
+
+        return ! \App\Support\GuardianRelationshipTypes::requiresVerification($relationship->pivot->relationship_type ?? null)
+            || in_array($status, ['verified', 'reserved'], true);
     }
 }

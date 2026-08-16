@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Support\GuardianRelationshipTypes;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ParentChildAccount extends Model
@@ -13,6 +15,18 @@ class ParentChildAccount extends Model
     protected $fillable = [
         'parent_user_id',
         'child_user_id',
+        'relationship_type',
+        'relationship_custom',
+        'relationship_status',
+        'relationship_verified_status',
+        'relationship_verification_submitted_at',
+        'relationship_verification_reviewed_by',
+        'relationship_verification_reviewed_at',
+        'relationship_verification_rejection_reason',
+        'relationship_verification_rejection_note',
+        'relationship_verification_revoked_at',
+        'relationship_notes',
+        'is_legacy_relationship',
         'can_view_progress',
         'can_view_quiz_answers',
         'can_approve_content',
@@ -29,9 +43,13 @@ class ParentChildAccount extends Model
         'can_view_progress' => 'boolean',
         'can_view_quiz_answers' => 'boolean',
         'can_approve_content' => 'boolean',
+        'is_legacy_relationship' => 'boolean',
         'verification_reviewed_at' => 'datetime',
         'verification_approved_at' => 'datetime',
         'relationship_verified_at' => 'datetime',
+        'relationship_verification_submitted_at' => 'datetime',
+        'relationship_verification_reviewed_at' => 'datetime',
+        'relationship_verification_revoked_at' => 'datetime',
     ];
 
     /**
@@ -48,6 +66,37 @@ class ParentChildAccount extends Model
     public function child(): BelongsTo
     {
         return $this->belongsTo(User::class, 'child_user_id');
+    }
+
+    public function relationshipLabel(): string
+    {
+        return GuardianRelationshipTypes::label($this->relationship_type, $this->relationship_custom);
+    }
+
+    public function relationshipVerificationLabel(): string
+    {
+        return GuardianRelationshipTypes::statusLabel($this->relationship_verified_status);
+    }
+
+    public function requiresRelationshipVerification(): bool
+    {
+        return GuardianRelationshipTypes::requiresVerification($this->relationship_type);
+    }
+
+    public function hasVerifiedRelationshipRequirement(): bool
+    {
+        return ! $this->requiresRelationshipVerification()
+            || in_array($this->relationship_verified_status, ['verified', 'reserved'], true);
+    }
+
+    public function verificationDocuments(): HasMany
+    {
+        return $this->hasMany(GuardianRelationshipVerificationDocument::class, 'parent_child_account_id');
+    }
+
+    public function verificationAudits(): HasMany
+    {
+        return $this->hasMany(GuardianRelationshipVerificationAudit::class, 'parent_child_account_id');
     }
 
     /**

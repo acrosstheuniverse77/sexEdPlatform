@@ -20,7 +20,7 @@ class ParentChildrenActionsUiTest extends TestCase
         $response = $this->actingAs($parent)->get(route('parent.children.index'));
 
         $response->assertOk()
-            ->assertSee('View Child Dashboard', false)
+            ->assertSee('View Dependent Dashboard', false)
             ->assertSee('Message '.$approvedChild->full_name, false)
             ->assertSee('open-global-chat', false)
             ->assertDontSee('>Manage</a>', false)

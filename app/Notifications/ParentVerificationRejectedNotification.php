@@ -29,12 +29,12 @@ class ParentVerificationRejectedNotification extends Notification
                 (string) config('mail.from.address'),
                 (string) config('mail.from.name'),
             )
-            ->subject('Update on Your Parent Verification')
+            ->subject('Update on Your Guardian Verification')
             ->view('emails.moderation-status', [
-                'title' => 'Parent Verification Update',
+                'title' => 'Guardian Verification Update',
                 'subtitle' => 'Your submission needs corrections',
-                'greetingName' => $notifiable->first_name ?? 'Parent',
-                'intro' => 'Your parent or guardian verification was not approved at this time.',
+                'greetingName' => $notifiable->first_name ?? 'Guardian',
+                'intro' => 'Your guardian verification was not approved at this time.',
                 'details' => [
                     'Reason: ' . $this->reason,
                     'Please correct the issue and submit an updated verification request.',
@@ -47,8 +47,8 @@ class ParentVerificationRejectedNotification extends Notification
     {
         return [
             'type' => 'parent_verification_rejected',
-            'title' => 'Parent verification rejected',
-            'message' => 'Your parent verification was not approved. Check your email for details.',
+            'title' => 'Guardian verification rejected',
+            'message' => 'Your guardian verification was not approved. Check your email for details.',
             'reason' => $this->reason,
         ];
     }

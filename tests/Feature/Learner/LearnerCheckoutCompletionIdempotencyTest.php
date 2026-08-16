@@ -214,11 +214,9 @@ class LearnerCheckoutCompletionIdempotencyTest extends TestCase
             'updated_by' => $admin->id,
         ]);
 
-        $instructor = User::factory()->create(['role' => 'instructor']);
-        $instructor->assignRole('instructor');
-
         $module = Module::factory()->create([
-            'created_by' => $instructor->id,
+            'created_by' => $admin->id,
+            'content_owner_type' => 'admin',
             'is_published' => true,
             'access_type' => 'paid',
             'price_amount' => 499,

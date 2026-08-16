@@ -288,7 +288,7 @@ class UserController extends Controller
         }
 
         if ($this->hasVerifiedChildLink($user)) {
-            return 'Adult (Parent)';
+            return 'Adult (Guardian)';
         }
 
         return 'Adult';

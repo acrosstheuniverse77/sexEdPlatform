@@ -100,7 +100,7 @@ class AdminModuleReviewWorkspaceService
                 'title' => data_get($moduleData, 'title', $reviewRequest->module_title),
                 'content_owner_type' => $moduleOwnerType,
                 'thumbnail_url' => $thumbnailUrl,
-                'age_group' => $this->ageGroupLabel(
+                'age_group' => $module ? implode(' / ', $module->learnerCategoryLabels()) : $this->ageGroupLabel(
                     data_get($moduleData, 'min_age', $module?->min_age),
                     data_get($moduleData, 'max_age', $module?->max_age),
                 ),

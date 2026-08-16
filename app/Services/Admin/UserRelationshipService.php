@@ -5,13 +5,18 @@ namespace App\Services\Admin;
 use App\Models\ParentChildAccount;
 use App\Models\User;
 use App\Services\AdminActivityLogService;
+use App\Services\GuardianRelationshipVerificationService;
+use App\Support\GuardianRelationshipTypes;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class UserRelationshipService
 {
-    public function __construct(private readonly AdminActivityLogService $activityLogService)
+    public function __construct(
+        private readonly AdminActivityLogService $activityLogService,
+        private readonly GuardianRelationshipVerificationService $relationshipVerificationService,
+    )
     {
     }
 
@@ -22,14 +27,14 @@ class UserRelationshipService
             $childId = (int) $payload['child_user_id'];
 
             if ($parentId === $childId) {
-                throw new InvalidArgumentException('Parent and child accounts must be different users.');
+                throw new InvalidArgumentException('Guardian and dependent accounts must be different users.');
             }
 
             $parent = User::query()->findOrFail($parentId);
             $child = User::query()->findOrFail($childId);
 
             if ($parent->birthdate && $parent->calculateAge() !== null && $parent->calculateAge() < 18) {
-                throw new InvalidArgumentException('Selected parent account is not eligible for parent linkage.');
+                throw new InvalidArgumentException('Selected guardian account is not eligible for guardian linkage.');
             }
 
             $existing = ParentChildAccount::query()
@@ -38,12 +43,17 @@ class UserRelationshipService
                 ->first();
 
             if ($existing) {
-                throw new InvalidArgumentException('This parent-child relationship already exists.');
+                throw new InvalidArgumentException('This guardian-dependent relationship already exists.');
             }
 
             $relationship = ParentChildAccount::query()->create([
                 'parent_user_id' => $parentId,
                 'child_user_id' => $childId,
+                'relationship_type' => (string) $payload['relationship_type'],
+                'relationship_custom' => ($payload['relationship_type'] ?? null) === GuardianRelationshipTypes::OTHER ? trim((string) ($payload['relationship_custom'] ?? '')) : null,
+                'relationship_status' => 'active',
+                'relationship_verified_status' => $this->relationshipVerificationService->initialStatus((string) $payload['relationship_type']),
+                'relationship_notes' => $payload['relationship_notes'] ?? null,
                 'can_view_progress' => (bool) ($payload['can_view_progress'] ?? true),
                 'can_view_quiz_answers' => (bool) ($payload['can_view_quiz_answers'] ?? true),
                 'can_approve_content' => (bool) ($payload['can_approve_content'] ?? false),
@@ -62,6 +72,8 @@ class UserRelationshipService
                     'source' => 'admin.users.relationship.attach',
                     'parent_user_id' => $parentId,
                     'child_user_id' => $childId,
+                    'relationship_type' => $relationship->relationship_type,
+                    'relationship_status' => $relationship->relationship_status,
                 ],
                 request: $request,
                 adminUserId: $actorId,
@@ -80,7 +92,7 @@ class UserRelationshipService
                 ->first();
 
             if (! $relationship) {
-                throw new InvalidArgumentException('Parent-child relationship was not found.');
+                throw new InvalidArgumentException('Guardian-dependent relationship was not found.');
             }
 
             $before = $relationship->toArray();
@@ -115,7 +127,7 @@ class UserRelationshipService
                 ->first();
 
             if (! $relationship) {
-                throw new InvalidArgumentException('Parent-child relationship was not found.');
+                throw new InvalidArgumentException('Guardian-dependent relationship was not found.');
             }
 
             $before = $relationship->toArray();

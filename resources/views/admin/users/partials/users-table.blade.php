@@ -18,7 +18,7 @@
                 <option value="learner-child">Learner Child</option>
                 <option value="learner-teen">Learner Teen</option>
                 <option value="learner-adult">Learner Adult</option>
-                <option value="parent">Parent</option>
+                <option value="guardian">Guardian</option>
                 <option value="instructor">Instructor</option>
                 <option value="admin">Admin</option>
             </select>

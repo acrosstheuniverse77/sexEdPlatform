@@ -113,9 +113,9 @@
                 </a>
             </p>
             <p class="mt-2 text-sm text-gray-600">
-                Need a parent account?
+                Need a guardian account?
                 <a href="{{ route('parent.register') }}" class="font-semibold text-brand-purple-primary hover:text-brand-purple-light transition-colors">
-                    Create a Parent Account
+                    Create a Guardian Account
                 </a>
             </p>
         </div>

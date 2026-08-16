@@ -41,13 +41,13 @@ class InstructorLearnerCategoryClassificationTest extends TestCase
             ->get(route('instructor.users.index'))
             ->assertOk()
             ->assertSeeText('Learner Category Adult')
-            ->assertDontSeeText('Learner Category Adult (Parent)');
+            ->assertDontSeeText('Learner Category Adult (Guardian)');
 
         $this->actingAs($instructor)
             ->get(route('instructor.users.show', $adultLearner))
             ->assertOk()
             ->assertSeeText('Adult')
-            ->assertDontSeeText('Adult (Parent)');
+            ->assertDontSeeText('Adult (Guardian)');
     }
 
     public function test_adult_learner_with_verified_child_link_is_categorized_as_adult_parent(): void
@@ -92,11 +92,11 @@ class InstructorLearnerCategoryClassificationTest extends TestCase
         $this->actingAs($instructor)
             ->get(route('instructor.users.index'))
             ->assertOk()
-            ->assertSeeText('Learner Category Adult (Parent)');
+            ->assertSeeText('Learner Category Adult (Guardian)');
 
         $this->actingAs($instructor)
             ->get(route('instructor.users.show', $adultLearner))
             ->assertOk()
-            ->assertSeeText('Adult (Parent)');
+            ->assertSeeText('Adult (Guardian)');
     }
 }

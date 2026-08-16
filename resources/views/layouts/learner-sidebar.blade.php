@@ -92,17 +92,17 @@
 
     if ($hasApprovedParentLinks) {
         $navItems[] = [
-            'label'  => 'My Parent',
+            'label'  => 'My Guardian',
             'route'  => 'learner.parent.index',
             'active' => request()->routeIs('learner.parent.*'),
             'icon'   => '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="M12 3.25a4.75 4.75 0 1 0 0 9.5 4.75 4.75 0 0 0 0-9.5ZM8.75 8a3.25 3.25 0 1 1 6.5 0 3.25 3.25 0 0 1-6.5 0Zm-5.5 9.5A3.25 3.25 0 0 1 6.5 14.25h11A3.25 3.25 0 0 1 20.75 17.5v1.25a.75.75 0 0 1-1.5 0V17.5A1.75 1.75 0 0 0 17.5 15.75h-11A1.75 1.75 0 0 0 4.75 17.5v1.25a.75.75 0 0 1-1.5 0V17.5Z"/></svg>',
         ];
     }
 
-    // Add My Children nav item for verified parent accounts (even without existing children yet)
+    // Add My Dependents nav item for verified guardian accounts.
     if ($authUser->isParent() || ($authUser->isParentRegistration() && $authUser->isParentVerificationApproved())) {
         $navItems[] = [
-            'label'  => 'My Children',
+            'label'  => 'My Dependents',
             'route'  => 'parent.children.index',
             'active' => request()->routeIs('parent.children.*'),
             'badge'  => $pendingParentApprovalRequestCount,

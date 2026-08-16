@@ -42,7 +42,7 @@ class AdminUserRelationshipManagementPageTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.users.relationships.index'))
             ->assertOk()
-            ->assertSee('Parent-Child Relationships', false)
+            ->assertSee('Guardian-Dependent Relationships', false)
             ->assertSee('Attach New Relationship', false)
             ->assertSee('Existing Relationships', false);
     }

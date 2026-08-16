@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Notifications\Admin\ChildVerificationRequestSubmittedNotification;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -15,6 +16,7 @@ class ChildRegistrationUploadPersistenceTest extends TestCase
     public function test_child_credentials_submit_notifies_admins_about_new_child_verification_request(): void
     {
         Storage::fake('public');
+        Http::fake(['api.pwnedpasswords.com/*' => Http::response('', 200)]);
         Notification::fake();
 
         $admin = User::factory()->create(['role' => 'admin']);
@@ -31,9 +33,13 @@ class ChildRegistrationUploadPersistenceTest extends TestCase
             ->withSession($this->childWizardSession())
             ->post(route('parent.create-child.credentials.store'), [
                 'username' => 'childnotifyadmin',
-                'password' => 'password123',
-                'password_confirmation' => 'password123',
+                'password' => 'Password123!',
+                'password_confirmation' => 'Password123!',
             ])
+            ->assertRedirect(route('parent.create-child.validation'));
+
+        $this->actingAs($parent)
+            ->post(route('parent.create-child.validation.store'))
             ->assertRedirect(route('parent.create-child.done'));
 
         Notification::assertSentTo(
@@ -91,7 +97,8 @@ class ChildRegistrationUploadPersistenceTest extends TestCase
 
         $this->actingAs($parent)
             ->withSession($this->childWizardSession())
-            ->get(route('parent.create-child.credentials'))
+            ->withSession(['child_step3' => ['username' => 'childpreview', 'password' => 'Password123!']])
+            ->get(route('parent.create-child.validation'))
             ->assertOk()
             ->assertSee('data-testid="child-verification-preview"', false)
             ->assertSee('birth-cert.pdf', false);
@@ -100,6 +107,7 @@ class ChildRegistrationUploadPersistenceTest extends TestCase
     public function test_child_temp_remove_and_replace_keep_session_metadata_in_sync(): void
     {
         Storage::fake('public');
+        Http::fake(['api.pwnedpasswords.com/*' => Http::response('', 200)]);
 
         $parent = $this->createApprovedParent();
 
@@ -138,17 +146,15 @@ class ChildRegistrationUploadPersistenceTest extends TestCase
 
         $this->actingAs($parent)
             ->withSession($this->childWizardSession())
-            ->post(route('parent.create-child.credentials.store'), [
-                'username' => 'childwithoutdoc',
-                'password' => 'password123',
-                'password_confirmation' => 'password123',
-            ])
+            ->withSession(['child_step3' => ['username' => 'childwithoutdoc', 'password' => 'Password123!']])
+            ->post(route('parent.create-child.validation.store'))
             ->assertSessionHasErrors(['verification_document']);
     }
 
     public function test_child_credentials_submit_finalizes_temp_upload_and_clears_session(): void
     {
         Storage::fake('public');
+        Http::fake(['api.pwnedpasswords.com/*' => Http::response('', 200)]);
 
         $parent = $this->createApprovedParent();
 
@@ -161,9 +167,13 @@ class ChildRegistrationUploadPersistenceTest extends TestCase
             ->withSession($this->childWizardSession())
             ->post(route('parent.create-child.credentials.store'), [
                 'username' => 'childwithdoc',
-                'password' => 'password123',
-                'password_confirmation' => 'password123',
+                'password' => 'Password123!',
+                'password_confirmation' => 'Password123!',
             ])
+            ->assertRedirect(route('parent.create-child.validation'));
+
+        $this->actingAs($parent)
+            ->post(route('parent.create-child.validation.store'))
             ->assertRedirect(route('parent.create-child.done'));
 
         $link = DB::table('parent_child_accounts')
@@ -176,6 +186,27 @@ class ChildRegistrationUploadPersistenceTest extends TestCase
         $this->assertStringStartsWith('child-verifications/'.$parent->id.'/', $link->verification_document_path);
         Storage::disk('public')->assertExists($link->verification_document_path);
         $this->assertNull(session('registration_temp_uploads.child.verification_document'));
+    }
+
+    public function test_guardian_can_start_dependent_account_creation_for_older_dependent(): void
+    {
+        $parent = $this->createApprovedParent();
+
+        $this->actingAs($parent)
+            ->post(route('parent.create-child.store'), [
+                'first_name' => 'Adult',
+                'middle_initial' => null,
+                'last_name' => 'Dependent',
+                'suffix' => null,
+                'birthdate' => now()->subYears(22)->toDateString(),
+                'gender' => 'prefer_not_to_say',
+                'relationship_type' => 'biological_mother',
+                'relationship_custom' => null,
+            ])
+            ->assertRedirect(route('parent.create-child.location'))
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(22, session('child_step1.age'));
     }
 
     private function createApprovedParent(): User
@@ -248,6 +279,8 @@ class ChildRegistrationUploadPersistenceTest extends TestCase
                 'birthdate' => now()->subYears(10)->toDateString(),
                 'age' => 10,
                 'gender' => 'male',
+                'relationship_type' => 'biological_mother',
+                'relationship_custom' => null,
             ],
             'child_step2' => [
                 'city_code' => '402101000',

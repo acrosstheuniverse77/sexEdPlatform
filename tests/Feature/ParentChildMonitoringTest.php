@@ -163,7 +163,7 @@ class ParentChildMonitoringTest extends TestCase
         $this->actingAs($parent)
             ->get(route('parent.children.enrollments.show', [$child, $enrollment]))
             ->assertOk()
-            ->assertSee('Enrollment Request Details')
+            ->assertSee('Lesson Details')
             ->assertSee('Body Safety Basics')
             ->assertSee('Learning Content Review')
             ->assertSee('Lesson Parent Review')
@@ -188,7 +188,7 @@ class ParentChildMonitoringTest extends TestCase
             ->get(route('parent.children.show', $child));
 
         $response->assertOk()
-            ->assertSee('Pending Parent Approval')
+            ->assertSee('Pending Guardian Approval')
             ->assertSee(route('parent.children.enrollments.show', [$child, $enrollment]), false);
     }
 

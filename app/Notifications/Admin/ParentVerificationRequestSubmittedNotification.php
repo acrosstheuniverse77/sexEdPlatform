@@ -21,13 +21,13 @@ class ParentVerificationRequestSubmittedNotification extends Notification
 
     public function toDatabase(object $notifiable): array
     {
-        $parentName = trim((string) ($this->parent->full_name ?? $this->parent->name ?? 'Parent applicant'));
+        $parentName = trim((string) ($this->parent->full_name ?? $this->parent->name ?? 'Guardian applicant'));
 
         return [
             'type' => 'parent_verification_request_submitted',
             'status' => 'pending',
-            'title' => 'New Parent Verification Request',
-            'message' => $parentName . ' submitted a parent verification request.',
+            'title' => 'New Guardian Verification Request',
+            'message' => $parentName . ' submitted a guardian verification request.',
             'parent_user_id' => $this->parent->id,
             'action_url' => route('admin.parent-verifications.index', [
                 'type' => 'parents',

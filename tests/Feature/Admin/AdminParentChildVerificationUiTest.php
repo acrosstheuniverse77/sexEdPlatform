@@ -412,6 +412,24 @@ class AdminParentChildVerificationUiTest extends TestCase
         ]);
         $dependent->assignRole('learner');
 
+        $childVerificationDependent = User::factory()->create([
+            'first_name' => 'Dina',
+            'last_name' => 'Verification',
+        ]);
+        $childVerificationDependent->assignRole('learner');
+
+        ParentChildAccount::create([
+            'parent_user_id' => $guardian->id,
+            'child_user_id' => $childVerificationDependent->id,
+            'relationship_type' => 'parent',
+            'relationship_status' => 'pending',
+            'can_view_progress' => true,
+            'can_view_quiz_answers' => true,
+            'can_approve_content' => true,
+            'verification_status' => 'pending',
+            'verification_document_path' => 'child-verifications/temp/dina-verification.pdf',
+        ]);
+
         $relationship = ParentChildAccount::create([
             'parent_user_id' => $guardian->id,
             'child_user_id' => $dependent->id,
@@ -456,7 +474,7 @@ class AdminParentChildVerificationUiTest extends TestCase
 
         self::assertStringContainsString('>Child</th>', $childTableMarkup);
         self::assertStringContainsString('h-9 w-9 rounded-full object-cover', $childTableMarkup);
-        self::assertStringContainsString('aria-label="Dina Dependent avatar fallback"', $childTableMarkup);
+        self::assertStringContainsString('aria-label="Dina Verification avatar fallback"', $childTableMarkup);
         self::assertStringContainsString('inline-flex h-9 w-9', $childTableMarkup);
 
         self::assertStringContainsString('>Dependent</th>', $relationshipTableMarkup);

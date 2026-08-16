@@ -55,6 +55,7 @@ class AdminModuleAuthoringWorkflowTest extends DatabaseTestCase
             'description' => 'Admin module payload',
             'age_bracket' => 'teens',
             'enrollment_mode' => 'auto',
+            'enrollment_limit' => 50,
             'action' => $action,
         ];
     }

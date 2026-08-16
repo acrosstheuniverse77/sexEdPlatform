@@ -21,7 +21,7 @@ class WizardStepper extends Component
         ['label' => 'Personal Info', 'route' => 'parent.register'],
         ['label' => 'Account Info',  'route' => 'parent.register.account'],
         ['label' => 'Verify Email',  'route' => 'verification.notice'],
-        ['label' => 'Profile',       'route' => 'profile.complete'],
+        ['label' => 'Guardian Verification', 'route' => 'guardian.verification.create'],
     ];
 
     public function __construct(

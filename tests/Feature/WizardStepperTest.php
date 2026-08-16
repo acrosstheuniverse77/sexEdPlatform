@@ -100,9 +100,9 @@ class WizardStepperTest extends TestCase
         $this->assertFalse($steps[3]['isActive']);
     }
 
-    public function test_parent_flow_step_4_active_on_profile_complete(): void
+    public function test_parent_flow_step_4_active_on_guardian_verification(): void
     {
-        $component = new WizardStepper('profile.complete', true);
+        $component = new WizardStepper('guardian.verification.create', true);
         $steps = $component->steps;
 
         $this->assertCount(4, $steps);
@@ -153,9 +153,9 @@ class WizardStepperTest extends TestCase
         $this->assertCount(4, $component->steps);
     }
 
-    public function test_profile_complete_shows_parent_flow_with_session_flag(): void
+    public function test_guardian_verification_shows_parent_flow_with_session_flag(): void
     {
-        $component = new WizardStepper('profile.complete', true);
+        $component = new WizardStepper('guardian.verification.create', true);
         $steps = $component->steps;
         $this->assertCount(4, $steps);
         $this->assertTrue($steps[3]['isActive']); // step 4 of 4

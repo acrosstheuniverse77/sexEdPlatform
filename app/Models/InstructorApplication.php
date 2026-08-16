@@ -29,6 +29,7 @@ class InstructorApplication extends Model
         'educational_background',
         'government_id_path',
         'clearance_path',
+        'cv_resume_path',
         'bio',
         'teaching_credential_path',
         'sexed_certificate_path',
@@ -36,6 +37,9 @@ class InstructorApplication extends Model
         'approved_by',
         'approved_at',
         'rejection_reason',
+        'rejection_reason_code',
+        'rejection_reason_note',
+        'review_message',
         'application_metadata',
     ];
 

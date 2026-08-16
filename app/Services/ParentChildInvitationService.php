@@ -38,34 +38,6 @@ class ParentChildInvitationService
             throw new InvalidArgumentException('You cannot invite your own account.');
         }
 
-        $existingRelationship = ParentChildAccount::withTrashed()
-            ->where('parent_user_id', $parent->id)
-            ->where('child_user_id', $child->id)
-            ->first();
-
-        if ($existingRelationship && $existingRelationship->deleted_at === null && $existingRelationship->verification_status === 'approved') {
-            throw new InvalidArgumentException('This learner is already linked to your guardian account.');
-        }
-
-        if ($existingRelationship && $existingRelationship->deleted_at === null && $existingRelationship->verification_status === 'pending') {
-            throw new InvalidArgumentException('A relationship verification request is already pending for this learner.');
-        }
-
-        $existingPending = ParentChildInvitation::query()
-            ->where('inviter_parent_user_id', $parent->id)
-            ->where('child_user_id', $child->id)
-            ->where('status', ParentChildInvitationStatus::Pending->value)
-            ->latest('id')
-            ->first();
-
-        if ($existingPending !== null) {
-            if ($existingPending->isExpired()) {
-                $existingPending->update(['status' => ParentChildInvitationStatus::Expired->value]);
-            } else {
-                throw new InvalidArgumentException('An invitation is already pending for this learner.');
-            }
-        }
-
         $requiresVerification = GuardianRelationshipTypes::requiresVerification($relationshipType);
         if ($requiresVerification && ! $verificationPayload) {
             throw new InvalidArgumentException('Supporting documentation is required for this relationship.');
@@ -75,6 +47,39 @@ class ParentChildInvitationService
 
         try {
             $invitation = DB::transaction(function () use ($parent, $child, $relationshipType, $relationshipCustom, $message, $requiresVerification, $verificationPayload, &$stagedPaths): ParentChildInvitation {
+                User::query()
+                    ->lockForUpdate()
+                    ->findOrFail($child->id);
+
+                $existingRelationship = ParentChildAccount::withTrashed()
+                    ->where('parent_user_id', $parent->id)
+                    ->where('child_user_id', $child->id)
+                    ->first();
+
+                if ($existingRelationship && $existingRelationship->deleted_at === null && $existingRelationship->verification_status === 'approved') {
+                    throw new InvalidArgumentException('This learner is already linked to your guardian account.');
+                }
+
+                if ($existingRelationship && $existingRelationship->deleted_at === null && $existingRelationship->verification_status === 'pending') {
+                    throw new InvalidArgumentException('A relationship verification request is already pending for this learner.');
+                }
+
+                $existingPending = ParentChildInvitation::query()
+                    ->where('inviter_parent_user_id', $parent->id)
+                    ->where('child_user_id', $child->id)
+                    ->where('status', ParentChildInvitationStatus::Pending->value)
+                    ->lockForUpdate()
+                    ->latest('id')
+                    ->first();
+
+                if ($existingPending !== null) {
+                    if ($existingPending->isExpired()) {
+                        $existingPending->update(['status' => ParentChildInvitationStatus::Expired->value]);
+                    } else {
+                        throw new InvalidArgumentException('An invitation is already pending for this learner.');
+                    }
+                }
+
                 $invitation = ParentChildInvitation::query()->create([
                     'inviter_parent_user_id' => $parent->id,
                     'child_user_id' => $child->id,
@@ -131,6 +136,7 @@ class ParentChildInvitationService
 
         try {
             [$updatedInvitation, $wasExpired] = DB::transaction(function () use ($child, $invitation, $normalizedDecision, $decisionNote, &$movedDocuments): array {
+                $lockedChild = User::query()->lockForUpdate()->findOrFail($child->id);
                 $invitation = ParentChildInvitation::query()
                     ->lockForUpdate()
                     ->findOrFail($invitation->id);
@@ -145,8 +151,6 @@ class ParentChildInvitationService
                     return [$invitation->fresh(), true];
                 }
 
-                $lockedChild = User::query()->lockForUpdate()->findOrFail($child->id);
-
                 if ((int) $invitation->child_user_id !== (int) $lockedChild->id) {
                     throw new InvalidArgumentException('You are not allowed to respond to this invitation.');
                 }
@@ -157,6 +161,15 @@ class ParentChildInvitationService
                         ->where('parent_user_id', $invitation->inviter_parent_user_id)
                         ->where('child_user_id', $invitation->child_user_id)
                         ->first();
+
+                    if ($link && $link->deleted_at === null && $link->verification_status === 'approved') {
+                        throw new InvalidArgumentException('This learner is already linked to the guardian account.');
+                    }
+
+                    if ($link && $link->deleted_at === null && $link->verification_status === 'pending') {
+                        throw new InvalidArgumentException('A relationship verification request is already pending for this learner.');
+                    }
+
                     $relationshipType = $invitation->relationship_type ?: GuardianRelationshipTypes::LEGACY_PARENT;
                     $requiresVerification = GuardianRelationshipTypes::requiresVerification($relationshipType);
                     $documents = $requiresVerification ? $invitation->relationship_verification_documents : null;

@@ -13,6 +13,11 @@ const defaultState = {
     discovery: {
         role: null,
         supportAdmin: null,
+        supportAvailability: {
+            available: false,
+            title: 'Support Currently Offline',
+            message: 'Your message will be reviewed when support becomes available.',
+        },
         contacts: {
             learners: [],
             instructors: [],
@@ -113,6 +118,7 @@ function normalizeConversation(conversation) {
             : null,
         can_send: conversation.can_send !== false,
         unread_count: Number(conversation.unread_count || 0),
+        support_availability: conversation.support_availability || null,
     };
 }
 
@@ -461,6 +467,7 @@ document.addEventListener('alpine:init', () => {
 
                 this.discovery.role = response.data.role || this.currentUserRole;
                 this.discovery.supportAdmin = normalizeParticipant(response.data.support_admin || null);
+                this.discovery.supportAvailability = response.data.support_availability || this.discovery.supportAvailability;
                 this.discovery.contacts = {
                     learners: (response.data.contacts?.learners || []).map((contact) => normalizeParticipant(contact)),
                     instructors: (response.data.contacts?.instructors || []).map((contact) => normalizeParticipant(contact)),
@@ -599,6 +606,17 @@ document.addEventListener('alpine:init', () => {
 
         activeConversationIsAccepted() {
             return this.activeConversation()?.status === 'accepted';
+        },
+
+        activeConversationIsSupport() {
+            return this.activeConversation()?.conversation_type === 'admin_support_chat'
+                && this.currentUserRole !== 'admin';
+        },
+
+        activeSupportAvailability() {
+            return this.activeConversation()?.support_availability
+                || this.discovery.supportAvailability
+                || defaultState.discovery.supportAvailability;
         },
 
         activeMessages() {

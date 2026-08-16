@@ -183,10 +183,10 @@ class EnrollmentController extends Controller
             ->filter(fn ($link) => $link->parent !== null)
             ->values()
             ->map(function ($link): array {
-                $parentName = trim((string) ($link->parent?->full_name ?? $link->parent?->name ?? 'Parent'));
+                $parentName = trim((string) ($link->parent?->full_name ?? $link->parent?->name ?? 'Guardian'));
 
                 return [
-                    'parent_name' => $parentName !== '' ? $parentName : 'Parent',
+                    'parent_name' => $parentName !== '' ? $parentName : 'Guardian',
                     'verification_status' => (string) ($link->verification_status ?? 'pending'),
                     'can_view_progress' => (bool) ($link->can_view_progress ?? false),
                     'can_view_quiz_answers' => (bool) ($link->can_view_quiz_answers ?? false),

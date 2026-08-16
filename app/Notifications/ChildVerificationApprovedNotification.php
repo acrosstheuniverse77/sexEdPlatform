@@ -33,15 +33,15 @@ class ChildVerificationApprovedNotification extends Notification
             ->subject('Child Account Verification Approved')
             ->view('emails.moderation-status', [
                 'title' => 'Child Account Approved',
-                'subtitle' => 'Parent controls are now active',
-                'greetingName' => $notifiable->first_name ?? 'Parent',
+                'subtitle' => 'Guardian controls are now active',
+                'greetingName' => $notifiable->first_name ?? 'Guardian',
                 'intro' => 'Your child account verification has been approved for ' . $this->child->full_name . '.',
                 'details' => [
                     'You can now monitor progress, quiz activity, and learning history.',
-                    'Open your parent dashboard to manage your child account.',
+                    'Open your guardian dashboard to manage your dependent account.',
                 ],
                 'actionUrl' => route('parent.children.index'),
-                'actionText' => 'Go to My Children',
+                'actionText' => 'Go to My Dependents',
             ]);
     }
 

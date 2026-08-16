@@ -17,15 +17,21 @@ class EmailVerificationPromptController extends Controller
         $user = $request->user();
 
         if ($user->hasVerifiedEmail()) {
-            if ($user->isParentRegistration() && ! $user->isParentVerificationApproved()) {
-                return view('auth.parent-verification-status', [
-                    'user' => $user,
-                ]);
+            if ($user->isParentRegistration() && ! $user->parent_verification_status) {
+                return redirect()->route('guardian.verification.create');
             }
 
-            if ($user->isParentRegistration() && $user->isParentVerificationApproved() && $user->hasCompletedProfile()) {
+            if ($user->isParentRegistration() && ! $user->isParentVerificationApproved()) {
+                return redirect()->route('guardian.verification.status');
+            }
+
+            if ($user->isParentRegistration() && $user->isParentVerificationApproved() && ! $user->hasCompletedGuardianOnboarding()) {
+                return redirect()->route('guardian.onboarding.show');
+            }
+
+            if ($user->isParentRegistration() && $user->isParentVerificationApproved() && $user->hasCompletedGuardianOnboarding()) {
                 return redirect()->route('learner.dashboard')
-                    ->with('success', 'Parent verification approved.')
+                    ->with('success', 'Guardian verification approved.')
                     ->with('show_parent_approved_dashboard_modal', true);
             }
 

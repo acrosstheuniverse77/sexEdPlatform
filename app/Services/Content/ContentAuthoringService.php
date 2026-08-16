@@ -53,8 +53,10 @@ class ContentAuthoringService
      */
     private function normalizeCommonPayload(array $validated, ?Module $existing = null): array
     {
-        $ageBracket = (string) ($validated['age_bracket'] ?? 'teens');
-        [$minAge, $maxAge] = $this->ageRangeForBracket($ageBracket);
+        $learnerCategories = Module::normalizeLearnerCategories(
+            (array) ($validated['age_brackets'] ?? [($validated['age_bracket'] ?? 'teens')])
+        );
+        [$minAge, $maxAge] = Module::ageRangeForLearnerCategories($learnerCategories);
 
         $accessType = (string) ($validated['access_type'] ?? ($existing?->access_type ?? 'free'));
         $priceCurrency = strtoupper((string) ($validated['price_currency'] ?? ($existing?->price_currency ?? 'PHP')));
@@ -132,15 +134,4 @@ class ContentAuthoringService
         return $payload;
     }
 
-    /**
-     * @return array{0:int,1:int}
-     */
-    private function ageRangeForBracket(string $ageBracket): array
-    {
-        return match ($ageBracket) {
-            'kids' => [5, 12],
-            'adults' => [18, 100],
-            default => [13, 17],
-        };
-    }
 }

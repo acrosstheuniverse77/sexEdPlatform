@@ -4,6 +4,7 @@ namespace App\Http\Requests\Instructor;
 
 use App\Services\Instructor\InstructorPlanCapabilityService;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreModuleRequest extends FormRequest
 {
@@ -20,7 +21,9 @@ class StoreModuleRequest extends FormRequest
             'title' => 'required|string|max:255',
             'description' => 'required|string',
             'thumbnail' => 'nullable|image|max:2048',
-            'age_bracket' => 'required|in:kids,teens,adults',
+            'age_bracket' => ['nullable', Rule::in(['kids', 'teens', 'adults'])],
+            'age_brackets' => ['required_without:age_bracket', 'array', 'min:1'],
+            'age_brackets.*' => ['required', Rule::in(['kids', 'teens', 'adults'])],
             'enrollment_mode' => 'required|in:auto,manual',
             'action' => 'nullable|in:publish,draft,archive',
             'order' => 'nullable|integer|min:0',
@@ -29,8 +32,8 @@ class StoreModuleRequest extends FormRequest
             'price_amount' => 'nullable|numeric|min:0.01|required_if:access_type,paid',
             'price_currency' => 'nullable|in:PHP',
             'enrollment_limit' => $enrollmentLimitCap !== null
-                ? 'required|integer|min:1|max:' . $enrollmentLimitCap
-                : 'required|integer|min:1',
+                ? 'nullable|integer|min:1|max:' . $enrollmentLimitCap
+                : 'nullable|integer|min:1',
         ];
     }
 
