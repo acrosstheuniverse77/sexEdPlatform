@@ -63,8 +63,8 @@
 
         @if($parentLinks->isNotEmpty())
             <div class="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-6 shadow-sm">
-                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Parent Transparency</h2>
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">This learner is linked to a parent account. You may coordinate updates when guidance is needed.</p>
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Guardian Transparency</h2>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">This learner is linked to a guardian account. You may coordinate updates when guidance is needed.</p>
                 <div class="mt-4 space-y-3">
                     @foreach($parentLinks as $parentLink)
                         @php
@@ -99,7 +99,7 @@
                                     <button type="button"
                                        @click="window.dispatchEvent(new CustomEvent('open-global-chat', { detail: { target_user_id: {{ (int) $parentUser->id }}, conversation_type: 'direct', name: @js($parentUser->name) } }))"
                                        class="inline-flex items-center justify-center px-3.5 py-2 rounded-lg text-sm font-semibold bg-brand-600 text-white hover:bg-brand-700 transition-colors">
-                                        Message Parent
+                                        Message Guardian
                                     </button>
                                 @endif
                             </div>
@@ -111,8 +111,8 @@
 
         @if($linkedChildren->isNotEmpty())
             <div class="rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-6 shadow-sm">
-                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Parent Account Details</h2>
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">All children currently linked to this parent account.</p>
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Guardian Account Details</h2>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">All children currently linked to this guardian account.</p>
                 <div class="mt-4 space-y-3">
                     @foreach($linkedChildren as $childLink)
                         @php

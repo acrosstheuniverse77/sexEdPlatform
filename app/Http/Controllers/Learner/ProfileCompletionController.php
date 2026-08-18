@@ -26,6 +26,10 @@ class ProfileCompletionController extends Controller
     {
         $user = Auth::user();
 
+        if ($user->isParentRegistration() && $user->isParentVerificationApproved() && ! $user->hasCompletedGuardianOnboarding()) {
+            return redirect()->route('guardian.onboarding.show');
+        }
+
         // If profile already completed, redirect to dashboard
         if ($user->hasCompletedProfile()) {
             if ($user->isParentRegistration() && $user->isParentVerificationApproved()) {
@@ -63,6 +67,10 @@ class ProfileCompletionController extends Controller
     public function checkUsername(Request $request)
     {
         $user = Auth::user();
+
+        if ($user->isParentRegistration() && $user->isParentVerificationApproved() && ! $user->hasCompletedGuardianOnboarding()) {
+            return redirect()->route('guardian.onboarding.show');
+        }
         $rawUsername = (string) $request->query('username', '');
         $username = strtolower(trim($rawUsername));
 
@@ -149,7 +157,7 @@ class ProfileCompletionController extends Controller
 
             if (! $user->isParentVerificationApproved()) {
                 return redirect()->route('parent.verification.status')
-                    ->with('warning', 'Your parent account is pending verification.');
+                    ->with('warning', 'Your guardian account is pending verification.');
             }
         }
         
@@ -168,7 +176,7 @@ class ProfileCompletionController extends Controller
         // If parent account, continue to dashboard and show approved-parent modal
         if ($learnerProfile->is_parent_account) {
             return redirect()->route('learner.dashboard')
-                ->with('success', 'Profile completed! Your parent account is approved.')
+                ->with('success', 'Profile completed! Your guardian account is approved.')
                 ->with('show_parent_approved_dashboard_modal', true);
         }
 

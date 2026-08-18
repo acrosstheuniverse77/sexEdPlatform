@@ -1,18 +1,32 @@
-# Community Feed V1 Design
+# Community Feed V1 Baseline Design
+
+> Current status: superseded as the active product target by
+> `docs/superpowers/specs/2026-08-05-community-hub-design.md`.
+> Keep this document as the backend safety baseline only. The current feed
+> experience is the Connector Community Hub: connector-scoped, adult-facing,
+> moderation-first, with tabs for Featured, Announcements, Events, Resources,
+> Q&A, and Discussions. Do not implement this older V1 document as a standalone
+> generic feed.
 
 ## Status
 
-Approved for implementation planning.
+Superseded by the Community Hub spec for active implementation. Retained for
+backend safety contracts, entity definitions, moderation rules, and minor
+exclusion requirements.
 
 ## Context
 
 Conscious Connections is an age-aware Laravel education platform for sexual health, consent, relationships, and community education in the Philippines. The platform already has global RBAC, Laravel policies, connector-local roles, parent-child safety workflows, centralized moderation, suspensions, appeals, connector accounts, seminars, livestreams, and notifications.
 
-Community Feed V1 must reuse those safety and governance patterns. It must not become an open social network or an adult-to-minor contact surface.
+Community Feed V1 defined the original safety and governance baseline. The
+current Community Hub still reuses those patterns and still must not become an
+open social network or an adult-to-minor contact surface.
 
 ## V1 Scope
 
-Community Feed V1 is a connector-scoped adult-facing feed where approved connectors can publish announcements, educational resources, and moderated questions.
+The current Community Hub is a connector-scoped, adult-facing education space.
+Approved connectors can publish announcements, seminar/event posts, educational
+resources, moderated Q&A, and connector-authored discussion prompts.
 
 Minors cannot create posts, comment, react, or receive replies in V1. Guardian notifications are reserved for future minor participation or child feed visibility features. In V1, guardian alerts are not required because child accounts do not directly interact with the feed.
 
@@ -65,11 +79,13 @@ Required relationships:
 - Has many reports or report-source records.
 - Has many moderation action logs.
 
-Allowed V1 post types:
+Current supported post types:
 
 - Announcement
+- Event
 - Educational resource
 - Moderated question
+- Discussion prompt
 
 Post statuses:
 
@@ -92,7 +108,7 @@ V1 comments are flat only. There are no nested replies because nested replies ca
 
 Represents low-risk educational reactions.
 
-Recommended V1 reaction set:
+Current reaction set:
 
 - `learned`
 - `helpful`
@@ -278,16 +294,19 @@ Acceptance criteria:
 - Feed permissions respect global RBAC, connector-local roles, suspension state, and connector status.
 - The module can be frozen during a safety incident.
 
-## Implementation Planning Notes
+## Current Implementation Planning Notes
 
-Implementation should extend existing service-layer, policy, connector-permission, notification, and moderation patterns. It should not introduce a parallel moderation or suspension system.
+Active implementation work should follow the Community Hub spec and plan, while
+preserving this document's service-layer, policy, connector-permission,
+notification, and moderation contracts. It should not introduce a parallel
+moderation or suspension system.
 
-The first implementation plan should prioritize backend safety contracts before UI polish:
+The active Community Hub implementation should prioritize:
 
-- Migrations and models.
-- Policies and permission seeding.
-- Connector-space access service.
-- Pre-screening service.
-- Moderation adapter.
-- Admin and connector moderation actions.
-- Tests for minor exclusion, suspension behavior, connector scoping, moderation routing, audit retention, and emergency freeze.
+- Stable backend safety contracts from this baseline.
+- User-facing Community Hub copy instead of generic Community Feed copy.
+- Hub tabs: Featured, Announcements, Events, Resources, Q&A, Discussions, and authorized Moderation.
+- Post types: announcement, event, resource, moderated_question, and discussion_prompt.
+- Featured/pinned posts and seminar-aware event posts.
+- Admin and connector moderation workspaces matching the existing module UI.
+- Tests for minor exclusion, suspension behavior, connector scoping, moderation routing, audit retention, emergency freeze, and absence of guardian notifications in the adult-facing version.

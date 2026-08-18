@@ -6,19 +6,19 @@
                 <p class="text-white/90 font-semibold tracking-wide text-sm uppercase">Conscious Connections</p>
             </div>
             <h2 class="text-4xl font-bold text-white mb-4 leading-tight">Young learner?</h2>
-            <p class="text-white/80 text-lg max-w-xs">A parent account is needed first</p>
+            <p class="text-white/80 text-lg max-w-xs">A guardian account is needed first</p>
         </div>
     </x-slot>
 
     <div class="mb-6">
-        <h2 class="text-2xl font-bold text-purple-900">Parent/Guardian Required</h2>
-        <p class="mt-2 text-sm text-gray-600">Children under 13 years old need a parent or guardian to create their account.</p>
+        <h2 class="text-2xl font-bold text-purple-900">Guardian Required</h2>
+        <p class="mt-2 text-sm text-gray-600">Young learners under 13 years old need a guardian to create their account.</p>
     </div>
 
     <!-- Purple info block -->
     <div class="bg-purple-50 border-l-4 border-purple-500 p-4 mb-6">
         <p class="text-sm text-purple-800">
-            For your child's safety and to comply with online privacy laws, we require parental consent for users under 13 years old.
+            For young learner safety and online privacy compliance, we require guardian consent for users under 13 years old.
         </p>
     </div>
 
@@ -32,8 +32,8 @@
                     1
                 </div>
                 <div class="ml-4">
-                    <h4 class="text-sm font-semibold text-gray-900">Parent/Guardian Registers</h4>
-                    <p class="text-sm text-gray-600">Create your parent account and upload a valid government-issued ID (must be 18+ years old)</p>
+                    <h4 class="text-sm font-semibold text-gray-900">Guardian Registers</h4>
+                    <p class="text-sm text-gray-600">Create your guardian account and upload a valid government-issued ID (must be 18+ years old)</p>
                 </div>
             </div>
 
@@ -43,8 +43,8 @@
                     2
                 </div>
                 <div class="ml-4">
-                    <h4 class="text-sm font-semibold text-gray-900">Admin Reviews Parent Verification</h4>
-                    <p class="text-sm text-gray-600">After email verification, your parent account goes to pending admin review</p>
+                    <h4 class="text-sm font-semibold text-gray-900">Admin Reviews Guardian Verification</h4>
+                    <p class="text-sm text-gray-600">After email verification, your guardian account goes to pending admin review</p>
                 </div>
             </div>
 
@@ -54,8 +54,8 @@
                     3
                 </div>
                 <div class="ml-4">
-                    <h4 class="text-sm font-semibold text-gray-900">Create Child Account</h4>
-                    <p class="text-sm text-gray-600">Once approved, create a child account and upload a supporting document</p>
+                    <h4 class="text-sm font-semibold text-gray-900">Create Dependent Account</h4>
+                    <p class="text-sm text-gray-600">Once approved, create a dependent account and upload a supporting document</p>
                 </div>
             </div>
 
@@ -66,7 +66,7 @@
                 </div>
                 <div class="ml-4">
                     <h4 class="text-sm font-semibold text-gray-900">Monitor Progress</h4>
-                    <p class="text-sm text-gray-600">After child approval, track your child's learning progress and quiz results</p>
+                    <p class="text-sm text-gray-600">After dependent approval, track learning progress and quiz results</p>
                 </div>
             </div>
         </div>
@@ -80,7 +80,7 @@
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
             </svg>
-            Register as Parent/Guardian
+            Register as Guardian
         </a>
 
         <a href="{{ route('login') }}" class="w-full inline-flex justify-center items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-purple-primary transition">
@@ -91,7 +91,7 @@
     <!-- Privacy Notice -->
     <div class="mt-8 p-4 bg-gray-50 rounded-lg">
         <p class="text-xs text-gray-600 text-center">
-             We take your child's privacy seriously. Read our 
+             We take young learner privacy seriously. Read our 
             <a href="{{ route('privacy') }}" class="text-brand-purple-primary hover:text-brand-purple-light underline" target="_blank">Privacy Policy</a> 
             and <a href="{{ route('terms') }}" class="text-brand-purple-primary hover:text-brand-purple-light underline" target="_blank">Terms of Service</a>.
         </p>

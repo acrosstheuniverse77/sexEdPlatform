@@ -54,6 +54,17 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
         Route::post('/{appeal}/thread', [Admin\ModerationAppealController::class, 'storeThreadMessage'])->name('thread.store');
     });
 
+    Route::prefix('community')->name('community.')->group(function () {
+        Route::get('/', [Admin\CommunityFeedController::class, 'index'])->name('index');
+        Route::get('/settings', [Admin\CommunityFeedSettingsController::class, 'show'])->name('settings');
+        Route::post('/settings/freeze', [Admin\CommunityFeedSettingsController::class, 'freeze'])->name('freeze');
+        Route::post('/settings/unfreeze', [Admin\CommunityFeedSettingsController::class, 'unfreeze'])->name('unfreeze');
+        Route::get('/{communityPost}', [Admin\CommunityFeedController::class, 'show'])->name('show');
+        Route::post('/{communityPost}/moderation/hide', [Admin\CommunityModerationController::class, 'hide'])->name('moderation.hide');
+        Route::post('/{communityPost}/moderation/restore', [Admin\CommunityModerationController::class, 'restore'])->name('moderation.restore');
+        Route::post('/{communityPost}/moderation/remove', [Admin\CommunityModerationController::class, 'remove'])->name('moderation.remove');
+    });
+
     // Shared learning content authoring (reuses instructor content controllers)
     Route::resource('modules', Instructor\ModuleController::class);
     Route::patch('modules/{module}/activate', [Instructor\ModuleController::class, 'activate'])
@@ -271,6 +282,13 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
 
     Route::prefix('parent-verifications')->name('parent-verifications.')->group(function () {
         Route::get('/', [Admin\ParentChildVerificationController::class, 'index'])->name('index');
+        Route::get('/parents/{user}', [Admin\ParentChildVerificationController::class, 'showParent'])
+            ->name('parents.show');
+        Route::get('/parents/{user}/document/{side}', [Admin\ParentChildVerificationController::class, 'parentDocument'])
+            ->whereIn('side', ['front', 'back'])
+            ->name('parents.document');
+        Route::post('/parents/{user}/reset-onboarding', [Admin\ParentChildVerificationController::class, 'resetGuardianOnboarding'])
+            ->name('parents.reset-onboarding');
 
         Route::post('/parents/{user}/approve', [Admin\ParentChildVerificationController::class, 'approveParent'])
             ->name('parents.approve');
@@ -289,6 +307,17 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
             ->name('children.archive');
         Route::delete('/children/{parentChildAccount}', [Admin\ParentChildVerificationController::class, 'destroyChild'])
             ->name('children.destroy');
+
+        Route::get('/relationships/{parentChildAccount}', [Admin\ParentChildVerificationController::class, 'showRelationship'])
+            ->name('relationships.show');
+        Route::post('/relationships/{parentChildAccount}/approve', [Admin\ParentChildVerificationController::class, 'approveRelationship'])
+            ->name('relationships.approve');
+        Route::post('/relationships/{parentChildAccount}/reject', [Admin\ParentChildVerificationController::class, 'rejectRelationship'])
+            ->name('relationships.reject');
+        Route::post('/relationships/{parentChildAccount}/revoke', [Admin\ParentChildVerificationController::class, 'revokeRelationship'])
+            ->name('relationships.revoke');
+        Route::get('/relationships/{parentChildAccount}/documents/{document}', [Admin\ParentChildVerificationController::class, 'relationshipDocument'])
+            ->name('relationships.documents.show');
     });
 
     Route::post('/subscribers/{subscription}/archive', [Admin\SubscriberAdminController::class, 'archive'])

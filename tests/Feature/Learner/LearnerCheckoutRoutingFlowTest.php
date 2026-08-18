@@ -21,9 +21,12 @@ class LearnerCheckoutRoutingFlowTest extends TestCase
         $this->withoutMiddleware(EnsureProfileCompleted::class);
 
         $learner = $this->createLearner();
+        $admin = User::factory()->create(['role' => 'admin']);
+        $admin->assignRole('admin');
 
         $module = Module::factory()->create([
-            'created_by' => User::factory()->create(['role' => 'instructor'])->id,
+            'created_by' => $admin->id,
+            'content_owner_type' => 'admin',
             'is_published' => true,
             'access_type' => 'paid',
             'price_amount' => 499,

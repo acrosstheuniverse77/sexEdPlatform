@@ -59,7 +59,14 @@ class ParentInvitationController extends Controller
             $this->invitationService->sendInvitation(
                 $parent,
                 (string) $request->string('identifier'),
+                (string) $request->string('relationship_type'),
+                $request->filled('relationship_custom') ? (string) $request->string('relationship_custom') : null,
                 $request->filled('message') ? (string) $request->string('message') : null,
+                $request->hasFile('relationship_document') ? [
+                    'document_type' => (string) $request->string('relationship_document_type'),
+                    'document' => $request->file('relationship_document'),
+                    'supporting_document' => $request->file('relationship_supporting_document'),
+                ] : null,
             );
         } catch (InvalidArgumentException $exception) {
             return back()->withErrors(['identifier' => $exception->getMessage()])->withInput();
@@ -104,7 +111,7 @@ class ParentInvitationController extends Controller
         }
 
         $message = $updatedInvitation->status->value === 'accepted'
-            ? 'Invitation accepted. Parent link is now active.'
+            ? 'Invitation accepted. Guardian relationship is awaiting any required admin review.'
             : 'Invitation rejected.';
 
         return redirect()->route('parent.invitations.show', $updatedInvitation)
@@ -136,7 +143,7 @@ class ParentInvitationController extends Controller
 
         if (! $parent->isParentRegistration() || ! $parent->isParentVerificationApproved()) {
             return redirect()->route('parent.verification.status')
-                ->with('warning', 'Your parent account is still under admin review.');
+                ->with('warning', 'Your guardian account is still under admin review.');
         }
 
         if (! $parent->hasCompletedProfile()) {

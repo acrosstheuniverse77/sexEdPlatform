@@ -42,26 +42,22 @@
                         </div>
 
                         @php
-                            // Determine current age bracket
-                            $currentBracket = 'kids';
-                            if ($module->min_age === 13 && $module->max_age === 17) {
-                                $currentBracket = 'teens';
-                            } elseif ($module->min_age === 18) {
-                                $currentBracket = 'adults';
-                            }
+                            $currentCategories = old('age_brackets', $module->learnerCategoryKeys());
                         @endphp
 
                         <div class="mb-4">
-                            <label class="block text-sm font-medium text-gray-700">Age Bracket <span class="text-red-500">*</span></label>
-                            <select name="age_bracket" required
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-brand-500 focus:ring-brand-500">
-                                <option value="">Select target age group</option>
-                                <option value="kids" {{ old('age_bracket', $currentBracket) === 'kids' ? 'selected' : '' }}>Kids (5-12 years)</option>
-                                <option value="teens" {{ old('age_bracket', $currentBracket) === 'teens' ? 'selected' : '' }}>Teens (13-17 years)</option>
-                                <option value="adults" {{ old('age_bracket', $currentBracket) === 'adults' ? 'selected' : '' }}>Adults (18+ years)</option>
-                            </select>
-                            <p class="mt-1 text-xs text-gray-500">Select the age group this module is designed for</p>
-                            @error('age_bracket')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+                            <label class="block text-sm font-medium text-gray-700">Eligible Learner Categories <span class="text-red-500">*</span></label>
+                            <div class="mt-2 grid gap-2 sm:grid-cols-3">
+                                @foreach(\App\Models\Module::learnerCategoryLabelsMap() as $category => $label)
+                                    <label class="flex items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-sm">
+                                        <input type="checkbox" name="age_brackets[]" value="{{ $category }}" @checked(in_array($category, $currentCategories, true)) class="rounded border-gray-300 text-brand-600 focus:ring-brand-500">
+                                        <span>{{ $label }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                            <p class="mt-1 text-xs text-gray-500">Select at least one learner category this module is designed for</p>
+                            @error('age_brackets')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
+                            @error('age_brackets.*')<p class="mt-1 text-sm text-red-600">{{ $message }}</p>@enderror
                         </div>
 
                         <div class="mb-6">
@@ -174,4 +170,3 @@
                 </div>
             </div>
 @endsection
-

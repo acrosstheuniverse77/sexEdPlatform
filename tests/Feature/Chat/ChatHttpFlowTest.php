@@ -10,6 +10,7 @@ use App\Models\MessageRequest;
 use App\Models\Module;
 use App\Models\ModuleEnrollment;
 use App\Models\ParentChildAccount;
+use App\Models\ParentChildInvitation;
 use App\Models\User;
 use App\Enums\EnrollmentStatus;
 use Illuminate\Http\UploadedFile;
@@ -279,6 +280,47 @@ class ChatHttpFlowTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('requires_request', false)
             ->assertJsonPath('conversation.conversation_type', Conversation::TYPE_MODULE_CHAT);
+    }
+
+    public function test_enrolled_learner_can_start_instructor_chat_with_pending_guardian_invitation(): void
+    {
+        $parent = User::factory()->create(['role' => 'learner']);
+        $parent->assignRole('learner');
+        $learner = User::factory()->create(['role' => 'learner']);
+        $learner->assignRole('learner');
+        $instructor = User::factory()->create(['role' => 'instructor']);
+        $instructor->assignRole('instructor');
+
+        ParentChildInvitation::query()->create([
+            'inviter_parent_user_id' => $parent->id,
+            'child_user_id' => $learner->id,
+            'invite_token' => (string) \Illuminate\Support\Str::uuid(),
+            'relationship_type' => 'legal_guardian',
+            'status' => 'pending',
+            'expires_at' => now()->addDays(3),
+        ]);
+
+        $module = Module::factory()->create([
+            'created_by' => $instructor->id,
+            'is_published' => true,
+            'content_owner_type' => 'instructor',
+        ]);
+
+        ModuleEnrollment::query()->create([
+            'user_id' => $learner->id,
+            'module_id' => $module->id,
+            'status' => EnrollmentStatus::Approved,
+            'enrolled_at' => now(),
+        ]);
+
+        $this->actingAs($learner)
+            ->postJson(route('chat.conversations.start'), [
+                'target_user_id' => $instructor->id,
+                'conversation_type' => Conversation::TYPE_DIRECT,
+                'initial_message' => 'Can you help with this module?',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('requires_request', false);
     }
 
     public function test_message_index_returns_latest_window_and_supports_loading_older_messages(): void

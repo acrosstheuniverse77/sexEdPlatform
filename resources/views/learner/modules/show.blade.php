@@ -1,4 +1,4 @@
-﻿@extends('layouts.learner-app')
+@extends('layouts.learner-app')
 
 @section('title', $module->title)
 
@@ -17,6 +17,7 @@
     $approvedEnrollmentsCount = $approvedEnrollmentsCount ?? 0;
     $isAtCapacity = $isAtCapacity ?? false;
     $canPurchase = $canPurchase ?? false;
+    $isOwnedByCurrentUser = $isOwnedByCurrentUser ?? $module->isOwnedBy($authUser);
     $needsParentApproval = $needsParentApproval ?? false;
     $isParentApprovedForPurchase = $isParentApprovedForPurchase ?? false;
 
@@ -93,7 +94,7 @@
                 <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/>
             </svg>
             @if($hasUnlimitedShields)
-                <span class="text-sm font-bold text-gray-900 dark:text-white">∞</span>
+                <span class="text-sm font-bold text-gray-900 dark:text-white">&infin;</span>
                 <span class="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">Unlimited Shields</span>
             @else
                 <span class="text-sm font-bold text-gray-900 dark:text-white">{{ $shieldsRemaining }}</span>
@@ -491,7 +492,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-2.761 0-5 2.239-5 5m5-5c2.761 0 5 2.239 5 5m-5-5v10m0 0l-3-3m3 3l3-3"/>
                             </svg>
                             <div>
-                                <p class="text-sm font-semibold text-indigo-800 dark:text-indigo-300">Parent Approved. Payment Required.</p>
+                                <p class="text-sm font-semibold text-indigo-800 dark:text-indigo-300">Guardian Approved. Payment Required.</p>
                                 <p class="text-xs text-indigo-700 dark:text-indigo-400 mt-0.5">Continue to checkout to unlock this paid module.</p>
                             </div>
                         </div>
@@ -516,8 +517,8 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-2.761 0-5 2.239-5 5m5-5c2.761 0 5 2.239 5 5m-5-5v10m0 0l-3-3m3 3l3-3"/>
                             </svg>
                             <div>
-                                <p class="text-sm font-semibold text-amber-800 dark:text-amber-300">Awaiting Parent Approval</p>
-                                <p class="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Your request was submitted. You cannot submit another request until your parent approves or rejects this one.</p>
+                                <p class="text-sm font-semibold text-amber-800 dark:text-amber-300">Awaiting Guardian Approval</p>
+                                <p class="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Your request was submitted. You cannot submit another request until your guardian approves or rejects this one.</p>
                             </div>
                         </div>
                         <a href="{{ route('learner.notifications.index') }}"
@@ -562,13 +563,23 @@
                     </div>
 
                     @if($isPaidModule)
-                        @if($needsParentApproval && !$isParentApprovedForPurchase)
+                        @if($isOwnedByCurrentUser)
+                            <div class="flex items-start gap-3 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800/40 rounded-xl">
+                                <svg class="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M12 3.75l7.5 3v5.25c0 4.142-2.924 8.012-7.5 9-4.576-.988-7.5-4.858-7.5-9V6.75l7.5-3z"/>
+                                </svg>
+                                <div>
+                                    <p class="text-sm font-semibold text-purple-800 dark:text-purple-300">Owned by You</p>
+                                    <p class="text-xs text-purple-700 dark:text-purple-400 mt-0.5">You can manage this module as its owner, but you cannot purchase your own module.</p>
+                                </div>
+                            </div>
+                        @elseif($needsParentApproval && !$isParentApprovedForPurchase)
                             <div class="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-xl">
                                 <svg class="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3m0 3h.01M5.2 19h13.6c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.468 16c-.77 1.333.192 3 1.732 3z"/>
                                 </svg>
                                 <div>
-                                    <p class="text-sm font-semibold text-amber-800 dark:text-amber-300">Parent approval required before payment</p>
+                                    <p class="text-sm font-semibold text-amber-800 dark:text-amber-300">Guardian approval required before payment</p>
                                     <p class="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Request approval first, then return to complete checkout.</p>
                                 </div>
                             </div>
@@ -577,7 +588,7 @@
                                 <button type="submit"
                                         class="flex items-center justify-center gap-2 w-full text-sm font-semibold text-white py-3 px-4 rounded-xl transition hover:opacity-90"
                                         style="background: linear-gradient(135deg, #A30EB2, #730DB1, #3B0CB1);">
-                                    Request Parent Approval
+                                    Request Guardian Approval
                                 </button>
                             </form>
                         @elseif($isAtCapacity)
@@ -664,6 +675,12 @@
 <script src="{{ asset('build/tinymce/tinymce.min.js') }}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        document.querySelector('[data-review-form="true"]')?.addEventListener('submit', function () {
+            if (typeof tinymce !== 'undefined') {
+                tinymce.triggerSave();
+            }
+        });
+
         if (typeof tinymce === 'undefined') {
             return;
         }

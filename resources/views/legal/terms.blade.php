@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
@@ -54,14 +54,14 @@
 
                 <!-- Age Requirements -->
                 <section>
-                    <h2 class="text-xl font-semibold mb-4" style="color: #730DB1;">2. Age Requirements & Parental Consent</h2>
+                    <h2 class="text-xl font-semibold mb-4" style="color: #730DB1;">2. Age Requirements & Guardian Consent</h2>
                     <div class="space-y-3 text-gray-700">
                         <p class="leading-relaxed">
                             <strong>For Users Under 13 Years Old:</strong> In compliance with the Children's Online Privacy Protection Act (COPPA), 
-                            children under the age of 13 cannot create an account without parental consent. A parent or legal guardian must:
+                            children under the age of 13 cannot create an account without guardian consent. A guardian or legal guardian must:
                         </p>
                         <ul class="list-disc list-inside pl-4 space-y-2">
-                            <li>Register as a parent user (must be 18 years or older)</li>
+                            <li>Register as a guardian user (must be 18 years or older)</li>
                             <li>Verify their email address</li>
                             <li>Create a child account on behalf of the minor</li>
                             <li>Maintain oversight of the child's account and activities</li>
@@ -86,13 +86,13 @@
                             <li>You must provide accurate, complete information during registration</li>
                             <li>Currently, only Gmail accounts (@gmail.com) are accepted for email verification</li>
                             <li>You are responsible for maintaining the confidentiality of your account credentials</li>
-                            <li>Parent accounts are verified through email confirmation</li>
+                            <li>Guardian accounts are verified through email confirmation</li>
                         </ul>
                         <p class="leading-relaxed mt-4"><strong>Account Security:</strong></p>
                         <ul class="list-disc list-inside pl-4 space-y-2">
                             <li>Never share your password with anyone</li>
                             <li>Notify us immediately if you suspect unauthorized access to your account</li>
-                            <li>Parents are responsible for securing their child accounts</li>
+                            <li>Guardians are responsible for securing their child accounts</li>
                         </ul>
                     </div>
                 </section>
@@ -113,23 +113,23 @@
                     </div>
                 </section>
 
-                <!-- Parent Rights -->
+                <!-- Guardian Rights -->
                 <section>
-                    <h2 class="text-xl font-semibold mb-4" style="color: #730DB1;">5. Parent Rights & Responsibilities</h2>
+                    <h2 class="text-xl font-semibold mb-4" style="color: #730DB1;">5. Guardian Rights & Responsibilities</h2>
                     <div class="space-y-3 text-gray-700">
-                        <p class="leading-relaxed">Parents who create accounts for children under 13 have the right to:</p>
+                        <p class="leading-relaxed">Guardians who create accounts for children under 13 have the right to:</p>
                         <ul class="list-disc list-inside pl-4 space-y-2">
                             <li>View their child's learning progress and module completion status</li>
                             <li>Review quiz attempts, answers, and scores</li>
                             <li>Approve or restrict access to specific content (when implemented)</li>
                             <li>Request deletion of their child's account and all associated data</li>
                         </ul>
-                        <p class="leading-relaxed mt-4">Parents are responsible for:</p>
+                        <p class="leading-relaxed mt-4">Guardians are responsible for:</p>
                         <ul class="list-disc list-inside pl-4 space-y-2">
                             <li>Monitoring their child's platform usage and activities</li>
                             <li>Discussing age-appropriate content with their child</li>
                             <li>Ensuring their child understands safe online behavior</li>
-                            <li>Keeping their parent account credentials secure</li>
+                            <li>Keeping their guardian account credentials secure</li>
                         </ul>
                     </div>
                 </section>
@@ -214,7 +214,7 @@
                             You may request account deletion at any time by contacting support.
                         </p>
                         <p class="leading-relaxed">
-                            Parents may request immediate deletion of child accounts, and we will comply within 30 days.
+                            Guardians may request immediate deletion of child accounts, and we will comply within 30 days.
                         </p>
                     </div>
                 </section>
@@ -255,8 +255,8 @@
 
         <!-- Footer Links -->
         <div class="mt-8 text-center space-x-4 pb-10 text-sm">
-            <button onclick="history.back()" class="font-medium hover:opacity-75 transition-opacity" style="color: #730DB1;">← Go Back</button>
-            <span class="text-gray-400">•</span>
+            <button onclick="history.back()" class="font-medium hover:opacity-75 transition-opacity" style="color: #730DB1;">? Go Back</button>
+            <span class="text-gray-400">�</span>
             <a href="{{ route('privacy') }}" class="font-medium hover:opacity-75 transition-opacity" style="color: #730DB1;">Privacy Policy</a>
         </div>
     </main>

@@ -65,7 +65,7 @@
  <div>
  <label class="block text-sm font-medium text-gray-700 mb-1.5">Target Audience</label>
  <div class="flex flex-wrap gap-3">
- @foreach(['Learners','Instructors','Counselors','Parents','Healthcare Workers','General Public'] as $aud)
+ @foreach(['Learners','Instructors','Counselors','Guardians','Healthcare Workers','General Public'] as $aud)
  <label class="flex items-center gap-2 text-sm text-gray-700 ">
  <input type="checkbox" name="audience[]" value="{{ strtolower($aud) }}" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500">
  {{ $aud }}

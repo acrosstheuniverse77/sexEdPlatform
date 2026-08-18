@@ -43,6 +43,7 @@ class AdminUserRelationshipMutationTest extends TestCase
             ->post(route('admin.users.relationships.attach'), [
                 'parent_user_id' => $parent->id,
                 'child_user_id' => $child->id,
+                'relationship_type' => 'aunt',
                 'is_verified' => false,
             ])
             ->assertRedirect();
@@ -50,6 +51,8 @@ class AdminUserRelationshipMutationTest extends TestCase
         $this->assertDatabaseHas('parent_child_accounts', [
             'parent_user_id' => $parent->id,
             'child_user_id' => $child->id,
+            'relationship_type' => 'aunt',
+            'relationship_status' => 'active',
         ]);
 
         $this->actingAs($admin)
@@ -74,7 +77,7 @@ class AdminUserRelationshipMutationTest extends TestCase
             ])
             ->assertRedirect();
 
-        $this->assertDatabaseMissing('parent_child_accounts', [
+        $this->assertSoftDeleted('parent_child_accounts', [
             'parent_user_id' => $parent->id,
             'child_user_id' => $child->id,
         ]);

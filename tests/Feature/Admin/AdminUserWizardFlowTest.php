@@ -55,7 +55,8 @@ class AdminUserWizardFlowTest extends TestCase
             ->followingRedirects()
             ->get(route('admin.users.edit', $target))
             ->assertOk()
-            ->assertSee('Edit User: '.$target->name, false)
+            ->assertSee('Edit User:', false)
+            ->assertSee(e($target->name), false)
             ->assertSee('Update User', false);
     }
 }

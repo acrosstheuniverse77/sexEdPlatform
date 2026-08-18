@@ -8,6 +8,7 @@ enum ModerationCaseSource: string
     case ChatReport = 'chat_report';
     case LearnerReport = 'learner_report';
     case InstructorApplication = 'instructor_application';
+    case CommunityFeed = 'community_feed';
     case AdminManual = 'admin_manual';
     case SystemEvent = 'system_event';
 
@@ -18,6 +19,7 @@ enum ModerationCaseSource: string
             self::ChatReport => 'Chat Report',
             self::LearnerReport => 'Learner Report',
             self::InstructorApplication => 'Instructor Application',
+            self::CommunityFeed => 'Community Feed',
             self::AdminManual => 'Admin Manual',
             self::SystemEvent => 'System Event',
         };

@@ -11,7 +11,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                 </svg>
-                Back to Child Dashboard
+                Back to Dependent Dashboard
             </a>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Quiz Attempt Details</h1>
             <p class="text-sm text-gray-500 mt-1">Review {{ $child->full_name }}'s attempt results and answers.</p>
@@ -21,7 +21,7 @@
                 onclick='window.dispatchEvent(new CustomEvent("open-global-chat", { detail: { target_user_id: {{ (int) $child->id }}, conversation_type: "direct", name: @json($child->full_name ?: $child->name) } }))'
                 class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
                 style="background: linear-gradient(135deg, #A30EB2, #730DB1, #3B0CB1);">
-            Message Child
+            Message Dependent
         </button>
     </div>
 

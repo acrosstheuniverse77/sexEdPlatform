@@ -43,7 +43,7 @@
                         $ageBracket = $learnerProfile->getAgeBracket();
                         $isParentUser = (bool) ($learnerProfile->is_parent_account ?? false);
                         $typeBadge = match(true) {
-                            $isParentUser              => ['label' => 'Parent Account',  'class' => 'bg-amber-400/20 text-amber-200 border-amber-400/30'],
+                            $isParentUser              => ['label' => 'Guardian Account',  'class' => 'bg-amber-400/20 text-amber-200 border-amber-400/30'],
                             $ageBracket === 'kids'     => ['label' => 'Young Learner',   'class' => 'bg-green-400/20 text-green-200 border-green-400/30'],
                             $ageBracket === 'teens'    => ['label' => 'Teen Learner',    'class' => 'bg-blue-400/20 text-blue-100 border-blue-400/30'],
                             $ageBracket === 'adults'   => ['label' => 'Adult Learner',   'class' => 'bg-white/10 text-purple-100 border-white/20'],
@@ -88,8 +88,8 @@
             <section class="p-5 border bg-amber-50/60 dark:bg-amber-900/10 rounded-2xl border-amber-100/60 dark:border-amber-800/30">
                 <div class="flex items-center justify-between mb-4">
                     <div class="pl-3 border-l-4 border-amber-400">
-                        <h2 class="text-base font-semibold text-gray-900 dark:text-white">Parent Invitation Requests</h2>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">Review pending invitations from parent accounts.</p>
+                        <h2 class="text-base font-semibold text-gray-900 dark:text-white">Guardian Invitation Requests</h2>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Review pending invitations from guardian accounts.</p>
                     </div>
                 </div>
 
@@ -99,7 +99,7 @@
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div class="min-w-0">
                                     <p class="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                                        {{ $invitation->inviterParent?->name ?? 'Parent' }} invited you to link accounts
+                                        {{ $invitation->inviterParent?->name ?? 'Guardian' }} invited you to link accounts
                                     </p>
                                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ $invitation->created_at?->diffForHumans() }}</p>
                                 </div>
@@ -118,12 +118,12 @@
             <section class="p-5 border bg-indigo-50/40 dark:bg-indigo-900/10 rounded-2xl border-indigo-100/60 dark:border-indigo-800/30">
                 <div class="flex items-center justify-between mb-4">
                     <div class="pl-3 border-l-4 border-indigo-400">
-                        <h2 class="text-base font-semibold text-gray-900 dark:text-white">My Parent</h2>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">Linked parent accounts you can contact directly.</p>
+                        <h2 class="text-base font-semibold text-gray-900 dark:text-white">My Guardian</h2>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Linked guardian accounts you can contact directly.</p>
                     </div>
                     <a href="{{ route('learner.parent.index') }}"
                        class="group inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-indigo-100 text-indigo-700 hover:bg-indigo-600 hover:text-white hover:scale-105 hover:shadow-md hover:shadow-indigo-300/40 transition-all duration-200 dark:bg-indigo-900/40 dark:text-indigo-300 dark:hover:bg-indigo-600 dark:hover:text-white">
-                        View My Parent
+                        View My Guardian
                     </a>
                 </div>
 
@@ -166,7 +166,7 @@
                                         <button type="button"
                                             onclick='window.dispatchEvent(new CustomEvent("open-global-chat", { detail: { target_user_id: {{ (int) $parentUser->id }}, conversation_type: "direct", name: @json($parentUser->name) } }))'
                                             class="inline-flex items-center justify-center px-3.5 py-2 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors">
-                                            Message Parent
+                                            Message Guardian
                                         </button>
                                     @endif
                                 </div>
@@ -297,8 +297,8 @@
      class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
     <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
          @click.away="showParentApprovedDashboardModal = false">
-        <h3 class="text-xl font-bold text-purple-900">Parent Verification Approved</h3>
-        <p class="mt-2 text-sm text-gray-600">Your parent account is now active. You are now on your dashboard.</p>
+        <h3 class="text-xl font-bold text-purple-900">Guardian Verification Approved</h3>
+        <p class="mt-2 text-sm text-gray-600">Your guardian account is now active. You are now on your dashboard.</p>
 
         <div class="mt-5 space-y-3">
             <a href="{{ route('learner.modules.index') }}"
@@ -309,7 +309,7 @@
             <a href="{{ route('parent.create-child') }}"
                class="w-full inline-flex justify-center items-center px-6 py-3 text-base font-medium rounded-xl text-white transition"
                style="background: linear-gradient(135deg, #A30EB2, #730DB1, #3B0CB1);">
-                Create Child Account
+                Create Dependent Account
             </a>
         </div>
     </div>

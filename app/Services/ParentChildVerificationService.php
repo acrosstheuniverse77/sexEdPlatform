@@ -11,6 +11,7 @@ use App\Notifications\ChildVerificationApprovedNotification;
 use App\Notifications\ChildVerificationRejectedNotification;
 use App\Notifications\ParentVerificationApprovedNotification;
 use App\Notifications\ParentVerificationRejectedNotification;
+use App\Notifications\ParentVerificationSubmittedNotification;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +35,9 @@ class ParentChildVerificationService
                 'parent_verification_reviewed_by' => Auth::id(),
                 'parent_verification_reviewed_at' => now(),
                 'parent_verification_approved_at' => now(),
+                'guardian_onboarding_status' => $parent->hasCompletedProfile() ? 'completed' : 'not_started',
+                'guardian_onboarding_started_at' => null,
+                'guardian_onboarding_completed_at' => $parent->hasCompletedProfile() ? now() : null,
             ]);
 
             $this->notifySafely($parent, new ParentVerificationApprovedNotification());
@@ -59,8 +63,54 @@ class ParentChildVerificationService
         });
     }
 
+    public function submitParentIdentity(
+        User $parent,
+        string $idType,
+        ?string $idTypeOther,
+        string $frontPath,
+        ?string $backPath,
+    ): void {
+        if (! $parent->is_parent_registration) {
+            throw new InvalidArgumentException('User is not a guardian registration account.');
+        }
+
+        if ($parent->parent_verification_status === VerificationStatus::Pending->value) {
+            throw new InvalidArgumentException('Guardian verification is already pending review.');
+        }
+
+        DB::transaction(function () use ($parent, $idType, $idTypeOther, $frontPath, $backPath): void {
+            $oldFrontPath = $parent->parent_id_document_path;
+            $oldBackPath = $parent->parent_id_document_back_path;
+
+            $parent->update([
+                'parent_id_type' => $idType,
+                'parent_id_type_other' => $idType === 'other' ? $idTypeOther : null,
+                'parent_id_document_path' => $frontPath,
+                'parent_id_document_back_path' => $backPath,
+                'parent_verification_status' => VerificationStatus::Pending->value,
+                'parent_verification_rejection_reason' => null,
+                'parent_verification_submitted_at' => now(),
+                'parent_verification_reviewed_by' => null,
+                'parent_verification_reviewed_at' => null,
+                'parent_verification_approved_at' => null,
+            ]);
+
+            foreach ([$oldFrontPath, $oldBackPath] as $oldPath) {
+                if (! empty($oldPath) && ! in_array($oldPath, [$frontPath, $backPath], true)) {
+                    Storage::disk('local')->delete((string) $oldPath);
+                    Storage::disk('public')->delete((string) $oldPath);
+                }
+            }
+
+            $this->notifySafely($parent, new ParentVerificationSubmittedNotification());
+            $this->notifyAdminsSafely(new ParentVerificationRequestSubmittedNotification($parent));
+        });
+    }
+
     public function approveChild(ParentChildAccount $verification): void
     {
+        $this->assertChildRegistrationVerification($verification);
+
         DB::transaction(function () use ($verification): void {
             $verification->loadMissing(['parent', 'child']);
 
@@ -70,6 +120,7 @@ class ParentChildVerificationService
                 'verification_reviewed_by' => Auth::id(),
                 'verification_reviewed_at' => now(),
                 'verification_approved_at' => now(),
+                'relationship_status' => 'active',
                 'relationship_verified_at' => now(),
             ]);
 
@@ -79,6 +130,8 @@ class ParentChildVerificationService
 
     public function rejectChild(ParentChildAccount $verification, string $reason): void
     {
+        $this->assertChildRegistrationVerification($verification);
+
         DB::transaction(function () use ($verification, $reason): void {
             $verification->loadMissing(['parent', 'child']);
 
@@ -95,37 +148,10 @@ class ParentChildVerificationService
         });
     }
 
-    public function resubmitParent(User $parent, string $newDocumentPath): void
-    {
-        if (! $parent->is_parent_registration) {
-            throw new InvalidArgumentException('User is not a parent registration account.');
-        }
-
-        if ($parent->parent_verification_status !== VerificationStatus::Rejected->value) {
-            throw new InvalidArgumentException('Only rejected parent verification records can be resubmitted.');
-        }
-
-        DB::transaction(function () use ($parent, $newDocumentPath): void {
-            $oldPath = $parent->parent_id_document_path;
-
-            $parent->update([
-                'parent_id_document_path' => $newDocumentPath,
-                'parent_verification_status' => VerificationStatus::Pending->value,
-                'parent_verification_reviewed_by' => null,
-                'parent_verification_reviewed_at' => null,
-                'parent_verification_approved_at' => null,
-            ]);
-
-            if (! empty($oldPath) && $oldPath !== $newDocumentPath) {
-                Storage::disk('public')->delete((string) $oldPath);
-            }
-
-            $this->notifyAdminsSafely(new ParentVerificationRequestSubmittedNotification($parent));
-        });
-    }
-
     public function resubmitChild(ParentChildAccount $verification, string $newDocumentPath): void
     {
+        $this->assertChildRegistrationVerification($verification);
+
         if ($verification->verification_status !== VerificationStatus::Rejected->value) {
             throw new InvalidArgumentException('Only rejected child verification records can be resubmitted.');
         }
@@ -153,6 +179,13 @@ class ParentChildVerificationService
                 $verification
             ));
         });
+    }
+
+    private function assertChildRegistrationVerification(ParentChildAccount $verification): void
+    {
+        if (blank($verification->verification_document_path)) {
+            throw new InvalidArgumentException('Invitation relationships must be reviewed through the relationship verification queue.');
+        }
     }
 
     private function notifySafely(User $notifiable, Notification $notification): void

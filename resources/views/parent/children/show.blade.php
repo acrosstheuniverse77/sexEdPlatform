@@ -9,6 +9,8 @@
         $childAvatarUrl = $child->learnerProfile?->avatar_path
             ? asset('storage/' . ltrim((string) $child->learnerProfile->avatar_path, '/'))
             : null;
+        $relationshipLabel = \App\Support\GuardianRelationshipTypes::label($parentChildLink?->pivot?->relationship_type ?? null, $parentChildLink?->pivot?->relationship_custom ?? null);
+        $relationshipStatus = $parentChildLink?->pivot?->relationship_status ?? 'active';
     @endphp
 
     {{-- Back link + child header --}}
@@ -19,13 +21,13 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                 </svg>
-                Back to My Children
+                Back to My Dependents
             </a>
             <button type="button"
                     onclick='window.dispatchEvent(new CustomEvent("open-global-chat", { detail: { target_user_id: {{ (int) $child->id }}, conversation_type: "direct", name: @json($child->full_name ?: $child->name) } }))'
                     class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
                     style="background: linear-gradient(135deg, #A30EB2, #730DB1, #3B0CB1);">
-                Message Child
+                Message Dependent
             </button>
         </div>
 
@@ -42,6 +44,14 @@
             @endif
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ $child->name }}</h1>
+                <div class="mt-2 flex flex-wrap gap-2">
+                    <span class="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                        {{ $relationshipLabel }}
+                    </span>
+                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
+                        {{ ucfirst($relationshipStatus) }}
+                    </span>
+                </div>
                 @if($child->learnerProfile && $child->learnerProfile->birthdate)
                     <div class="flex items-center gap-2 mt-1">
                         <span class="text-sm text-gray-500">{{ $child->learnerProfile->getAge() }} years old</span>
@@ -337,7 +347,7 @@
                                             · Requested {{ $enrollment->created_at->diffForHumans() }}
                                         </p>
                                         <span class="mt-2 inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
-                                            Pending Parent Approval
+                                            Pending Guardian Approval
                                         </span>
                                         <a href="{{ route('parent.children.enrollments.show', [$child, $enrollment]) }}"
                                            class="mt-2 inline-flex items-center rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-100">

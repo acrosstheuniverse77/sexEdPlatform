@@ -11,7 +11,7 @@ use Tests\TestCase;
 
 class ParentRegistrationUploadPersistenceTest extends TestCase
 {
-    public function test_parent_account_submission_notifies_admins_about_new_parent_verification_request(): void
+    public function test_parent_account_submission_waits_for_post_email_guardian_verification(): void
     {
         Storage::fake('public');
         Notification::fake();
@@ -34,12 +34,11 @@ class ParentRegistrationUploadPersistenceTest extends TestCase
             ->assertStatus(302)
             ->assertSessionHasNoErrors();
 
-        Notification::assertSentTo(
-            [$admin],
-            ParentVerificationRequestSubmittedNotification::class,
-            fn (ParentVerificationRequestSubmittedNotification $notification) => data_get($notification->toDatabase($admin), 'status') === 'pending'
-                && str_contains((string) data_get($notification->toDatabase($admin), 'action_url'), 'admin/parent-verifications')
-        );
+        $parent = User::query()->where('email', 'newparent@gmail.com')->firstOrFail();
+
+        $this->assertNull($parent->parent_verification_status);
+        $this->assertNull($parent->parent_id_document_path);
+        Notification::assertNotSentTo($admin, ParentVerificationRequestSubmittedNotification::class);
     }
 
     public function test_parent_temp_upload_endpoint_stores_preview_ready_metadata(): void
@@ -79,8 +78,8 @@ class ParentRegistrationUploadPersistenceTest extends TestCase
 
         $this->get(route('parent.register'))
             ->assertOk()
-            ->assertSee('data-testid="parent-government-id-preview"', false)
-            ->assertSee('government-id.pdf', false);
+            ->assertDontSee('data-testid="parent-government-id-preview"', false)
+            ->assertDontSee('government-id.pdf', false);
     }
 
     public function test_parent_temp_upload_remove_endpoint_clears_session_and_temp_file(): void
@@ -111,12 +110,10 @@ class ParentRegistrationUploadPersistenceTest extends TestCase
             'government_id' => UploadedFile::fake()->create('government-id.pdf', 100, 'application/pdf'),
         ])->assertOk();
 
-        $path = $uploadResponse->json('upload.path');
-
         $this->post(route('parent.register.store'), $this->validParentPayload())
             ->assertRedirect(route('parent.register.account'));
 
-        $this->assertSame($path, session('pending_parent_info.government_id_path'));
+        $this->assertNull(session('pending_parent_info.government_id_path'));
     }
 
     public function test_parent_back_navigation_preserves_uploaded_preview(): void
@@ -127,17 +124,15 @@ class ParentRegistrationUploadPersistenceTest extends TestCase
             'government_id' => UploadedFile::fake()->create('government-id.pdf', 100, 'application/pdf'),
         ])->assertOk();
 
-        $path = $uploadResponse->json('upload.path');
-
         $this->post(route('parent.register.store'), $this->validParentPayload())
             ->assertRedirect(route('parent.register.account'));
 
-        $this->assertSame($path, session('pending_parent_info.government_id_path'));
+        $this->assertNull(session('pending_parent_info.government_id_path'));
 
         $this->get(route('parent.register'))
             ->assertOk()
-            ->assertSee('data-testid="parent-government-id-preview"', false)
-            ->assertSee('government-id.pdf', false);
+            ->assertDontSee('data-testid="parent-government-id-preview"', false)
+            ->assertDontSee('government-id.pdf', false);
     }
 
     private function validParentPayload(): array

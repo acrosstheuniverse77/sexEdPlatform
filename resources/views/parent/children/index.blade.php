@@ -1,6 +1,6 @@
-﻿@extends('layouts.learner-app')
+@extends('layouts.learner-app')
 
-@section('title', 'My Children')
+@section('title', 'My Dependents')
 
 @section('content')
 <div class="max-w-5xl mx-auto space-y-6">
@@ -9,8 +9,8 @@
     <div class="flex items-center justify-between p-6 text-white rounded-2xl"
          style="background: linear-gradient(135deg, #A30EB2, #730DB1, #3B0CB1);">
         <div>
-            <h1 class="text-2xl font-bold">My Children</h1>
-            <p class="mt-1 text-sm text-white/80">Manage your child applications and monitor approved accounts.</p>
+            <h1 class="text-2xl font-bold">My Dependents</h1>
+            <p class="mt-1 text-sm text-white/80">Manage dependent applications and monitor approved accounts.</p>
         </div>
         <div class="flex items-center gap-2">
             <a href="{{ route('parent.invitations.history') }}"
@@ -32,7 +32,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
                 </svg>
-                Add Child
+                Add Dependent
             </a>
         </div>
     </div>
@@ -123,9 +123,9 @@
                 ? asset('storage/' . ltrim((string) $invitedChildAvatarPath, '/'))
                 : null;
             $statusDescription = match ($statusValue) {
-                'accepted' => 'Accepted. Parent-child link is active.',
+                'accepted' => 'Accepted. Guardian-child link is active.',
                 'rejected' => 'Rejected by learner.',
-                'cancelled' => 'Cancelled by parent.',
+                'cancelled' => 'Cancelled by guardian.',
                 'expired' => 'Expired with no response.',
                 default => 'Pending learner response.',
             };
@@ -136,7 +136,7 @@
         <div class="p-5 bg-white border border-gray-200 shadow-sm rounded-2xl">
             <div class="flex items-center justify-between gap-3">
                 <div>
-                    <h2 class="text-lg font-semibold text-gray-900">Latest Parent Link Invitation</h2>
+                    <h2 class="text-lg font-semibold text-gray-900">Latest Guardian Link Invitation</h2>
                     <p class="mt-1 text-sm text-gray-500">Showing your most recent invitation transaction.</p>
                 </div>
                 <a href="{{ route('parent.invitations.history') }}"
@@ -155,8 +155,8 @@
                             <p class="text-xs text-gray-600">{{ $statusDescription }}</p>
                         </div>
                         <div class="flex flex-wrap items-center gap-4 text-xs text-gray-500">
-                            <span>Invited Parent: <span class="font-semibold text-gray-700">{{ auth()->user()?->name ?? 'Parent' }}</span></span>
-                            <span>Related Child: <span class="font-semibold text-gray-700">{{ $latestInvitation->child?->name ?? 'Learner' }}</span></span>
+                            <span>Invited Guardian: <span class="font-semibold text-gray-700">{{ auth()->user()?->name ?? 'Guardian' }}</span></span>
+                            <span>Related Dependent: <span class="font-semibold text-gray-700">{{ $latestInvitation->child?->name ?? 'Learner' }}</span></span>
                             <span>Sent: <span class="font-semibold text-gray-700">{{ $sentAtText }}</span></span>
                             <span>Last update: <span class="font-semibold text-gray-700">{{ $latestActivityText }}</span></span>
                         </div>
@@ -165,7 +165,7 @@
                     <div class="flex items-center gap-2">
                         <div class="hidden -space-x-2 sm:flex">
                             @if($parentAvatarUrl)
-                                <img src="{{ $parentAvatarUrl }}" alt="Parent avatar" class="object-cover w-8 h-8 border border-white rounded-full">
+                                <img src="{{ $parentAvatarUrl }}" alt="Guardian avatar" class="object-cover w-8 h-8 border border-white rounded-full">
                             @else
                                 <span class="inline-flex items-center justify-center w-8 h-8 text-xs font-bold text-purple-700 bg-purple-100 border border-white rounded-full">
                                     {{ strtoupper(substr((string) auth()->user()?->name, 0, 1)) }}
@@ -199,9 +199,9 @@
                           d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
                 </svg>
             </div>
-            <h3 class="mb-2 text-xl font-semibold text-gray-900">No children added yet</h3>
+            <h3 class="mb-2 text-xl font-semibold text-gray-900">No dependents added yet</h3>
             <p class="max-w-sm mx-auto mb-6 text-sm text-gray-500">
-                Create a learning account for your child. You'll be able to monitor their progress and quiz results.
+                Create a learning account for your dependent. You'll be able to monitor their progress and quiz results.
             </p>
             <a href="{{ route('parent.create-child') }}"
                style="background: linear-gradient(135deg, #A30EB2, #730DB1, #3B0CB1);"
@@ -209,7 +209,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
                 </svg>
-                Add Your First Child
+                Add Your First Dependent
             </a>
         </div>
     @else
@@ -223,6 +223,17 @@
                         ? asset('storage/' . ltrim((string) $child->learnerProfile->avatar_path, '/'))
                         : null;
                     $canUseChat = auth()->user()?->can('access chat') ?? false;
+                    $relationshipLabel = \App\Support\GuardianRelationshipTypes::label($child->pivot->relationship_type ?? null, $child->pivot->relationship_custom ?? null);
+                    $relationshipStatus = $child->pivot->relationship_status ?? 'active';
+                    $relationshipVerificationStatus = $child->pivot->relationship_verified_status ?? 'not_required';
+                    $relationshipVerificationLabel = \App\Support\GuardianRelationshipTypes::statusLabel($relationshipVerificationStatus);
+                    $relationshipVerificationNeedsAction = in_array($relationshipVerificationStatus, ['pending', 'rejected', 'resubmission_required'], true);
+                    $relationshipVerificationClass = match ($relationshipVerificationStatus) {
+                        'verified', 'not_required' => 'bg-emerald-100 text-emerald-700',
+                        'rejected', 'revoked' => 'bg-rose-100 text-rose-700',
+                        'resubmission_required' => 'bg-orange-100 text-orange-700',
+                        default => 'bg-amber-100 text-amber-700',
+                    };
                 @endphp
                 <div class="relative overflow-hidden transition bg-white border border-gray-200 shadow-sm rounded-2xl hover:shadow-md">
 
@@ -264,6 +275,17 @@
                             @if($child->learnerProfile?->username)
                                 <p class="text-xs text-purple-600 mt-0.5">{{ $child->learnerProfile->username }}</p>
                             @endif
+                            <div class="mt-2 flex flex-wrap gap-2">
+                                <span class="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+                                    {{ $relationshipLabel }}
+                                </span>
+                                <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
+                                    {{ ucfirst($relationshipStatus) }}
+                                </span>
+                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold {{ $relationshipVerificationClass }}">
+                                    {{ $relationshipVerificationLabel }}
+                                </span>
+                            </div>
                         </div>
 
                         {{-- Consent + verification badges --}}
@@ -348,13 +370,19 @@
                     <div class="flex items-center justify-between px-5 py-4 border-t border-gray-100">
                         @if($isApprovedChild)
                             <div class="flex items-center gap-2">
+                                @if($relationshipVerificationNeedsAction)
+                                    <a href="{{ route('parent.relationship-verifications.show', $child->pivot->id) }}"
+                                       class="inline-flex items-center gap-1.5 text-sm font-medium text-amber-700 hover:text-amber-900">
+                                        Review Verification
+                                    </a>
+                                @endif
                                 <a href="{{ route('parent.children.show', $child->id) }}"
                                    class="inline-flex items-center gap-1.5 text-sm font-medium text-purple-700 hover:text-purple-900">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                               d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                                     </svg>
-                                    View Child Dashboard
+                                    View Dependent Dashboard
                                 </a>
                             </div>
 

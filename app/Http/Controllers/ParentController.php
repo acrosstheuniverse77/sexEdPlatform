@@ -44,6 +44,7 @@ class ParentController extends Controller
             'pendingEnrollments' => $canApproveContent ? $this->service->getPendingEnrollments($child) : collect(),
             'canViewQuizAnswers' => $canViewQuizAnswers,
             'canApproveContent'  => $canApproveContent,
+            'parentChildLink' => $parentChildLink,
         ]);
     }
 

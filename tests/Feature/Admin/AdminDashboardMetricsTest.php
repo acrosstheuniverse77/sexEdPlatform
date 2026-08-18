@@ -23,14 +23,14 @@ class AdminDashboardMetricsTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertSee('Total Users', false)
-            ->assertSee('Total Instructors', false)
-            ->assertSee('Total Learners', false)
+            ->assertSee('Learners', false)
+            ->assertSee('Instructors', false)
             ->assertSee('Total Modules', false)
-            ->assertSee('Active Subscriptions', false)
-            ->assertSee('Pending Instructor Applications', false)
-            ->assertSee('Pending Module Reviews', false)
-            ->assertSee('Payments Needing Review', false);
+            ->assertSee('Total Revenue', false)
+            ->assertSee('Learners Demographic', false)
+            ->assertSee('Monthly Subscribers', false)
+            ->assertSee('Moderation Queue', false)
+            ->assertSee('Quick Actions', false);
     }
 
     public function test_admin_sidebar_hides_unimplemented_navigation_items(): void
@@ -47,7 +47,6 @@ class AdminDashboardMetricsTest extends TestCase
             ->get(route('admin.dashboard'))
             ->assertOk()
             ->assertDontSee('Calendar', false)
-            ->assertDontSee('Seminars', false)
             ->assertDontSee('Organizations', false)
             ->assertDontSee('Communication', false);
     }

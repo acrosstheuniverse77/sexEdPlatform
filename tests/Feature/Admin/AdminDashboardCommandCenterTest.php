@@ -23,11 +23,12 @@ class AdminDashboardCommandCenterTest extends TestCase
         $this->actingAs($admin)
             ->get(route('admin.dashboard'))
             ->assertOk()
-            ->assertSee('Admin Command Center', false)
-            ->assertSee('Platform Snapshot', false)
-            ->assertSee('Moderation Queues', false)
+            ->assertSee('Learners Demographic', false)
+            ->assertSee('Monthly Subscribers', false)
+            ->assertSee('Moderation Queue', false)
+            ->assertSee('Quick Actions', false)
             ->assertSee('Recent System Activity', false)
             ->assertSee('Instructor Applications', false)
-            ->assertSee('Module Published Review', false);
+            ->assertSee('Manage Modules', false);
     }
 }

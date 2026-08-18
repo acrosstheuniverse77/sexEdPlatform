@@ -14,7 +14,7 @@ use Tests\TestCase;
 
 class ParentChildVerificationResubmissionTest extends TestCase
 {
-    public function test_rejected_parent_can_resubmit_and_move_back_to_pending(): void
+    public function test_legacy_parent_resubmission_post_redirects_to_guardian_verification_form(): void
     {
         Storage::fake('public');
         Notification::fake();
@@ -41,28 +41,19 @@ class ParentChildVerificationResubmissionTest extends TestCase
             ->post(route('parent.verification.resubmit'), [
                 'government_id' => UploadedFile::fake()->create('corrected-government-id.pdf', 120, 'application/pdf'),
             ])
-            ->assertRedirect(route('parent.verification.status'))
-            ->assertSessionHas('success');
+            ->assertRedirect(route('guardian.verification.create'));
 
         $parent->refresh();
 
-        $this->assertSame('pending', $parent->parent_verification_status);
+        $this->assertSame('rejected', $parent->parent_verification_status);
         $this->assertSame('Uploaded ID is blurred.', $parent->parent_verification_rejection_reason);
-        $this->assertNull($parent->parent_verification_reviewed_by);
-        $this->assertNull($parent->parent_verification_reviewed_at);
+        $this->assertSame($admin->id, $parent->parent_verification_reviewed_by);
+        $this->assertNotNull($parent->parent_verification_reviewed_at);
         $this->assertNull($parent->parent_verification_approved_at);
-        $this->assertNotSame('parent-verifications/original/rejected-parent-id.pdf', $parent->parent_id_document_path);
-        $this->assertStringStartsWith('parent-verifications/' . $parent->id . '/', (string) $parent->parent_id_document_path);
+        $this->assertSame('parent-verifications/original/rejected-parent-id.pdf', $parent->parent_id_document_path);
 
-        Storage::disk('public')->assertMissing('parent-verifications/original/rejected-parent-id.pdf');
-        Storage::disk('public')->assertExists((string) $parent->parent_id_document_path);
-
-        Notification::assertSentTo(
-            [$admin],
-            ParentVerificationRequestSubmittedNotification::class,
-            fn (ParentVerificationRequestSubmittedNotification $notification) => data_get($notification->toDatabase($admin), 'status') === 'pending'
-                && (int) data_get($notification->toDatabase($admin), 'parent_user_id') === $parent->id
-        );
+        Storage::disk('public')->assertExists('parent-verifications/original/rejected-parent-id.pdf');
+        Notification::assertNotSentTo($admin, ParentVerificationRequestSubmittedNotification::class);
     }
 
     public function test_rejected_child_can_be_resubmitted_by_owning_parent_and_move_back_to_pending(): void
@@ -155,7 +146,7 @@ class ParentChildVerificationResubmissionTest extends TestCase
             ->post(route('parent.verification.resubmit'), [
                 'government_id' => UploadedFile::fake()->create('second-parent-corrected-id.pdf', 120, 'application/pdf'),
             ])
-            ->assertRedirect(route('parent.verification.status'));
+            ->assertRedirect(route('guardian.verification.create'));
 
         $firstParent->refresh();
         $secondParent->refresh();
@@ -163,8 +154,8 @@ class ParentChildVerificationResubmissionTest extends TestCase
         $this->assertSame('rejected', $firstParent->parent_verification_status);
         $this->assertSame('parent-verifications/original/first-parent-id.pdf', $firstParent->parent_id_document_path);
 
-        $this->assertSame('pending', $secondParent->parent_verification_status);
-        $this->assertStringStartsWith('parent-verifications/' . $secondParent->id . '/', (string) $secondParent->parent_id_document_path);
+        $this->assertSame('rejected', $secondParent->parent_verification_status);
+        $this->assertSame('parent-verifications/original/second-parent-id.pdf', $secondParent->parent_id_document_path);
     }
 
     public function test_parent_cannot_resubmit_child_verification_for_non_owned_link(): void

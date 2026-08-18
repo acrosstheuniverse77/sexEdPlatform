@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
-@section('title', 'Parent & Child Verifications')
-@section('page-title', 'Parent & Child Verifications')
+@section('title', 'Guardian & Dependent Verifications')
+@section('page-title', 'Guardian & Dependent Verifications')
 
 @section('content')
 @php
@@ -15,6 +15,11 @@
         'pending' => (int) $pendingChildCount,
         'approved' => (int) $approvedChildCount,
         'rejected' => (int) $rejectedChildCount,
+    ];
+    $relationshipStatusCounts = [
+        'pending' => (int) $pendingRelationshipCount,
+        'approved' => (int) $approvedRelationshipCount,
+        'rejected' => (int) $rejectedRelationshipCount,
     ];
     $parentSearchRows = $parentApplications->map(function ($application) {
         $statusValue = $application->parent_verification_status ?: 'pending';
@@ -48,6 +53,29 @@
             'search' => $search,
         ];
     })->values();
+    $relationshipSearchRows = $relationshipApplications->map(function ($application) {
+        $statusValue = match ((string) ($application->relationship_verified_status ?: 'pending')) {
+            'verified' => 'approved',
+            'rejected', 'revoked' => 'rejected',
+            default => 'pending',
+        };
+        $search = strtolower(trim(implode(' ', array_filter([
+            (string) ($application->parent?->full_name ?? ''),
+            (string) ($application->parent?->email ?? ''),
+            (string) ($application->child?->full_name ?? ''),
+            (string) ($application->child?->learnerProfile?->username ?? ''),
+            (string) $application->relationshipLabel(),
+            (string) $application->relationshipVerificationLabel(),
+            (string) ($application->relationship_verification_submitted_at?->format('M d, Y h:i A') ?? ''),
+            (string) $statusValue,
+        ]))));
+
+        return [
+            'id' => (int) $application->id,
+            'status' => $statusValue,
+            'search' => $search,
+        ];
+    })->values();
 @endphp
 
 <div class="mx-auto max-w-7xl px-4 py-8"
@@ -56,8 +84,10 @@
         activeStatus: @js($status),
         parentCounts: @js($parentStatusCounts),
         childCounts: @js($childStatusCounts),
+        relationshipCounts: @js($relationshipStatusCounts),
         parentSearchRows: @js($parentSearchRows),
         childSearchRows: @js($childSearchRows),
+        relationshipSearchRows: @js($relationshipSearchRows),
         searchQuery: '',
         page: 1,
         perPage: 10,
@@ -98,7 +128,15 @@
             return String(searchableText || '').toLowerCase().includes(query);
         },
         rowsFor(type) {
-            return type === 'parents' ? this.parentSearchRows : this.childSearchRows;
+            if (type === 'parents') {
+                return this.parentSearchRows;
+            }
+
+            if (type === 'relationships') {
+                return this.relationshipSearchRows;
+            }
+
+            return this.childSearchRows;
         },
         filteredRowsFor(type, status = null) {
             const query = this.normalizedSearchQuery();
@@ -127,11 +165,11 @@
                 return this.filteredCountFor(type, status);
             }
 
-            const counts = type === 'parents' ? this.parentCounts : this.childCounts;
+            const counts = type === 'parents' ? this.parentCounts : (type === 'relationships' ? this.relationshipCounts : this.childCounts);
             return Number(counts[status] || 0);
         },
         totalCountFor(type) {
-            const counts = type === 'parents' ? this.parentCounts : this.childCounts;
+            const counts = type === 'parents' ? this.parentCounts : (type === 'relationships' ? this.relationshipCounts : this.childCounts);
 
             return Number(counts.pending || 0)
                 + Number(counts.approved || 0)
@@ -198,8 +236,8 @@
             }, 3500);
         },
         handleModerationUpdated(detail) {
-            const countsKey = detail.type === 'parents' ? 'parentCounts' : 'childCounts';
-            const rowsKey = detail.type === 'parents' ? 'parentSearchRows' : 'childSearchRows';
+            const countsKey = detail.type === 'parents' ? 'parentCounts' : (detail.type === 'relationships' ? 'relationshipCounts' : 'childCounts');
+            const rowsKey = detail.type === 'parents' ? 'parentSearchRows' : (detail.type === 'relationships' ? 'relationshipSearchRows' : 'childSearchRows');
             const fromStatus = detail.oldStatus || 'pending';
             const toStatus = detail.newStatus || 'pending';
             const rowId = Number(detail.rowId || 0);
@@ -257,7 +295,7 @@
         <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-6">
             <article class="min-h-[116px] rounded-[28px] border border-brand-200 bg-gradient-to-br from-brand-50 via-white to-brand-100/70 p-5 shadow-theme-xs">
                 <div class="flex items-start justify-between gap-3">
-                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-brand-700" x-text="activeType === 'parents' ? 'Parent Applications' : 'Child Applications'">Parent Applications</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-brand-700" x-text="activeType === 'parents' ? 'Guardian Applications' : (activeType === 'relationships' ? 'Relationship Verifications' : 'Dependent Applications')">Guardian Applications</p>
                     <span class="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 via-brand-700 to-brand-900 text-white shadow-lg shadow-brand-200">
                         <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     </span>
@@ -304,8 +342,9 @@
                         <label class="block">
                             <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Account Type</span>
                             <select x-model="activeType" @change="setType($event.target.value)" class="w-full px-4 py-3 text-sm text-gray-900 transition bg-white border border-brand-100 shadow-sm outline-none rounded-2xl focus:border-gray-300 focus:ring-2 focus:ring-gray-100">
-                                <option value="children">Child Verifications</option>
-                                <option value="parents">Parent Verifications</option>
+                                <option value="children">Dependent Verifications</option>
+                                <option value="parents">Guardian Verifications</option>
+                                <option value="relationships">Relationship Verifications</option>
                             </select>
                         </label>
                         <label class="block xl:col-span-2">
@@ -332,8 +371,8 @@
                     <thead class="bg-brand-50/45">
                         <tr>
                             <th class="w-[8%] px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.18em] text-gray-500">No. #</th>
-                            <th class="w-[24%] px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.18em] text-gray-500">Parent</th>
-                            <th class="w-[22%] px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.18em] text-gray-500">Child</th>
+                            <th class="w-[24%] px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.18em] text-gray-500">Guardian</th>
+                            <th class="w-[18%] px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.18em] text-gray-500">ID Type</th>
                             <th class="w-[14%] px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.18em] text-gray-500 whitespace-nowrap">Status</th>
                             <th class="w-[18%] px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.18em] text-gray-500 whitespace-nowrap">Submitted</th>
                             <th class="w-[14%] px-4 py-3 text-right text-xs font-bold uppercase tracking-[0.18em] text-gray-500 whitespace-nowrap">Actions</th>
@@ -345,7 +384,21 @@
                                 $statusValue = $application->parent_verification_status ?: 'pending';
                                 $parentDocumentPath = (string) ($application->parent_id_document_path ?? '');
                                 $hasParentDocument = $parentDocumentPath !== '';
-                                $parentDocumentUrl = $hasParentDocument ? asset('storage/' . $parentDocumentPath) : null;
+                                $parentDocumentUrl = $hasParentDocument ? route('admin.parent-verifications.parents.document', [$application, 'front']) : null;
+                                $parentIdTypeLabels = [
+                                    'national_id' => 'National ID (PhilSys)',
+                                    'passport' => 'Passport',
+                                    'drivers_license' => "Driver's License",
+                                    'umid' => 'UMID',
+                                    'philhealth' => 'PhilHealth ID',
+                                    'postal_id' => 'Postal ID',
+                                    'senior_citizen_id' => 'Senior Citizen ID',
+                                    'pwd_id' => 'PWD ID',
+                                    'prc_id' => 'PRC ID',
+                                    'voters_id' => "Voter's ID (if applicable)",
+                                    'other' => $application->parent_id_type_other ?: 'Other',
+                                ];
+                                $parentIdTypeLabel = $parentIdTypeLabels[$application->parent_id_type] ?? 'Not submitted';
                                 $parentDocumentExtension = $hasParentDocument ? strtolower(pathinfo($parentDocumentPath, PATHINFO_EXTENSION)) : null;
                                 $parentPreviewType = $hasParentDocument
                                     ? (in_array($parentDocumentExtension, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)
@@ -354,8 +407,8 @@
                                     : 'file';
                                 $parentRejectionReason = trim((string) preg_replace('/\s+/u', ' ', str_replace("\xC2\xA0", ' ', html_entity_decode(strip_tags((string) ($application->parent_verification_rejection_reason ?? '')), ENT_QUOTES | ENT_HTML5, 'UTF-8'))));
                                 $parentPreviewDetails = [
-                                    'Queue' => 'Parent Verification',
-                                    'Parent Name' => $application->full_name,
+                                    'Queue' => 'Guardian Verification',
+                                    'Guardian Name' => $application->full_name,
                                     'Email' => $application->email,
                                     'Status' => ucfirst($statusValue),
                                     'Submitted At' => $application->created_at?->format('M d, Y h:i A') ?? 'N/A',
@@ -372,6 +425,15 @@
                                 $linkedChildSubtext = $linkedChild?->learnerProfile?->username
                                     ? '@' . $linkedChild->learnerProfile->username
                                     : ($linkedChild?->email ?? null);
+                                $guardianAvatarPath = $application->learnerProfile?->avatar_path;
+                                $guardianAvatarUrl = $guardianAvatarPath
+                                    ? asset('storage/' . ltrim((string) $guardianAvatarPath, '/'))
+                                    : null;
+                                $guardianInitials = collect(preg_split('/\s+/', trim((string) ($application->full_name ?: $application->name ?: 'Guardian'))))
+                                    ->filter()
+                                    ->map(fn (string $part): string => strtoupper(substr($part, 0, 1)))
+                                    ->take(2)
+                                    ->implode('');
                             @endphp
                                 <tr x-data="{
                                     currentStatus: @js($statusValue),
@@ -549,12 +611,21 @@
                                 class="transition hover:bg-brand-50/55">
                                 <td class="px-4 py-3 align-top text-sm font-semibold text-gray-500" x-text="rowNumberFor('parents', {{ (int) $application->id }})"></td>
                                 <td class="px-4 py-3 align-top">
-                                    <p class="text-sm font-semibold text-gray-900 break-words">{{ $application->full_name }}</p>
-                                    <p class="text-xs text-gray-500 break-words">{{ $application->email }}</p>
+                                    <div class="flex items-center gap-3">
+                                        @if($guardianAvatarUrl)
+                                            <img src="{{ $guardianAvatarUrl }}" alt="{{ $application->full_name }} avatar" class="h-9 w-9 rounded-full object-cover">
+                                        @else
+                                            <span aria-label="{{ $application->full_name }} avatar fallback" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">{{ $guardianInitials }}</span>
+                                        @endif
+                                        <div class="min-w-0">
+                                            <p class="text-sm font-semibold text-gray-900 break-words">{{ $application->full_name }}</p>
+                                            <p class="text-xs text-gray-500 break-words">{{ $application->email }}</p>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td class="px-4 py-3 align-top">
-                                    <p class="text-sm font-semibold text-gray-900 break-words">{{ $linkedChildName }}</p>
-                                    <p class="text-xs text-gray-500 break-words">{{ $linkedChildSubtext ?: 'Pending child link' }}</p>
+                                    <p class="text-sm font-semibold text-gray-900 break-words">{{ $parentIdTypeLabel }}</p>
+                                    <p class="text-xs text-gray-500 break-words">Guardian identity</p>
                                 </td>
                                 <td class="px-4 py-3 align-top">
                                     <span class="inline-flex rounded-full px-3 py-1 text-xs font-bold"
@@ -567,25 +638,14 @@
                                 </td>
                                 <td class="px-4 py-3 align-top whitespace-nowrap text-right">
                                     <div class="flex items-center justify-end gap-2">
-                                        <button type="button"
-                                                :title="currentStatus === 'approved' ? 'View Approved Application' : (currentStatus === 'rejected' ? 'View Rejected Application' : 'Review Application')"
-                                                @click="openReviewModal()"
-                                                class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border transition"
-                                                :class="currentStatus === 'approved' ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : (currentStatus === 'rejected' ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100' : 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100')"
-                                                aria-label="Review application">
-                                            <svg x-show="currentStatus === 'pending'" x-cloak class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        <a href="{{ route('admin.parent-verifications.parents.show', $application) }}"
+                                           class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-gray-200 bg-white text-gray-700 transition hover:bg-gray-50"
+                                           title="View Details"
+                                           aria-label="View Details">
+                                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6M7 4h7l3 3v13H7z" />
                                             </svg>
-                                            <svg x-show="currentStatus === 'approved'" x-cloak class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                            </svg>
-                                            <svg x-show="currentStatus === 'rejected'" x-cloak class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                        </button>
-
+                                        </a>
                                         <button type="button"
                                                 @click="openActionConfirm('archive')"
                                                 class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 text-amber-700 transition hover:bg-amber-100"
@@ -618,8 +678,8 @@
                                                 <h3 class="text-sm font-semibold text-gray-900" x-text="actionType === 'delete' ? 'Delete Application?' : 'Archive Application?'"></h3>
                                             </div>
                                             <div class="px-5 py-5">
-                                                <p class="text-sm text-gray-700" x-show="actionType === 'archive'" x-cloak>Archive this parent verification application?</p>
-                                                <p class="text-sm text-gray-700" x-show="actionType === 'delete'" x-cloak>Permanently delete this parent verification application?</p>
+                                                <p class="text-sm text-gray-700" x-show="actionType === 'archive'" x-cloak>Archive this guardian verification application?</p>
+                                                <p class="text-sm text-gray-700" x-show="actionType === 'delete'" x-cloak>Permanently delete this guardian verification application?</p>
                                             </div>
                                             <div class="flex items-center justify-end gap-2 border-t border-gray-100 px-5 py-4">
                                                 <button type="button"
@@ -646,133 +706,12 @@
                                         @method('DELETE')
                                     </form>
 
-                                     <div x-show="reviewModalOpen"
-                                         x-cloak
-                                         @keydown.escape.window="if (reviewModalOpen) closeReviewModal()"
-                                         class="fixed inset-0 z-[100100] flex items-start justify-center overflow-y-auto p-4 pt-14 text-left sm:p-6 sm:pt-16 lg:p-8 lg:pt-20">
-                                        <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm" @click="closeReviewModal()"></div>
-
-                                        <div class="relative z-10 flex w-full max-w-4xl max-h-[calc(100vh-4rem)] flex-col overflow-hidden rounded-2xl bg-white text-left shadow-2xl sm:max-h-[calc(100vh-5rem)] lg:max-h-[calc(100vh-6rem)]">
-                                            <div class="shrink-0 border-b border-gray-100 bg-gray-50/80 px-6 py-4">
-                                                <div class="flex items-center justify-between">
-                                                    <div>
-                                                        <p class="text-xs font-semibold uppercase tracking-[0.24em] text-sky-600">Verification Review</p>
-                                                        <h2 class="mt-1 text-lg font-bold text-gray-900">Parent Verification - {{ $application->full_name }}</h2>
-                                                        <p class="text-sm text-gray-500">Submitted {{ $application->created_at->format('M d, Y h:i A') }}</p>
-                                                    </div>
-                                                    <button type="button" @click="closeReviewModal()" class="rounded-full p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600">
-                                                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                                        </svg>
-                                                    </button>
-                                                </div>
-                                            </div>
-
-                                            <div class="min-h-0 flex-1 space-y-5 overflow-y-auto bg-white px-6 py-5">
-                                                <section class="rounded-2xl border border-gray-200 bg-white p-4" x-data="{ open: true }">
-                                                    <div class="flex items-center justify-between gap-3 border-b border-gray-100 pb-3">
-                                                        <h3 class="text-base font-bold text-gray-900">Section 1 - Application Details</h3>
-                                                        <button type="button" @click="open = !open" class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50" x-text="open ? 'Hide' : 'Show'"></button>
-                                                    </div>
-
-                                                    <dl x-show="open" x-cloak class="mt-4 grid gap-3 sm:grid-cols-2">
-                                                        @foreach($parentPreviewDetails as $label => $value)
-                                                            <div class="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
-                                                                <dt class="text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-500">{{ $label }}</dt>
-                                                                @if($label === 'Status')
-                                                                    <dd class="mt-1">
-                                                                        <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold"
-                                                                              :class="currentStatus === 'approved' ? 'bg-emerald-100 text-emerald-700' : (currentStatus === 'rejected' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700')"
-                                                                              x-text="currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1)"></span>
-                                                                    </dd>
-                                                                @elseif($label === 'Rejection Reason')
-                                                                    <dd class="mt-1 text-sm font-medium text-gray-900 break-words" x-text="rejectionReason || 'N/A'"></dd>
-                                                                @else
-                                                                    <dd class="mt-1 text-sm font-medium text-gray-900 break-words">{{ $value ?: 'N/A' }}</dd>
-                                                                @endif
-                                                            </div>
-                                                        @endforeach
-                                                    </dl>
-                                                </section>
-
-                                                <section class="rounded-2xl border border-gray-200 bg-white p-4" x-data="{ open: true }">
-                                                    <div class="flex items-center justify-between gap-3 border-b border-gray-100 pb-3">
-                                                        <h3 class="text-base font-bold text-gray-900">Section 2 - Submitted Document</h3>
-                                                        <button type="button" @click="open = !open" class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50" x-text="open ? 'Hide' : 'Show'"></button>
-                                                    </div>
-
-                                                    <div x-show="open" x-cloak class="mt-4">
-                                                    @if($hasParentDocument)
-                                                        <div class="rounded-xl border border-gray-200 bg-gray-50 p-3">
-                                                            <p class="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Parent Government ID</p>
-
-                                                            @if($parentPreviewType === 'image')
-                                                                <img src="{{ $parentDocumentUrl }}" alt="Parent verification document" class="mx-auto max-h-[50vh] w-auto max-w-full rounded-lg border border-gray-200 bg-white object-contain">
-                                                            @elseif($parentPreviewType === 'pdf')
-                                                                <iframe src="{{ $parentDocumentUrl }}#toolbar=0&navpanes=0" class="h-[52vh] w-full rounded-lg border border-gray-200 bg-white" title="Parent verification document"></iframe>
-                                                            @else
-                                                                <div class="rounded-xl border border-gray-200 bg-white p-5 text-center">
-                                                                    <p class="text-sm text-gray-600">Inline preview is not available for this file type.</p>
-                                                                </div>
-                                                            @endif
-
-                                                            <div class="mt-3">
-                                                                <a href="{{ $parentDocumentUrl }}" download class="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100">Download document</a>
-                                                            </div>
-                                                        </div>
-                                                    @else
-                                                        <p class="text-sm text-gray-500">No document uploaded.</p>
-                                                    @endif
-                                                    </div>
-                                                </section>
-
-                                                <section class="rounded-2xl border border-gray-200 bg-white p-4" x-data="{ open: true }">
-                                                    <div class="flex items-center justify-between gap-3 border-b border-gray-100 pb-3">
-                                                        <h3 class="text-base font-bold text-gray-900">Section 3 - Moderation Actions</h3>
-                                                        <button type="button" @click="open = !open" class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50" x-text="open ? 'Hide' : 'Show'"></button>
-                                                    </div>
-
-                                                    <div x-show="open" x-cloak class="mt-4">
-                                                    <div class="flex flex-wrap items-center gap-2" x-show="currentStatus === 'pending'" x-cloak>
-                                                        <button type="button"
-                                                            data-testid="submit-approval-action"
-                                                                @click="submitApprove(@js(route('admin.parent-verifications.parents.approve', $application)))"
-                                                                :disabled="processingApprove || processingReject"
-                                                                class="inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
-                                                            <span x-text="processingApprove ? 'Approving...' : 'Approve Application'"></span>
-                                                        </button>
-                                                        <button type="button"
-                                                                @click="openRejectModal()"
-                                                                :disabled="processingApprove || processingReject"
-                                                                class="inline-flex items-center rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60">
-                                                            Reject Application
-                                                        </button>
-                                                    </div>
-
-                                                    <p class="mt-3 text-sm text-emerald-700" x-show="currentStatus === 'approved'" x-cloak>
-                                                        This parent verification has already been approved.
-                                                    </p>
-                                                    <p class="mt-3 text-sm text-rose-700" x-show="currentStatus === 'rejected'" x-cloak>
-                                                        This parent verification has already been rejected.
-                                                    </p>
-                                                    </div>
-                                                </section>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    @include('admin.parent-verifications.partials.moderation-modal-shell', [
-                                        'title' => 'Reject Parent Verification',
-                                        'submitUrl' => route('admin.parent-verifications.parents.reject', $application),
-                                        'moderationReasons' => $moderationReasons,
-                                    ])
-
                                 </td>
                             </tr>
                         @empty
                         @endforelse
                         <tr x-show="!hasRowsForCurrent()">
-                            <td colspan="6" class="px-4 py-10 text-center text-sm text-gray-500">No parent verification records found for this status. Try another status tab or switch account type.</td>
+                            <td colspan="6" class="px-4 py-10 text-center text-sm text-gray-500">No guardian verification records found for this status. Try another status tab or switch account type.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -783,7 +722,7 @@
                     <thead class="bg-brand-50/45">
                         <tr>
                             <th class="w-[8%] px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.18em] text-gray-500">No. #</th>
-                            <th class="w-[22%] px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.18em] text-gray-500">Parent</th>
+                            <th class="w-[22%] px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.18em] text-gray-500">Guardian</th>
                             <th class="w-[24%] px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.18em] text-gray-500">Child</th>
                             <th class="w-[14%] px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.18em] text-gray-500 whitespace-nowrap">Status</th>
                             <th class="w-[18%] px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.18em] text-gray-500 whitespace-nowrap">Submitted</th>
@@ -816,7 +755,7 @@
                                     ? [
                                         'url' => $parentComparisonUrl,
                                         'type' => $parentComparisonType,
-                                        'title' => 'Parent Government ID - ' . ($application->parent?->full_name ?? 'Parent'),
+                                        'title' => 'Guardian Government ID - ' . ($application->parent?->full_name ?? 'Guardian'),
                                     ]
                                     : null;
                                 $childRejectionReason = trim((string) preg_replace('/\s+/u', ' ', str_replace("\xC2\xA0", ' ', html_entity_decode(strip_tags((string) ($application->verification_rejection_reason ?? '')), ENT_QUOTES | ENT_HTML5, 'UTF-8'))));
@@ -826,8 +765,8 @@
                                 }
                                 $childPreviewDetails = [
                                     'Queue' => 'Child Verification',
-                                    'Parent Name' => $application->parent?->full_name ?? 'Unknown parent',
-                                    'Parent Email' => $application->parent?->email ?? 'N/A',
+                                    'Guardian Name' => $application->parent?->full_name ?? 'Unknown guardian',
+                                    'Guardian Email' => $application->parent?->email ?? 'N/A',
                                     'Child Name' => $application->child?->full_name ?? 'Unknown child',
                                     'Child Username' => $application->child?->learnerProfile?->username ?? 'N/A',
                                     'Child Age' => $childAge !== null ? $childAge . ' years old' : 'N/A',
@@ -843,6 +782,26 @@
                                     (string) ($application->created_at?->format('M d, Y h:i A') ?? ''),
                                     (string) $statusValue,
                                 ]))));
+                                $guardianAvatarPath = $application->parent?->learnerProfile?->avatar_path;
+                                $guardianAvatarUrl = $guardianAvatarPath
+                                    ? asset('storage/' . ltrim((string) $guardianAvatarPath, '/'))
+                                    : null;
+                                $guardianName = $application->parent?->full_name ?? 'Unknown guardian';
+                                $guardianInitials = collect(preg_split('/\s+/', trim((string) $guardianName)))
+                                    ->filter()
+                                    ->map(fn (string $part): string => strtoupper(substr($part, 0, 1)))
+                                    ->take(2)
+                                    ->implode('');
+                                $dependentAvatarPath = $application->child?->learnerProfile?->avatar_path;
+                                $dependentAvatarUrl = $dependentAvatarPath
+                                    ? asset('storage/' . ltrim((string) $dependentAvatarPath, '/'))
+                                    : null;
+                                $dependentName = $application->child?->full_name ?? 'Unknown dependent';
+                                $dependentInitials = collect(preg_split('/\s+/', trim((string) $dependentName)))
+                                    ->filter()
+                                    ->map(fn (string $part): string => strtoupper(substr($part, 0, 1)))
+                                    ->take(2)
+                                    ->implode('');
                             @endphp
                                 <tr x-data="{
                                     currentStatus: @js($statusValue),
@@ -1020,15 +979,33 @@
                                 class="transition hover:bg-brand-50/55">
                                 <td class="px-4 py-3 align-top text-sm font-semibold text-gray-500" x-text="rowNumberFor('children', {{ (int) $application->id }})"></td>
                                 <td class="px-4 py-3 align-top">
-                                    <p class="text-sm font-semibold text-gray-900 break-words">{{ $application->parent?->full_name ?? 'Unknown parent' }}</p>
-                                    <p class="text-xs text-gray-500 break-words">{{ $application->parent?->email }}</p>
+                                    <div class="flex items-center gap-3">
+                                        @if($guardianAvatarUrl)
+                                            <img src="{{ $guardianAvatarUrl }}" alt="{{ $guardianName }} avatar" class="h-9 w-9 rounded-full object-cover">
+                                        @else
+                                            <span aria-label="{{ $guardianName }} avatar fallback" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">{{ $guardianInitials }}</span>
+                                        @endif
+                                        <div class="min-w-0">
+                                            <p class="text-sm font-semibold text-gray-900 break-words">{{ $guardianName }}</p>
+                                            <p class="text-xs text-gray-500 break-words">{{ $application->parent?->email }}</p>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td class="px-4 py-3 align-top">
-                                    <p class="text-sm font-semibold text-gray-900 break-words">{{ $application->child?->full_name ?? 'Unknown child' }}</p>
-                                    <p class="text-xs text-gray-500 break-words">{{ $application->child?->learnerProfile?->username ?: 'No username' }}</p>
-                                    @if(!is_null($childAge))
-                                        <p class="text-xs text-gray-500 break-words">{{ $childAge }} years old</p>
-                                    @endif
+                                    <div class="flex items-center gap-3">
+                                        @if($dependentAvatarUrl)
+                                            <img src="{{ $dependentAvatarUrl }}" alt="{{ $dependentName }} avatar" class="h-9 w-9 rounded-full object-cover">
+                                        @else
+                                            <span aria-label="{{ $dependentName }} avatar fallback" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-xs font-bold text-sky-700">{{ $dependentInitials }}</span>
+                                        @endif
+                                        <div class="min-w-0">
+                                            <p class="text-sm font-semibold text-gray-900 break-words">{{ $dependentName }}</p>
+                                            <p class="text-xs text-gray-500 break-words">{{ $application->child?->learnerProfile?->username ?: 'No username' }}</p>
+                                            @if(!is_null($childAge))
+                                                <p class="text-xs text-gray-500 break-words">{{ $childAge }} years old</p>
+                                            @endif
+                                        </div>
+                                    </div>
                                 </td>
                                 <td class="px-4 py-3 align-top">
                                     <span class="inline-flex rounded-full px-3 py-1 text-xs font-bold"
@@ -1201,19 +1178,19 @@
                                                         </article>
 
                                                         <article class="rounded-xl border border-gray-200 bg-gray-50 p-3">
-                                                            <p class="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Parent Government ID</p>
+                                                            <p class="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">Guardian Government ID</p>
 
                                                             @if($hasParentComparisonDocument && $parentComparisonType === 'image')
-                                                                <img src="{{ $parentComparisonUrl }}" alt="Parent comparison document" class="mx-auto max-h-[48vh] w-auto max-w-full rounded-lg border border-gray-200 bg-white object-contain">
+                                                                <img src="{{ $parentComparisonUrl }}" alt="Guardian comparison document" class="mx-auto max-h-[48vh] w-auto max-w-full rounded-lg border border-gray-200 bg-white object-contain">
                                                             @elseif($hasParentComparisonDocument && $parentComparisonType === 'pdf')
-                                                                <iframe src="{{ $parentComparisonUrl }}#toolbar=0&navpanes=0" class="h-[50vh] w-full rounded-lg border border-gray-200 bg-white" title="Parent comparison document"></iframe>
+                                                                <iframe src="{{ $parentComparisonUrl }}#toolbar=0&navpanes=0" class="h-[50vh] w-full rounded-lg border border-gray-200 bg-white" title="Guardian comparison document"></iframe>
                                                             @elseif($hasParentComparisonDocument)
                                                                 <div class="rounded-xl border border-gray-200 bg-white p-5 text-center">
                                                                     <p class="text-sm text-gray-600">Inline preview is not available for this file type.</p>
                                                                 </div>
                                                             @else
                                                                 <div class="rounded-xl border border-gray-200 bg-white p-5 text-center">
-                                                                    <p class="text-sm text-gray-600">No parent document available for comparison.</p>
+                                                                    <p class="text-sm text-gray-600">No guardian document available for comparison.</p>
                                                                 </div>
                                                             @endif
 
@@ -1273,7 +1250,101 @@
                         @empty
                         @endforelse
                         <tr x-show="!hasRowsForCurrent()">
-                            <td colspan="6" class="px-4 py-10 text-center text-sm text-gray-500">No child verification records found for this status. Try another status tab or switch account type.</td>
+                            <td colspan="6" class="px-4 py-10 text-center text-sm text-gray-500">No dependent verification records found for this status. Try another status tab or switch account type.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="overflow-x-auto" x-show="activeType === 'relationships'" x-cloak>
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-brand-50/45">
+                        <tr>
+                            <th class="w-[8%] px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.18em] text-gray-500">No. #</th>
+                            <th class="w-[22%] px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.18em] text-gray-500">Guardian</th>
+                            <th class="w-[22%] px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.18em] text-gray-500">Dependent</th>
+                            <th class="w-[18%] px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.18em] text-gray-500">Relationship</th>
+                            <th class="w-[14%] px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.18em] text-gray-500">Status</th>
+                            <th class="w-[16%] px-4 py-3 text-right text-xs font-bold uppercase tracking-[0.18em] text-gray-500">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 bg-white">
+                        @forelse($relationshipApplications as $application)
+                            @php
+                                $statusValue = match ((string) ($application->relationship_verified_status ?: 'pending')) {
+                                    'verified' => 'approved',
+                                    'rejected', 'revoked' => 'rejected',
+                                    default => 'pending',
+                                };
+                                $statusClass = match ($statusValue) {
+                                    'approved' => 'bg-emerald-100 text-emerald-700',
+                                    'rejected' => 'bg-rose-100 text-rose-700',
+                                    default => 'bg-amber-100 text-amber-700',
+                                };
+                                $guardianName = $application->parent?->full_name ?? 'Guardian';
+                                $guardianAvatarPath = $application->parent?->learnerProfile?->avatar_path;
+                                $guardianAvatarUrl = $guardianAvatarPath
+                                    ? asset('storage/' . ltrim((string) $guardianAvatarPath, '/'))
+                                    : null;
+                                $guardianInitials = collect(preg_split('/\s+/', trim((string) $guardianName)))
+                                    ->filter()
+                                    ->map(fn (string $part): string => strtoupper(substr($part, 0, 1)))
+                                    ->take(2)
+                                    ->implode('');
+                                $dependentName = $application->child?->full_name ?? 'Dependent';
+                                $dependentAvatarPath = $application->child?->learnerProfile?->avatar_path;
+                                $dependentAvatarUrl = $dependentAvatarPath
+                                    ? asset('storage/' . ltrim((string) $dependentAvatarPath, '/'))
+                                    : null;
+                                $dependentInitials = collect(preg_split('/\s+/', trim((string) $dependentName)))
+                                    ->filter()
+                                    ->map(fn (string $part): string => strtoupper(substr($part, 0, 1)))
+                                    ->take(2)
+                                    ->implode('');
+                            @endphp
+                            <tr x-show="rowOnCurrentPage('relationships', {{ (int) $application->id }})" x-cloak>
+                                <td class="px-4 py-4 text-sm text-gray-500" x-text="rowNumberFor('relationships', {{ (int) $application->id }})"></td>
+                                <td class="px-4 py-4 text-sm">
+                                    <div class="flex items-center gap-3">
+                                        @if($guardianAvatarUrl)
+                                            <img src="{{ $guardianAvatarUrl }}" alt="{{ $guardianName }} avatar" class="h-9 w-9 rounded-full object-cover">
+                                        @else
+                                            <span aria-label="{{ $guardianName }} avatar fallback" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">{{ $guardianInitials }}</span>
+                                        @endif
+                                        <div class="min-w-0">
+                                            <div class="font-semibold text-gray-900">{{ $guardianName }}</div>
+                                            <div class="text-xs text-gray-500">{{ $application->parent?->email }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-4 text-sm">
+                                    <div class="flex items-center gap-3">
+                                        @if($dependentAvatarUrl)
+                                            <img src="{{ $dependentAvatarUrl }}" alt="{{ $dependentName }} avatar" class="h-9 w-9 rounded-full object-cover">
+                                        @else
+                                            <span aria-label="{{ $dependentName }} avatar fallback" class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-xs font-bold text-sky-700">{{ $dependentInitials }}</span>
+                                        @endif
+                                        <div class="min-w-0">
+                                            <div class="font-semibold text-gray-900">{{ $dependentName }}</div>
+                                            <div class="text-xs text-gray-500">{{ $application->child?->learnerProfile?->username ?? $application->child?->email }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-4 text-sm">
+                                    <span class="inline-flex rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700">{{ $application->relationshipLabel() }}</span>
+                                    <div class="mt-1 text-xs text-gray-500">Submitted {{ $application->relationship_verification_submitted_at?->format('M d, Y') ?? 'not submitted' }}</div>
+                                </td>
+                                <td class="px-4 py-4 text-sm">
+                                    <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusClass }}">{{ $application->relationshipVerificationLabel() }}</span>
+                                </td>
+                                <td class="px-4 py-4 text-right">
+                                    <a href="{{ route('admin.parent-verifications.relationships.show', $application) }}" class="inline-flex items-center rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-100">View</a>
+                                </td>
+                            </tr>
+                        @empty
+                        @endforelse
+                        <tr x-show="!hasRowsForCurrent()">
+                            <td colspan="6" class="px-4 py-10 text-center text-sm text-gray-500">No relationship verification records found for this status. Try another status tab or switch account type.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -1358,7 +1429,7 @@
                     </div>
 
                     <div x-show="previewCompareUrl" x-cloak class="rounded-xl border border-gray-200 bg-white p-3">
-                        <p class="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-gray-500" x-text="previewCompareTitle || 'Parent Comparison Document'"></p>
+                        <p class="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-gray-500" x-text="previewCompareTitle || 'Guardian Comparison Document'"></p>
 
                         <template x-if="previewCompareType === 'image'">
                             <img :src="previewCompareUrl" alt="Comparison document preview" class="mx-auto max-h-[55vh] w-auto max-w-full rounded-lg border border-gray-200 bg-white object-contain">
@@ -1411,7 +1482,7 @@
             }
 
             if (!textarea.id) {
-                textarea.id = 'parent-child-moderation-editor-' + Math.random().toString(36).slice(2, 10);
+                textarea.id = 'guardian-child-moderation-editor-' + Math.random().toString(36).slice(2, 10);
             }
 
             const existingInstance = tinymce.get(textarea.id);
@@ -1464,7 +1535,7 @@
                 return;
             }
 
-            tinymce.remove('textarea.js-parent-child-moderation-editor');
+            tinymce.remove('textarea.js-guardian-child-moderation-editor');
         };
 
         window.initParentChildModerationEditors = function () {
@@ -1475,7 +1546,7 @@
             window.destroyParentChildModerationEditors();
 
             tinymce.init({
-                selector: 'textarea.js-parent-child-moderation-editor',
+                selector: 'textarea.js-guardian-child-moderation-editor',
                 license_key: 'gpl',
                 menubar: false,
                 branding: false,

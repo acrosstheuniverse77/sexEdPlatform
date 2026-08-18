@@ -28,8 +28,8 @@ class ParentEnrollmentApprovedNotification extends Notification
 
         return [
             'type' => 'parent_enrollment_approved',
-            'title' => 'Enrollment Approved by Parent',
-            'message' => 'Your parent approved your enrollment request for "' . $module->title . '".',
+            'title' => 'Enrollment Approved by Guardian',
+            'message' => 'Your guardian approved your enrollment request for "' . $module->title . '".',
             'module_id' => $module->id,
             'module_title' => $module->title,
             'approved_by' => $this->parent->name,

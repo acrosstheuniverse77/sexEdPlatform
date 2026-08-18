@@ -1,6 +1,6 @@
 @extends('layouts.learner-app')
 
-@section('title', 'My Parent')
+@section('title', 'My Guardian')
 
 @section('content')
 @php
@@ -11,7 +11,7 @@
     <section class="flex flex-col items-start justify-between gap-3 p-6 text-white rounded-2xl md:flex-row md:items-center"
         style="background: linear-gradient(135deg, #A30EB2, #730DB1, #3B0CB1);">
         <div>
-            <h1 class="text-2xl font-bold">My Parent</h1>
+            <h1 class="text-2xl font-bold">My Guardian</h1>
             <p class="mt-1 text-sm text-white/80">
                 Connected account{{ $totalParents === 1 ? '' : 's' }} and relationship details.
             </p>

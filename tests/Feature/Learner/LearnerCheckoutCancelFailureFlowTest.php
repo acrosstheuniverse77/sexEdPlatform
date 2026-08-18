@@ -124,11 +124,12 @@ class LearnerCheckoutCancelFailureFlowTest extends TestCase
 
     private function createPaidModule(): Module
     {
-        $instructor = User::factory()->create(['role' => 'instructor']);
-        $instructor->assignRole('instructor');
+        $admin = User::factory()->create(['role' => 'admin']);
+        $admin->assignRole('admin');
 
         return Module::factory()->create([
-            'created_by' => $instructor->id,
+            'created_by' => $admin->id,
+            'content_owner_type' => 'admin',
             'is_published' => true,
             'access_type' => 'paid',
             'price_amount' => 450,

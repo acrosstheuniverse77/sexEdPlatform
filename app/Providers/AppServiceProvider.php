@@ -109,6 +109,7 @@ class AppServiceProvider extends ServiceProvider
                     })
                     ->count(),
                 'pending_child_verifications' => ParentChildAccount::query()
+                    ->whereNotNull('verification_document_path')
                     ->where('verification_status', 'pending')
                     ->count(),
                 'pending_learner_reports' => ContentReport::query()->whereIn('status', ['submitted', 'under_review'])->count(),

@@ -11,6 +11,8 @@ use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\ParentApprovalLinkController;
+use App\Http\Controllers\Auth\GuardianIdentityVerificationController;
+use App\Http\Controllers\Auth\GuardianOnboardingController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Http\Request;
@@ -59,8 +61,7 @@ Route::middleware('guest')->group(function () {
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
 
     Route::get('instructor/login', function () {
-        return redirect()->route('login')
-            ->with('info', 'Please use the main login page. Instructors and learners now share one login.');
+        return redirect()->route('login');
     })->name('instructor.login');
 
     Route::post('instructor/login', function () {
@@ -134,11 +135,26 @@ Route::middleware('auth')->group(function () {
     Route::post('parent/verification-status/resubmit', [ParentRegistrationController::class, 'resubmitParentVerification'])
         ->name('parent.verification.resubmit');
 
+    Route::get('guardian/verification', [GuardianIdentityVerificationController::class, 'create'])
+        ->name('guardian.verification.create');
+
+    Route::post('guardian/verification', [GuardianIdentityVerificationController::class, 'store'])
+        ->name('guardian.verification.store');
+
+    Route::get('guardian/verification/status', [GuardianIdentityVerificationController::class, 'status'])
+        ->name('guardian.verification.status');
+
+    Route::get('guardian/onboarding', [GuardianOnboardingController::class, 'show'])
+        ->name('guardian.onboarding.show');
+
+    Route::post('guardian/onboarding', [GuardianOnboardingController::class, 'complete'])
+        ->name('guardian.onboarding.complete');
+
     Route::get('child/verification-status', [ParentRegistrationController::class, 'childVerificationStatus'])
         ->name('child.verification.status');
 
     // Parent routes (verified emails only)
-    Route::middleware('verified')->group(function () {
+    Route::middleware(['verified', 'guardian.verified'])->group(function () {
         Route::get('parent/create-child', [ParentRegistrationController::class, 'createChildForm'])
             ->name('parent.create-child');
 
@@ -162,6 +178,18 @@ Route::middleware('auth')->group(function () {
 
         Route::post('parent/create-child/credentials', [ParentRegistrationController::class, 'storeChildCredentials'])
             ->name('parent.create-child.credentials.store');
+
+        Route::get('parent/create-child/validation', [ParentRegistrationController::class, 'childValidationForm'])
+            ->name('parent.create-child.validation');
+
+        Route::post('parent/create-child/validation', [ParentRegistrationController::class, 'storeChildValidation'])
+            ->name('parent.create-child.validation.store');
+
+        Route::get('parent/create-child/relationship-verification', [ParentRegistrationController::class, 'childRelationshipVerificationForm'])
+            ->name('parent.create-child.relationship-verification');
+
+        Route::post('parent/create-child/relationship-verification', [ParentRegistrationController::class, 'storeChildRelationshipVerification'])
+            ->name('parent.create-child.relationship-verification.store');
 
         Route::get('parent/create-child/done', [ParentRegistrationController::class, 'childDone'])
             ->name('parent.create-child.done');

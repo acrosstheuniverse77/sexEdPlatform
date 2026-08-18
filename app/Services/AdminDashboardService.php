@@ -29,6 +29,7 @@ class AdminDashboardService
             ->count();
 
         $pendingChildVerifications = ParentChildAccount::query()
+            ->whereNotNull('verification_document_path')
             ->where(function ($query): void {
                 $query->where('verification_status', 'pending')
                     ->orWhereNull('verification_status');

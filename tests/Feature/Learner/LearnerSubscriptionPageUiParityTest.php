@@ -55,7 +55,7 @@ class LearnerSubscriptionPageUiParityTest extends TestCase
             ->get(route('subscription.index'))
             ->assertOk()
             ->assertSee('Your premium access has expired', false)
-            ->assertSee('Renew Subscription', false);
+            ->assertSee('Renew via Checkout', false);
     }
 
     public function test_subscription_page_shows_renewal_notice_for_expiring_subscription(): void
@@ -81,7 +81,7 @@ class LearnerSubscriptionPageUiParityTest extends TestCase
             ->get(route('subscription.index'))
             ->assertOk()
             ->assertSee('Your premium access is expiring soon', false)
-            ->assertSee('Renew Subscription', false);
+            ->assertSee('Renew via Checkout', false);
     }
 
     private function createPlan(string $name, ?int $renewalWarningDays): SubscriptionPlan

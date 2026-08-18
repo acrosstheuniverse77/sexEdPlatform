@@ -34,7 +34,7 @@ class ChildVerificationRejectedNotification extends Notification
             ->view('emails.moderation-status', [
                 'title' => 'Child Verification Update',
                 'subtitle' => 'Your submission needs corrections',
-                'greetingName' => $notifiable->first_name ?? 'Parent',
+                'greetingName' => $notifiable->first_name ?? 'Guardian',
                 'intro' => 'Your child account verification was not approved for ' . $this->child->full_name . '.',
                 'details' => [
                     'Reason: ' . $this->reason,

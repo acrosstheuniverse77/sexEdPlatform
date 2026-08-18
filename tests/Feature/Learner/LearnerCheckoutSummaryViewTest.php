@@ -78,11 +78,12 @@ class LearnerCheckoutSummaryViewTest extends TestCase
             'requires_parental_consent' => false,
         ]);
 
-        $instructor = User::factory()->create(['role' => 'instructor', 'name' => 'Instructor View Test']);
-        $instructor->assignRole('instructor');
+        $admin = User::factory()->create(['role' => 'admin', 'name' => 'Instructor View Test']);
+        $admin->assignRole('admin');
 
         $module = Module::factory()->create([
-            'created_by' => $instructor->id,
+            'created_by' => $admin->id,
+            'content_owner_type' => 'admin',
             'title' => 'Respect and Safety',
             'description' => 'Module summary details should be visible.',
             'is_published' => true,
@@ -103,7 +104,7 @@ class LearnerCheckoutSummaryViewTest extends TestCase
             ->assertSee('Instructor')
             ->assertSee('Respect and Safety')
             ->assertSee('Instructor View Test')
-            ->assertSee('Proceed to PayMongo')
+            ->assertSee('Proceed to GCash Checkout')
             ->assertDontSee('Select Payment Method')
             ->assertDontSee('Billing Information');
     }

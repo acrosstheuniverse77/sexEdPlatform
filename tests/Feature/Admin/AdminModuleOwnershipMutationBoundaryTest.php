@@ -91,6 +91,7 @@ class AdminModuleOwnershipMutationBoundaryTest extends DatabaseTestCase
             'description' => 'Updated module description',
             'age_bracket' => 'teens',
             'enrollment_mode' => 'auto',
+            'enrollment_limit' => 50,
             'action' => 'publish',
         ];
     }

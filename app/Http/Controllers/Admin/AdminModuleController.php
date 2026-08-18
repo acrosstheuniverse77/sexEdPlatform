@@ -7,6 +7,7 @@ use App\Models\Module;
 use App\Services\Content\ContentAuthoringService;
 use App\Services\ContentGovernanceService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class AdminModuleController extends Controller
 {
@@ -45,6 +46,7 @@ class AdminModuleController extends Controller
             $validated,
             $request->user(),
         );
+        $module->syncLearnerCategories($this->learnerCategoriesFromValidated($validated));
 
         return redirect()->route('admin.modules.show', $module)
             ->with('success', 'Admin-owned module created and published.');
@@ -78,6 +80,7 @@ class AdminModuleController extends Controller
             'is_published' => true,
             'published_by_admin_id' => $request->user()->id,
         ]);
+        $module->syncLearnerCategories($this->learnerCategoriesFromValidated($validated));
 
         return redirect()->route('admin.modules.show', $module)
             ->with('success', 'Admin-owned module updated.');
@@ -88,9 +91,22 @@ class AdminModuleController extends Controller
         return $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'required|string',
-            'age_bracket' => 'required|in:kids,teens,adults',
+            'age_bracket' => ['nullable', Rule::in(['kids', 'teens', 'adults'])],
+            'age_brackets' => ['required_without:age_bracket', 'array', 'min:1'],
+            'age_brackets.*' => ['required', Rule::in(['kids', 'teens', 'adults'])],
             'enrollment_mode' => 'required|in:auto,manual',
             'is_published' => 'nullable|boolean',
         ]);
+    }
+
+    /**
+     * @param array<string, mixed> $validated
+     * @return array<int, string>
+     */
+    private function learnerCategoriesFromValidated(array $validated): array
+    {
+        return Module::normalizeLearnerCategories(
+            (array) ($validated['age_brackets'] ?? [($validated['age_bracket'] ?? 'teens')])
+        );
     }
 }

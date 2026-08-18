@@ -337,4 +337,3 @@ class DashboardController extends Controller
         return ($level - 1) * $effectiveStep;
     }
 }
-

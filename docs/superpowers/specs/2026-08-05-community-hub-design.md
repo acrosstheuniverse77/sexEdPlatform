@@ -2,7 +2,12 @@
 
 ## Status
 
-Approved for implementation planning.
+Current source of truth for the Community Hub/feed product direction.
+
+Use this document instead of the older Community Feed V1 design when deciding
+user-facing copy, tabs, post types, layout, and engagement behavior. The older
+V1 design remains the safety baseline for moderation, adult-facing scope,
+minor exclusion, audit retention, and emergency freeze behavior.
 
 ## Product Direction
 
@@ -18,7 +23,10 @@ Community Hub should feel familiar to members: there is a feed, featured posts, 
 
 ## Developer Model
 
-Community Hub extends the existing Community Feed V1 safety architecture. It remains connector-scoped, adult-facing, policy-guarded, and backed by connector-local permissions plus global admin moderation.
+Community Hub is the current feed implementation direction. It extends the
+existing Community Feed V1 safety architecture while remaining connector-scoped,
+adult-facing, policy-guarded, and backed by connector-local permissions plus
+global admin moderation.
 
 Existing Community Feed V1 entities remain valid:
 

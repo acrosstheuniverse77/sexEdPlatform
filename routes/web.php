@@ -24,6 +24,7 @@ use App\Http\Controllers\Chat\ConversationController as ChatConversationControll
 use App\Http\Controllers\Chat\MessageController as ChatMessageController;
 use App\Http\Controllers\Chat\MessageRequestController as ChatMessageRequestController;
 use App\Http\Controllers\Chat\StatusController as ChatStatusController;
+use App\Http\Controllers\GuardianRelationshipVerificationController;
 use App\Http\Controllers\ParentInvitationController;
 use App\Http\Controllers\Api\LocationController;
 use App\Models\Conversation;
@@ -399,7 +400,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // Parent monitoring routes
-    Route::prefix('parent')->name('parent.')->middleware('verified')->group(function () {
+    Route::prefix('parent')->name('parent.')->middleware(['verified', 'guardian.verified'])->group(function () {
         Route::get('/children/{child}', [\App\Http\Controllers\ParentController::class, 'show'])
             ->name('children.show');
         Route::get('/children/{child}/quiz-attempts/{attempt}', [\App\Http\Controllers\ParentController::class, 'showQuizAttempt'])
@@ -410,6 +411,12 @@ Route::middleware('auth')->group(function () {
             ->name('children.enrollments.approve');
         Route::post('/children/{child}/enrollments/{enrollment}/reject', [\App\Http\Controllers\ParentController::class, 'rejectEnrollment'])
             ->name('children.enrollments.reject');
+        Route::get('/relationship-verifications/{parentChildAccount}', [GuardianRelationshipVerificationController::class, 'show'])
+            ->name('relationship-verifications.show');
+        Route::post('/relationship-verifications/{parentChildAccount}', [GuardianRelationshipVerificationController::class, 'store'])
+            ->name('relationship-verifications.store');
+        Route::get('/relationship-verifications/{parentChildAccount}/documents/{document}', [GuardianRelationshipVerificationController::class, 'document'])
+            ->name('relationship-verifications.documents.show');
 
         Route::get('/invitations', [ParentInvitationController::class, 'index'])
             ->name('invitations.index');
@@ -427,7 +434,7 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('chat')
         ->name('chat.')
-        ->middleware('permission:access chat')
+        ->middleware(['permission:access chat', 'guardian.verified'])
         ->group(function () {
             Route::get('/', fn () => view('chat.page'))->name('page');
             Route::get('/conversation/{conversation}', function (Request $request, Conversation $conversation) {

@@ -66,9 +66,9 @@
             </section>
 
             <section>
-                <h3 class="text-base font-semibold text-purple-900 mb-2">2. Age Requirements & Parental Consent</h3>
+                <h3 class="text-base font-semibold text-purple-900 mb-2">2. Age Requirements & Guardian Consent</h3>
                 <div class="space-y-2">
-                    <p><strong>Under 13:</strong> Children cannot create accounts without parental consent. A parent or legal guardian must register, verify their email, and create a child account on the child's behalf.</p>
+                    <p><strong>Under 13:</strong> Children cannot create accounts without guardian consent. A guardian or legal guardian must register, verify their email, and create a child account on the child's behalf.</p>
                     <p><strong>Ages 13–17:</strong> May create their own accounts but must complete email verification before accessing the platform.</p>
                     <p><strong>Adults (18+):</strong> May create accounts, enroll in modules, and optionally manage accounts for their children.</p>
                 </div>
@@ -81,7 +81,7 @@
                     <li>Only Gmail accounts (@gmail.com) are currently accepted for email verification.</li>
                     <li>You are responsible for maintaining the confidentiality of your credentials.</li>
                     <li>Never share your password with anyone.</li>
-                    <li>Parents are responsible for securing their child accounts.</li>
+                    <li>Guardians are responsible for securing their child accounts.</li>
                 </ul>
             </section>
 
@@ -97,9 +97,9 @@
             </section>
 
             <section>
-                <h3 class="text-base font-semibold text-purple-900 mb-2">5. Parent Rights & Responsibilities</h3>
-                <p class="mb-2">Parents who create accounts for children under 13 have the right to view their child's progress, review quiz attempts, and request deletion of the child's account.</p>
-                <p>Parents are responsible for monitoring their child's platform usage and ensuring their child understands safe online behavior.</p>
+                <h3 class="text-base font-semibold text-purple-900 mb-2">5. Guardian Rights & Responsibilities</h3>
+                <p class="mb-2">Guardians who create accounts for children under 13 have the right to view their child's progress, review quiz attempts, and request deletion of the child's account.</p>
+                <p>Guardians are responsible for monitoring their child's platform usage and ensuring their child understands safe online behavior.</p>
             </section>
 
             <section>
@@ -119,7 +119,7 @@
 
             <section>
                 <h3 class="text-base font-semibold text-purple-900 mb-2">9. Termination</h3>
-                <p>We reserve the right to suspend or terminate accounts that violate these Terms. You may request account deletion at any time. Parents may request immediate deletion of child accounts and we will comply within 30 days.</p>
+                <p>We reserve the right to suspend or terminate accounts that violate these Terms. You may request account deletion at any time. Guardians may request immediate deletion of child accounts and we will comply within 30 days.</p>
             </section>
 
             <section>
@@ -201,7 +201,7 @@
 
             <div class="bg-purple-50 border border-purple-200 rounded-xl p-4">
                 <p class="text-sm text-purple-900 font-medium">COPPA Compliance Statement</p>
-                <p class="text-xs text-purple-700 mt-1">We comply with the Children's Online Privacy Protection Act (COPPA). We do not knowingly collect personal information from children under 13 without verifiable parental consent. Parents have full control over their child's account and can review, modify, or delete their child's information at any time.</p>
+                <p class="text-xs text-purple-700 mt-1">We comply with the Children's Online Privacy Protection Act (COPPA). We do not knowingly collect personal information from children under 13 without verifiable guardian consent. Guardians have full control over their child's account and can review, modify, or delete their child's information at any time.</p>
             </div>
 
             <section>
@@ -212,10 +212,10 @@
                     <li>Location: region, province, city, barangay (Philippines)</li>
                     <li>Username and optional profile bio</li>
                 </ul>
-                <p class="mb-2"><strong>For children under 13 (collected via parent):</strong></p>
+                <p class="mb-2"><strong>For children under 13 (collected via guardian):</strong></p>
                 <ul class="list-disc list-inside pl-2 space-y-1">
-                    <li>Parent's name, email, and verified relationship</li>
-                    <li>Timestamp of when parent created the child account</li>
+                    <li>Guardian's name, email, and verified relationship</li>
+                    <li>Timestamp of when guardian created the child account</li>
                 </ul>
             </section>
 
@@ -232,11 +232,11 @@
 
             <section>
                 <h3 class="text-base font-semibold text-purple-900 mb-2">3. Data Protection for Children</h3>
-                <p class="mb-2">Children's accounts are created and managed by parents. We:</p>
+                <p class="mb-2">Children's accounts are created and managed by guardians. We:</p>
                 <ul class="list-disc list-inside pl-2 space-y-1">
                     <li>Do not display children's personal information publicly</li>
                     <li>Do not allow children to share personal information in public forums</li>
-                    <li>Allow parents to review and delete their child's data at any time</li>
+                    <li>Allow guardians to review and delete their child's data at any time</li>
                     <li>Do not sell or share children's data with third parties</li>
                 </ul>
             </section>
@@ -361,11 +361,11 @@
                     ['q' => 'How do I verify my email?',
                      'a' => 'After creating your account, we send a verification link to your Gmail address. Open the email and click the link. If you don\'t see it, check your Spam or Promotions folder, then use the "Resend Verification Email" button on the verification page.'],
                     ['q' => 'What if my child is under 13?',
-                     'a' => 'Children under 13 cannot register independently. A parent or guardian (18+) must register first, verify their email, then create a child account under their parent account. This complies with COPPA (Children\'s Online Privacy Protection Act).'],
+                     'a' => 'Children under 13 cannot register independently. A guardian (18+) must register first, verify their email, then create a child account under their guardian account. This complies with COPPA (Children\'s Online Privacy Protection Act).'],
                     ['q' => 'How do I reset my password?',
                      'a' => 'On the login page, click "Forgot Password?" and enter your registered Gmail address. We\'ll send you a password reset link. The link expires in 60 minutes — if it expires, you can request a new one.'],
                     ['q' => 'What age groups does this platform serve?',
-                     'a' => 'The platform serves learners aged 5 and up. Content is filtered by age bracket to ensure age-appropriate material. Children (5–12) require a parent account. Teens (13–17) and adults (18+) can register independently.'],
+                     'a' => 'The platform serves learners aged 5 and up. Content is filtered by age bracket to ensure age-appropriate material. Children (5–12) require a guardian account. Teens (13–17) and adults (18+) can register independently.'],
                     ['q' => 'Can I go back and edit my registration information?',
                      'a' => 'During registration, you can navigate back to previous steps and your information will be saved automatically. After completing registration, you can update most profile details from your profile settings page.'],
                     ['q' => 'How do I change my username?',

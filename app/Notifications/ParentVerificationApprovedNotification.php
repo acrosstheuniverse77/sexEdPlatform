@@ -27,12 +27,12 @@ class ParentVerificationApprovedNotification extends Notification
                 (string) config('mail.from.address'),
                 (string) config('mail.from.name'),
             )
-            ->subject('Your Parent Verification Has Been Approved')
+            ->subject('Your Guardian Verification Has Been Approved')
             ->view('emails.moderation-status', [
-                'title' => 'Parent Verification Approved',
-                'subtitle' => 'You can now continue your parent setup',
-                'greetingName' => $notifiable->first_name ?? 'Parent',
-                'intro' => 'Your parent or guardian verification has been approved. You can now continue to your account and complete any remaining setup steps.',
+                'title' => 'Guardian Verification Approved',
+                'subtitle' => 'You can now continue your guardian setup',
+                'greetingName' => $notifiable->first_name ?? 'Guardian',
+                'intro' => 'Your guardian verification has been approved. You can now continue to your account and complete any remaining setup steps.',
                 'details' => [
                     'Use the secure button below to continue to the platform.',
                     'After profile completion, you can create and manage child accounts.',
@@ -47,8 +47,8 @@ class ParentVerificationApprovedNotification extends Notification
     {
         return [
             'type' => 'parent_verification_approved',
-            'title' => 'Parent verification approved',
-            'message' => 'Your parent account has been approved. Complete your profile to continue.',
+            'title' => 'Guardian verification approved',
+            'message' => 'Your guardian account has been approved. Complete your profile to continue.',
             'approval_url' => $this->approvalUrl($notifiable),
         ];
     }

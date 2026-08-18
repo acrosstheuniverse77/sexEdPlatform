@@ -6,7 +6,7 @@
                 <p class="text-white/90 font-semibold tracking-wide text-sm uppercase">Conscious Connections</p>
             </div>
             <h2 class="text-4xl font-bold text-white mb-4 leading-tight">Set up their account</h2>
-            <p class="text-white/80 text-lg max-w-xs">Let's register your child and get them learning safely.</p>
+            <p class="text-white/80 text-lg max-w-xs">Register your dependent and get them learning safely.</p>
         </div>
     </x-slot>
 
@@ -18,8 +18,8 @@
     ]" />
 
     <div class="mb-6">
-        <h1 class="text-2xl font-bold text-purple-900">Child's Information</h1>
-        <p class="mt-1 text-sm text-gray-600">Tell us a little about your child.</p>
+        <h1 class="text-2xl font-bold text-purple-900">Dependent Information</h1>
+        <p class="mt-1 text-sm text-gray-600">Tell us a little about your dependent.</p>
     </div>
 
 
@@ -47,6 +47,8 @@
     <form method="POST" action="{{ route('parent.create-child.store') }}"
           x-data="{
               birthdate: '{{ old('birthdate', $pendingChild['birthdate'] ?? '') }}',
+              relationshipType: '{{ old('relationship_type', $pendingChild['relationship_type'] ?? '') }}',
+              verificationRequiredTypes: @js(array_values(array_filter(array_keys($relationshipOptions ?? \App\Support\GuardianRelationshipTypes::options()), fn ($type) => \App\Support\GuardianRelationshipTypes::requiresVerification($type)))),
               age: null,
               calculateAge() {
                   if (!this.birthdate) { this.age = null; return; }
@@ -141,19 +143,18 @@
                                 <input id="birthdate" name="birthdate" type="date" required
                                        x-model="birthdate"
                                        @change="calculateAge()"
-                                       min="{{ now()->subYears(13)->format('Y-m-d') }}"
-                                       max="{{ now()->subYears(5)->format('Y-m-d') }}"
+                                       max="{{ now()->format('Y-m-d') }}"
                                        class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-purple-primary focus:border-transparent transition">
-                                <p class="mt-1 text-xs text-gray-500">Age 5–13 only.</p>
+                                <p class="mt-1 text-xs text-gray-500">Use the dependent's legal birthdate.</p>
                                 <div x-show="age !== null" class="mt-2">
-                                    <template x-if="age >= 5 && age <= 17">
+                                    <template x-if="age >= 0">
                                         <p class="text-xs text-green-700 bg-green-50 rounded-lg px-3 py-2">
-                                            ✓ Age <strong x-text="age"></strong> — eligible!
+                                            Age <strong x-text="age"></strong> recorded for this dependent.
                                         </p>
                                     </template>
-                                    <template x-if="age !== null && (age < 5 || age > 17)">
+                                    <template x-if="age !== null && age < 0">
                                         <p class="text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2">
-                                            ✗ Must be 5–17 years old.
+                                            Birthdate cannot be in the future.
                                         </p>
                                     </template>
                                 </div>
@@ -178,11 +179,46 @@
                                 @enderror
                             </div>
                         </div>
+
+                        <div class="grid grid-cols-1 gap-4 mt-4 sm:grid-cols-2">
+                            <div>
+                                <label for="relationship_type" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Your Relationship <span class="text-red-500">*</span>
+                                </label>
+                                <select id="relationship_type" name="relationship_type" required x-model="relationshipType"
+                                        class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-purple-primary focus:border-transparent transition">
+                                    <option value="">Select relationship</option>
+                                    @foreach(($relationshipOptions ?? \App\Support\GuardianRelationshipTypes::options()) as $value => $label)
+                                        @continue($value === \App\Support\GuardianRelationshipTypes::LEGACY_PARENT)
+                                        <option value="{{ $value }}" {{ old('relationship_type', $pendingChild['relationship_type'] ?? '') === $value ? 'selected' : '' }}>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                                @error('relationship_type')
+                                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                @enderror
+                                <p x-show="verificationRequiredTypes.includes(relationshipType)" x-cloak class="mt-1 text-xs text-amber-700">
+                                    This relationship requires supporting documentation before full guardian features unlock.
+                                </p>
+                            </div>
+
+                            <div x-show="relationshipType === 'other'" x-cloak>
+                                <label for="relationship_custom" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Custom Relationship
+                                </label>
+                                <input id="relationship_custom" name="relationship_custom" type="text" maxlength="120"
+                                       value="{{ old('relationship_custom', $pendingChild['relationship_custom'] ?? '') }}"
+                                       class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-purple-primary focus:border-transparent transition"
+                                       placeholder="Specify relationship">
+                                @error('relationship_custom')
+                                    <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Actions -->
                     <div class="flex items-center justify-between pt-4 border-t border-gray-200">
-                        <a href="{{ route('parent.children.index') }}" class="text-sm text-gray-500 hover:text-gray-700">← Back to My Children</a>
+                        <a href="{{ route('parent.children.index') }}" class="text-sm text-gray-500 hover:text-gray-700">← Back to My Dependents</a>
                         <button type="submit"
                                 style="background: linear-gradient(135deg, #A30EB2, #730DB1, #3B0CB1);"
                                 class="inline-flex items-center justify-center gap-2 px-8 py-3.5 font-semibold text-white rounded-xl shadow-md hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all duration-200">
@@ -192,3 +228,4 @@
                 </form>
 
 </x-auth-split-layout>
+

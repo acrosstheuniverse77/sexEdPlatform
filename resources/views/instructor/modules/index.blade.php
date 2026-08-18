@@ -13,7 +13,8 @@
                 'id' => $prefillModule->id,
                 'title' => $prefillModule->title,
                 'description' => $prefillModule->description,
-                'age_bracket' => $prefillModule->min_age >= 18 ? 'adults' : ($prefillModule->min_age >= 13 ? 'teens' : 'kids'),
+                'age_brackets' => $prefillModule->learnerCategoryKeys(),
+                'age_bracket' => $prefillModule->learnerCategoryKeys()[0] ?? 'teens',
                 'enrollment_mode' => $prefillModule->enrollment_mode,
                 'access_type' => $prefillModule->access_type,
                 'price_amount' => $prefillModule->price_amount,
@@ -168,7 +169,8 @@
                 'id' => $module->id,
                 'title' => $module->title,
                 'description' => $module->description,
-                'age_bracket' => $module->min_age >= 18 ? 'adults' : ($module->min_age >= 13 ? 'teens' : 'kids'),
+                'age_brackets' => $module->learnerCategoryKeys(),
+                'age_bracket' => $module->learnerCategoryKeys()[0] ?? 'teens',
                 'enrollment_mode' => $module->enrollment_mode,
                 'access_type' => $module->access_type,
                 'price_amount' => $module->price_amount,
@@ -472,4 +474,3 @@
 @include('instructor.modules.partials.module-modal')
 
 @endsection
-

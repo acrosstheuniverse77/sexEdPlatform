@@ -1,6 +1,6 @@
 @extends('layouts.learner-app')
 
-@section('title', 'Parent Invitation')
+@section('title', 'Guardian Invitation')
 
 @section('content')
 @php
@@ -25,10 +25,10 @@
 		 style="background: linear-gradient(135deg, #A30EB2, #730DB1, #3B0CB1);">
 		<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 			<div>
-				<h1 class="text-2xl font-bold">Parent Link Invitation</h1>
+				<h1 class="text-2xl font-bold">Guardian Link Invitation</h1>
 				<p class="text-white/80 text-sm mt-1">
 					@if($isChildViewer)
-						Review and decide on this parent invitation request.
+						Review and decide on this guardian invitation request.
 					@else
 						Track the learner's response to your invitation.
 					@endif
@@ -66,8 +66,8 @@
 
 		<div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
 			<div class="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
-				<p class="text-xs text-gray-500">Parent</p>
-				<p class="font-semibold text-gray-900 mt-1">{{ $invitation->inviterParent?->name ?? 'Parent' }}</p>
+				<p class="text-xs text-gray-500">Guardian</p>
+				<p class="font-semibold text-gray-900 mt-1">{{ $invitation->inviterParent?->name ?? 'Guardian' }}</p>
 				<p class="text-xs text-gray-500 mt-1">{{ $invitation->inviterParent?->email }}</p>
 			</div>
 			<div class="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
@@ -87,10 +87,15 @@
 
 		@if($invitation->message)
 			<div class="mt-4 rounded-xl border border-purple-100 bg-purple-50 px-4 py-3">
-				<p class="text-xs font-semibold uppercase tracking-wide text-purple-700">Parent Message</p>
+				<p class="text-xs font-semibold uppercase tracking-wide text-purple-700">Guardian Message</p>
 				<p class="mt-1 text-sm text-purple-900">{{ $invitation->message }}</p>
 			</div>
 		@endif
+
+		<div class="mt-4 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+			<p class="text-xs font-semibold uppercase tracking-wide text-indigo-700">Guardian Relationship</p>
+			<p class="mt-1 text-sm font-semibold text-indigo-900">{{ $invitation->relationshipLabel() }}</p>
+		</div>
 
 		@if($invitation->decision_note)
 			<div class="mt-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
@@ -103,7 +108,7 @@
 	@if($isChildViewer && $statusValue === 'pending')
 		<div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-5 space-y-4">
 			<h3 class="text-base font-semibold text-gray-900">Respond to Invitation</h3>
-			<p class="text-sm text-gray-500">Accepting this request creates an approved parent-child link for guidance and monitoring.</p>
+			<p class="text-sm text-gray-500">Accepting this request confirms the link. Any required relationship verification remains subject to admin review.</p>
 
 			<form method="POST" action="{{ route('parent.invitations.respond', $invitation) }}" class="space-y-3">
 				@csrf
@@ -125,7 +130,7 @@
 						   name="note"
 						   maxlength="500"
 						   value="{{ old('note') }}"
-						   placeholder="Share context for the parent"
+						   placeholder="Share context for the guardian"
 						   class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-100">
 				</div>
 				<button type="submit"
@@ -138,7 +143,7 @@
 
 	@if($isParentViewer && $statusValue === 'pending')
 		<div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-5">
-			<h3 class="text-base font-semibold text-gray-900">Parent Action</h3>
+			<h3 class="text-base font-semibold text-gray-900">Guardian Action</h3>
 			<p class="text-sm text-gray-500 mt-1">Cancel this invitation if it was sent in error.</p>
 
 			<form method="POST" action="{{ route('parent.invitations.cancel', $invitation) }}" class="mt-4">

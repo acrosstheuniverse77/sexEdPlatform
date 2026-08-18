@@ -333,10 +333,10 @@
                                     </span>
                                     <span x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen"
                                           x-cloak class="flex min-w-0 flex-1 items-center gap-2">
-                                        <span class="truncate">Parent &amp; Child Verifications</span>
+                                        <span class="truncate">Guardian &amp; Child Verifications</span>
                                         <span class="{{ $adminSidebarBadgeSlotClasses }}">
                                             @if($pendingVerificationTotal > 0)
-                                                <span data-testid="admin-nav-badge-parent-child-verifications"
+                                                <span data-testid="admin-nav-badge-guardian-child-verifications"
                                                       class="{{ $adminSidebarBadgeClasses }}">
                                                     {{ $pendingVerificationTotal > 99 ? '99+' : $pendingVerificationTotal }}
                                                 </span>

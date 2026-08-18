@@ -72,7 +72,7 @@
     <div x-show="overviewOpen" class="space-y-4" style="display:none;">
         <dl class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
-                <dt class="text-gray-500">Age Group</dt>
+                <dt class="text-gray-500">Eligible Learners</dt>
                 <dd class="font-semibold text-gray-900">{{ data_get($workspace, 'module.age_group', 'Not specified') }}</dd>
             </div>
             <div>

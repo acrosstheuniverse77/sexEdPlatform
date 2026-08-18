@@ -120,6 +120,9 @@ class ConversationController extends Controller
                     'pending_request' => $pendingRequestPayload,
                     'can_send' => $this->chatAuthorizationService->canSendMessage($user, $conversation),
                     'unread_count' => $this->chatService->unreadCountForConversation($user, $conversation),
+                    'support_availability' => $conversation->conversation_type === Conversation::TYPE_ADMIN_SUPPORT
+                        ? $this->buildSupportAvailability($this->resolveSupportParticipant($conversation))
+                        : null,
                 ];
             })
             ->values();
@@ -284,6 +287,7 @@ class ConversationController extends Controller
         $payload = [
             'role' => $isAdminContext ? 'admin' : ($isInstructorContext ? 'instructor' : 'learner'),
             'support_admin' => $this->buildUserSnapshot($supportAdmin),
+            'support_availability' => $this->buildSupportAvailability($supportAdmin),
             'contacts' => [],
         ];
 
@@ -513,6 +517,39 @@ class ConversationController extends Controller
             'status' => $this->normalizeUserStatus($user->chat_status ?? $user->status),
             'avatar_url' => $this->resolveAvatarUrl($avatarPath),
         ];
+    }
+
+    protected function buildSupportAvailability(?User $supportAdmin): array
+    {
+        $isOnline = $supportAdmin === null
+            ? (bool) config('chat.support_availability.default_online', false)
+            : $this->normalizeUserStatus($supportAdmin->chat_status ?? $supportAdmin->status) === 'online';
+
+        return [
+            'available' => $isOnline,
+            'title' => (string) config(
+                $isOnline ? 'chat.support_availability.online_title' : 'chat.support_availability.offline_title'
+            ),
+            'message' => (string) config(
+                $isOnline ? 'chat.support_availability.online_message' : 'chat.support_availability.offline_message'
+            ),
+        ];
+    }
+
+    protected function resolveSupportParticipant(Conversation $conversation): ?User
+    {
+        $participantOne = $conversation->participantOne;
+        $participantTwo = $conversation->participantTwo;
+
+        if ($participantOne && $this->isAdminContext($participantOne)) {
+            return $participantOne;
+        }
+
+        if ($participantTwo && $this->isAdminContext($participantTwo)) {
+            return $participantTwo;
+        }
+
+        return $participantOne ?? $participantTwo;
     }
 
     protected function normalizeUserStatus(?string $status): string

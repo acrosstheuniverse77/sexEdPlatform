@@ -22,6 +22,7 @@ class AdminDoesNotEnterInstructorSubmissionQueueTest extends DatabaseTestCase
                 'description' => 'Platform module bypasses instructor review queue.',
                 'age_bracket' => 'teens',
                 'enrollment_mode' => 'auto',
+                'enrollment_limit' => 50,
                 'action' => 'publish',
             ])
             ->assertRedirect();

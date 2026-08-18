@@ -163,16 +163,16 @@
                         return NodeFilter.FILTER_REJECT;
                     }
 
-                    var parent = node.parentElement;
-                    if (!parent) {
+                    var guardian = node.parentElement;
+                    if (!guardian) {
                         return NodeFilter.FILTER_REJECT;
                     }
 
-                    if (parent.closest('#cc-page-translator')) {
+                    if (guardian.closest('#cc-page-translator')) {
                         return NodeFilter.FILTER_REJECT;
                     }
 
-                    var tag = parent.tagName;
+                    var tag = guardian.tagName;
                     if (['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEXTAREA', 'CODE', 'PRE', 'SVG', 'OPTION'].includes(tag)) {
                         return NodeFilter.FILTER_REJECT;
                     }

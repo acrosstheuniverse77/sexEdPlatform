@@ -174,7 +174,7 @@
                             $statusLabel = $isArchived
                                 ? 'Archived'
                                 : match((string) $enrollment->status->value) {
-                                    'pending_parent_approval' => 'Pending Parent Approval',
+                                    'pending_parent_approval' => 'Pending Guardian Approval',
                                     'pending' => 'Pending',
                                     'approved' => 'Approved',
                                     'rejected' => 'Rejected',

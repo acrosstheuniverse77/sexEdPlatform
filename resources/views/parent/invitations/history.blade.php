@@ -8,8 +8,8 @@
          style="background: linear-gradient(135deg, #A30EB2, #730DB1, #3B0CB1);">
         <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-                <h1 class="text-2xl font-bold">Parent Invitation History</h1>
-                <p class="text-white/80 text-sm mt-1">Review your complete parent-link invitation timeline.</p>
+                <h1 class="text-2xl font-bold">Guardian Invitation History</h1>
+                <p class="text-white/80 text-sm mt-1">Review your complete guardian-link invitation timeline.</p>
             </div>
             <div class="flex items-center gap-2">
                 <a href="{{ route('parent.invitations.index') }}"
@@ -18,7 +18,7 @@
                 </a>
                 <a href="{{ route('parent.children.index') }}"
                    class="inline-flex items-center rounded-xl bg-white/20 px-4 py-2 text-sm font-semibold text-white hover:bg-white/30">
-                    Back to My Children
+                    Back to My Dependents
                 </a>
             </div>
         </div>
@@ -69,15 +69,15 @@
                             <div class="grid gap-3 sm:grid-cols-2">
                                 <div class="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
                                     @if($parentAvatarUrl)
-                                        <img src="{{ $parentAvatarUrl }}" alt="Inviting parent avatar" class="h-10 w-10 rounded-full object-cover border border-gray-200">
+                                        <img src="{{ $parentAvatarUrl }}" alt="Inviting guardian avatar" class="h-10 w-10 rounded-full object-cover border border-gray-200">
                                     @else
                                         <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-purple-100 text-xs font-bold text-purple-700">
                                             {{ strtoupper(substr((string) ($invitation->inviterParent?->name ?? 'P'), 0, 1)) }}
                                         </span>
                                     @endif
                                     <div>
-                                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Invited Parent</p>
-                                        <p class="text-sm font-semibold text-gray-900">{{ $invitation->inviterParent?->name ?? 'Parent' }}</p>
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Invited Guardian</p>
+                                        <p class="text-sm font-semibold text-gray-900">{{ $invitation->inviterParent?->name ?? 'Guardian' }}</p>
                                         <p class="text-xs text-gray-500">{{ $invitation->inviterParent?->email ?? 'No email' }}</p>
                                     </div>
                                 </div>
@@ -91,8 +91,11 @@
                                         </span>
                                     @endif
                                     <div>
-                                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Related Child</p>
+                                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Related Dependent</p>
                                         <p class="text-sm font-semibold text-gray-900">{{ $invitation->child?->name ?? 'Learner' }}</p>
+                                        <span class="mt-1 inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+                                            {{ $invitation->relationshipLabel() }}
+                                        </span>
                                         <p class="text-xs text-gray-500">
                                             {{ $invitation->child?->email ?? 'No email' }}
                                             @if($invitation->child?->learnerProfile?->username)

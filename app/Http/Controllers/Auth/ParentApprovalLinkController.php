@@ -39,13 +39,13 @@ class ParentApprovalLinkController extends Controller
                 ->with('info', 'Please verify your email first before continuing.');
         }
 
-        if (! $user->hasCompletedProfile()) {
-            return redirect()->route('profile.complete')
-                ->with('success', 'Your parent verification was approved. Complete your profile to continue.');
+        if (! $user->hasCompletedGuardianOnboarding()) {
+            return redirect()->route('guardian.onboarding.show')
+                ->with('success', 'Your guardian verification was approved. Complete onboarding to continue.');
         }
 
         return redirect()->route('learner.dashboard')
-            ->with('success', 'Your parent verification is approved.')
+            ->with('success', 'Your guardian verification is approved.')
             ->with('show_parent_approved_dashboard_modal', true);
     }
 }

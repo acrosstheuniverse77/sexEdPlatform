@@ -17,6 +17,14 @@ class AuthenticationTest extends TestCase
         $response->assertStatus(200);
     }
 
+    public function test_instructor_login_redirect_does_not_flash_shared_login_message(): void
+    {
+        $response = $this->get(route('instructor.login'));
+
+        $response->assertRedirect(route('login'));
+        $this->assertFalse($response->getSession()->has('info'));
+    }
+
     public function test_users_can_authenticate_using_the_login_screen(): void
     {
         $user = User::factory()->create();

@@ -9,6 +9,7 @@ use App\Http\Requests\Admin\ToggleParentChildVerificationRequest;
 use App\Models\ParentChildAccount;
 use App\Models\User;
 use App\Services\Admin\UserRelationshipService;
+use App\Support\GuardianRelationshipTypes;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
@@ -26,6 +27,7 @@ class UserRelationshipAdminController extends Controller
 
         $search = trim((string) $request->string('search'));
         $verification = (string) $request->string('verification', 'all');
+        $relationshipType = (string) $request->string('relationship_type', 'all');
         $perPage = max(10, min((int) $request->integer('per_page', 25), 100));
 
         $relationships = ParentChildAccount::query()
@@ -52,6 +54,7 @@ class UserRelationshipAdminController extends Controller
             })
             ->when($verification === 'verified', fn ($query) => $query->whereNotNull('relationship_verified_at'))
             ->when($verification === 'unverified', fn ($query) => $query->whereNull('relationship_verified_at'))
+            ->when($relationshipType !== 'all', fn ($query) => $query->where('relationship_type', $relationshipType))
             ->latest('updated_at')
             ->paginate($perPage)
             ->withQueryString();
@@ -78,8 +81,10 @@ class UserRelationshipAdminController extends Controller
             'filters' => [
                 'search' => $search,
                 'verification' => $verification,
+                'relationship_type' => $relationshipType,
                 'per_page' => $perPage,
             ],
+            'relationshipOptions' => GuardianRelationshipTypes::options(),
             'parentCandidates' => $parentCandidates,
             'childCandidates' => $childCandidates,
         ]);
@@ -97,7 +102,7 @@ class UserRelationshipAdminController extends Controller
             return back()->withErrors(['relationship' => $exception->getMessage()])->withInput();
         }
 
-        return back()->with('success', 'Parent-child relationship attached successfully.');
+        return back()->with('success', 'Guardian-dependent relationship attached successfully.');
     }
 
     public function detach(DetachParentChildRequest $request): RedirectResponse
@@ -113,7 +118,7 @@ class UserRelationshipAdminController extends Controller
             return back()->withErrors(['relationship' => $exception->getMessage()])->withInput();
         }
 
-        return back()->with('success', 'Parent-child relationship detached successfully.');
+        return back()->with('success', 'Guardian-dependent relationship detached successfully.');
     }
 
     public function toggleVerification(ToggleParentChildVerificationRequest $request): RedirectResponse

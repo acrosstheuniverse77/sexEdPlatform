@@ -62,7 +62,7 @@ class LearnerPaidModulePurchaseFlowTest extends TestCase
             ->get(route('learner.modules.purchase.form', $module))
             ->assertOk()
             ->assertSee('Confirm Module Purchase')
-            ->assertSee('Proceed to PayMongo');
+            ->assertSee('Proceed to GCash Checkout');
 
         $response = $this->actingAs($learner)
             ->post(route('learner.modules.purchase.process', $module), [

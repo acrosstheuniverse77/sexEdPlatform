@@ -233,6 +233,33 @@ class ChatAdminSupportFlowTest extends TestCase
         Event::assertDispatched(MessageSent::class, 2);
     }
 
+    public function test_support_discovery_exposes_configurable_availability_state(): void
+    {
+        $learner = $this->makeUserWithRole('learner');
+        $supportAdmin = $this->makeUserWithRole('admin', ['chat_status' => 'offline']);
+
+        config()->set('chat.support_admin_user_id', $supportAdmin->id);
+        config()->set('chat.support_availability.default_online', true);
+        config()->set('chat.support_availability.online_title', 'Support Available');
+        config()->set('chat.support_availability.offline_title', 'Support Currently Offline');
+
+        $this->actingAs($learner)
+            ->getJson(route('chat.discovery'))
+            ->assertOk()
+            ->assertJsonPath('support_availability.available', false)
+            ->assertJsonPath('support_availability.title', 'Support Currently Offline')
+            ->assertJsonPath('support_availability.message', 'Your message will be reviewed when support becomes available.');
+
+        $supportAdmin->forceFill(['chat_status' => 'active'])->save();
+
+        $this->actingAs($learner)
+            ->getJson(route('chat.discovery'))
+            ->assertOk()
+            ->assertJsonPath('support_availability.available', true)
+            ->assertJsonPath('support_availability.title', 'Support Available')
+            ->assertJsonPath('support_availability.message', 'You can chat with platform support.');
+    }
+
     private function makeUserWithRole(string $role, array $attributes = []): User
     {
         $defaults = [

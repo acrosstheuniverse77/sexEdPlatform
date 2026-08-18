@@ -432,6 +432,24 @@
                 </div>
 
                 <div
+                    class="rounded-xl border px-3 py-2"
+                    x-show="$store.chat.activeConversationIsSupport()"
+                    :class="$store.chat.activeSupportAvailability().available ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'"
+                    data-chat-support-availability
+                >
+                    <p
+                        class="text-xs font-semibold"
+                        :class="$store.chat.activeSupportAvailability().available ? 'text-emerald-800' : 'text-amber-800'"
+                        x-text="$store.chat.activeSupportAvailability().title"
+                    ></p>
+                    <p
+                        class="mt-0.5 text-xs"
+                        :class="$store.chat.activeSupportAvailability().available ? 'text-emerald-700' : 'text-amber-700'"
+                        x-text="$store.chat.activeSupportAvailability().message"
+                    ></p>
+                </div>
+
+                <div
                     class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2"
                     x-show="$store.chat.activeConversationIsDeclined()"
                 >

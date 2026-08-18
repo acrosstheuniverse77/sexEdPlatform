@@ -1,10 +1,22 @@
 # Community Hub UI And Engagement Implementation Plan
 
+> Current source of truth for Community Hub/feed implementation. Use this plan
+> for active work instead of the older Community Feed V1 plan. The V1 plan is
+> retained only as the backend safety baseline.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Upgrade Community Feed V1 into a polished Connector Community Hub that matches the existing module UI and supports announcements, seminar/event posts, resources, moderated Q&A, and safe discussion prompts.
+**Goal:** Maintain the current Connector Community Hub/feed as a polished,
+moderation-first workspace that matches the existing module UI and supports
+announcements, seminar/event posts, resources, moderated Q&A, and safe
+discussion prompts.
 
-**Architecture:** Keep the existing Community Feed V1 backend safety architecture and route/model names stable while improving the product taxonomy and Blade UI layer. Add only the smallest backend changes needed for new post types, featured posts, seminar-aware event posts, and official Q&A answers. Use reusable Blade components so connector and admin pages stay visually consistent with seminars, modules, connector management, and moderation screens.
+**Architecture:** Keep the existing Community Feed V1 backend safety architecture
+and route/model names stable while treating Community Hub as the current
+user-facing feed. Add only the smallest backend changes needed for new post
+types, featured posts, seminar-aware event posts, and official Q&A answers. Use
+reusable Blade components so connector and admin pages stay visually consistent
+with seminars, modules, connector management, and moderation screens.
 
 **Tech Stack:** Laravel 12, PHP 8.2, Eloquent, Blade, Alpine.js, Tailwind CSS, Spatie Laravel Permission, Laravel notifications, PHPUnit/Laravel feature and unit tests, Vite.
 

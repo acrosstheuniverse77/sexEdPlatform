@@ -27,6 +27,16 @@ return [
         'seminars' => [
             'connector.manage_seminars' => 'Manage seminars',
         ],
+        'community' => [
+            'community.view_space' => 'View Community Hub',
+            'community.create_post' => 'Create Community Hub posts',
+            'community.edit_own_post' => 'Edit own Community Hub posts',
+            'community.manage_posts' => 'Manage Community Hub posts',
+            'community.approve_posts' => 'Approve Community Hub posts',
+            'community.lock_threads' => 'Lock Community Hub threads',
+            'community.manage_comments' => 'Manage Community Hub comments',
+            'community.escalate_to_platform' => 'Escalate Community Hub cases',
+        ],
         'modules' => [
             'connector.manage_modules' => 'Manage modules',
         ],

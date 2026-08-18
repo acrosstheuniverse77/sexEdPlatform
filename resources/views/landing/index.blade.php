@@ -484,7 +484,7 @@
             ['edu.png',     'Verified Certificates', 'Earn shareable certificates when you complete modules and pass required assessments.', '0.3s'],
             ['shields.png', 'Progress Protection', 'Use learning shields so one failed quiz does not break your momentum while you practice.', '0.4s'],
             ['streak.png',  'Gamified Motivation', 'Stay consistent through streaks, points, and milestone rewards designed to keep learners engaged.', '0.5s'],
-            ['connectors.png', 'Parent and Educator Support', 'Enable safe guidance through parent account tools, instructor-authored modules, and moderated communication.', '0.6s'],
+            ['connectors.png', 'Guardian and Educator Support', 'Enable safe guidance through guardian account tools, instructor-authored modules, and moderated communication.', '0.6s'],
         ];
         @endphp
 

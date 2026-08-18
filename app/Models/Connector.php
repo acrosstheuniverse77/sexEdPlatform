@@ -88,6 +88,16 @@ class Connector extends Model
         return $this->hasMany(Seminar::class);
     }
 
+    public function communitySpaces(): HasMany
+    {
+        return $this->hasMany(CommunitySpace::class);
+    }
+
+    public function communityPosts(): HasMany
+    {
+        return $this->hasMany(CommunityPost::class);
+    }
+
     public function activeSubscription(): HasOne
     {
         return $this->hasOne(Subscription::class)

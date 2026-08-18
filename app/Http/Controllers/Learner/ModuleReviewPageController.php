@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Learner;
 
 use App\Http\Controllers\Controller;
+use App\Models\InstructorFeedback;
 use App\Models\Module;
 use App\Services\LearnerModuleCompletionService;
 use Illuminate\Http\Request;
@@ -53,14 +54,35 @@ class ModuleReviewPageController extends Controller
         $reviews = $reviewsQuery->paginate(10)->withQueryString();
 
         $user = $request->user();
+        $module->loadMissing('creator');
         $eligibility = $this->completionService->reviewEligibility($user, $module);
         $userFeedback = $module->feedback()->where('learner_id', $user->id)->first();
+        $userInstructorFeedback = $module->creator
+            ? InstructorFeedback::query()
+                ->where('instructor_id', $module->creator->id)
+                ->where('learner_id', $user->id)
+                ->first()
+            : null;
 
         $summary = [
             'average' => round((float) ($module->feedback()->avg('rating') ?? 0), 1),
             'count' => (int) $module->feedback()->count(),
             'distribution' => collect(range(1, 5))
                 ->mapWithKeys(fn (int $rating) => [$rating => (int) $module->feedback()->where('rating', $rating)->count()]),
+        ];
+
+        $instructorReviews = $module->creator
+            ? InstructorFeedback::query()
+                ->where('instructor_id', $module->creator->id)
+                ->with(['learner.learnerProfile', 'sourceModule:id,title'])
+                ->latest('created_at')
+                ->paginate(10, ['*'], 'instructor_page')
+                ->withQueryString()
+            : null;
+
+        $instructorSummary = [
+            'average' => $module->creator ? round((float) (InstructorFeedback::query()->where('instructor_id', $module->creator->id)->avg('rating') ?? 0), 1) : 0,
+            'count' => $module->creator ? (int) InstructorFeedback::query()->where('instructor_id', $module->creator->id)->count() : 0,
         ];
 
         return view('learner.modules.reviews', [
@@ -74,6 +96,9 @@ class ModuleReviewPageController extends Controller
             'canSubmitReview' => (bool) $eligibility['eligible'],
             'reviewBlocker' => $eligibility['reason'],
             'userFeedback' => $userFeedback,
+            'instructorReviews' => $instructorReviews,
+            'instructorSummary' => $instructorSummary,
+            'userInstructorFeedback' => $userInstructorFeedback,
         ]);
     }
 }

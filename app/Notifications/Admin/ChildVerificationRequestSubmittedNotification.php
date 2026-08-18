@@ -25,7 +25,7 @@ class ChildVerificationRequestSubmittedNotification extends Notification
 
     public function toDatabase(object $notifiable): array
     {
-        $parentName = trim((string) ($this->parent->full_name ?? $this->parent->name ?? 'Parent'));
+        $parentName = trim((string) ($this->parent->full_name ?? $this->parent->name ?? 'Guardian'));
         $childName = trim((string) ($this->child->full_name ?? $this->child->name ?? 'Child learner'));
 
         return [

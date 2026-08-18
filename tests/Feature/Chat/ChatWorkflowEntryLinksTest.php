@@ -27,7 +27,7 @@ class ChatWorkflowEntryLinksTest extends TestCase
     {
         $instructorUsersIndex = File::get(resource_path('views/instructor/users/index.blade.php'));
 
-        $this->assertStringContainsString("'conversation_type' => 'direct'", $instructorUsersIndex);
+        $this->assertStringContainsString("conversation_type: 'direct'", $instructorUsersIndex);
         $this->assertStringContainsString('Message learner', $instructorUsersIndex);
     }
 
@@ -39,5 +39,4 @@ class ChatWorkflowEntryLinksTest extends TestCase
         $this->assertStringContainsString("conversation_type: 'admin_support_chat'", $conversationList);
     }
 }
-
 

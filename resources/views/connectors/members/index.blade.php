@@ -23,10 +23,17 @@
 
     $stats = [
         ['label' => 'Total Members', 'value' => $connector->memberships->where('status', 'active')->count(), 'icon' => 'users', 'tone' => 'text-brand-700 bg-brand-50 border-brand-100'],
-        ['label' => 'Pending Invitations', 'value' => $connector->invitations->where('status', 'pending')->count(), 'icon' => 'mail', 'tone' => 'text-amber-700 bg-amber-50 border-amber-100'],
-        ['label' => 'Removed Members', 'value' => $removedMembersCount, 'icon' => 'archive', 'tone' => 'text-gray-700 bg-gray-50 border-gray-100'],
         ['label' => 'New Members (Last 30 Days)', 'value' => $connector->memberships->where('status', 'active')->filter(fn ($item) => $item->accepted_at?->gte(now()->subDays(30)))->count(), 'icon' => 'spark', 'tone' => 'text-sky-700 bg-sky-50 border-sky-100'],
     ];
+
+    if ($canManageMembers) {
+        $stats = [
+            $stats[0],
+            ['label' => 'Pending Invitations', 'value' => $connector->invitations->where('status', 'pending')->count(), 'icon' => 'mail', 'tone' => 'text-amber-700 bg-amber-50 border-amber-100'],
+            ['label' => 'Removed Members', 'value' => $removedMembersCount, 'icon' => 'archive', 'tone' => 'text-gray-700 bg-gray-50 border-gray-100'],
+            $stats[1],
+        ];
+    }
 
     $memberRows = $connector->memberships->values()->map(function ($membership) use ($connector, $activeOwnerCount, $avatarUrlFor) {
         $user = $membership->user;
@@ -122,7 +129,7 @@
             <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">Access</p>
-                    <h2 class="mt-1 text-xl font-bold text-gray-900">Members Management</h2>
+                    <h2 class="mt-1 text-xl font-bold text-gray-900">{{ $canManageMembers ? 'Members Management' : 'Members Directory' }}</h2>
                 </div>
                 @if($canManageMembers)
                 <div class="flex items-center justify-end gap-2">
