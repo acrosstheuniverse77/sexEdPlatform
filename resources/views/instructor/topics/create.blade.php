@@ -319,7 +319,7 @@
                 </label>
             </div>
             <div class="mb-6">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Parent Topic for Inside Topic Placement</label>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Containing Topic for Inside Topic Placement</label>
                 <select name="parent_topic_id" class="w-full rounded-xl border-gray-200">
                     @foreach($lesson->topics as $lessonTopic)
                         @if($lessonTopic->type !== 'interactive_checkpoint')
@@ -880,4 +880,3 @@
         }
     </script>
 @endsection
-
