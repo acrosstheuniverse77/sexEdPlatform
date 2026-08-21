@@ -101,7 +101,9 @@ class LessonController extends Controller
 
         $allLessonsCompleted = $allLessons->count() > 0 && count($completedLessonIds) === $allLessons->count();
 
-        $topicIds = $allLessons->flatMap(fn ($moduleLesson) => $moduleLesson->topics->pluck('id'))->unique();
+        $topicIds = $allLessons
+            ->flatMap(fn ($moduleLesson) => $moduleLesson->topics->where('type', '!=', 'interactive_checkpoint')->pluck('id'))
+            ->unique();
         $completedModuleTopicIds = LessonTopicProgress::where('user_id', $user->id)
             ->whereIn('lesson_topic_id', $topicIds)
             ->where('completed', true)
@@ -219,11 +221,19 @@ class LessonController extends Controller
         // Calculate locked topics based on prerequisite dependencies
         $lockedTopicIds = [];
         foreach ($lessonTopics as $index => $topic) {
+            if ($topic->type === 'interactive_checkpoint') {
+                continue;
+            }
+
             if ($topic->is_prerequisite) {
                 // Prerequisite topics must be completed sequentially
                 // Lock if any previous prerequisite topics are not completed
                 for ($i = 0; $i < $index; $i++) {
                     $previousTopic = $lessonTopics[$i];
+                    if ($previousTopic->type === 'interactive_checkpoint') {
+                        continue;
+                    }
+
                     if ($previousTopic->is_prerequisite && !in_array($previousTopic->id, $completedTopicIds)) {
                         $lockedTopicIds[] = $topic->id;
                         break;
@@ -398,6 +408,20 @@ class LessonController extends Controller
         }
 
         // Mark topic as completed
+        if ($topic->type === 'interactive_checkpoint') {
+            $topic->markCompleted($user->id);
+
+            $nextTopicIndex = request()->input('next_topic_index');
+            if ($nextTopicIndex !== null) {
+                return redirect()->route('learner.lessons.show', ['lesson' => $lesson->id, 'topic' => $nextTopicIndex])
+                    ->with('success', 'Checkpoint completed.');
+            }
+
+            return redirect()->route('learner.lessons.show', $lesson)
+                ->with('success', 'Checkpoint completed.');
+        }
+
+        // Mark topic as completed
         $topic->markCompleted($user->id);
 
         // Award topic completion points and update streak
@@ -406,7 +430,7 @@ class LessonController extends Controller
         session()->flash('points_earned', $topicPoints);
 
         // Check if all topics are completed to auto-complete lesson
-        $allTopics = $lesson->topics()->ordered()->get();
+        $allTopics = $lesson->topics()->instructional()->ordered()->get();
         $completedCount = LessonTopicProgress::where('user_id', $user->id)
             ->whereIn('lesson_topic_id', $allTopics->pluck('id'))
             ->where('completed', true)

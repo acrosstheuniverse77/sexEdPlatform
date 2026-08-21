@@ -7,8 +7,9 @@
 
 @section('progress-bar')
     @php
-        $topicCount  = $lessonTopics->count();
-        $doneCount   = count($completedTopicIds);
+        $requiredTopics = $lessonTopics->where('type', '!=', 'interactive_checkpoint');
+        $topicCount  = $requiredTopics->count();
+        $doneCount   = $requiredTopics->whereIn('id', $completedTopicIds)->count();
         $progressPct = $topicCount > 0 ? round(($doneCount / $topicCount) * 100) : 0;
     @endphp
     <div class="flex items-center gap-2 w-full">
@@ -101,8 +102,9 @@
                     $__lIsCurrent   = $__l->id === $lesson->id;
                     $__lIsLocked    = in_array($__l->id, $sidebarLockedIds);
                     $__lTopics      = $__l->topics;
-                    $__lTopicCount  = $__lTopics->count();
-                    $__lDoneCount   = $__lTopics->filter(fn($t) => in_array($t->id, $allCompletedTopicIds))->count();
+                    $__lRequiredTopics = $__lTopics->where('type', '!=', 'interactive_checkpoint');
+                    $__lTopicCount  = $__lRequiredTopics->count();
+                    $__lDoneCount   = $__lRequiredTopics->filter(fn($t) => in_array($t->id, $allCompletedTopicIds))->count();
                     $__lQuiz        = $__l->quiz;
                     $__lTotalItems  = $__lTopicCount + ($__lQuiz ? 1 : 0);
                     $__lDoneItems   = $__lDoneCount + (($__lIsCurrent && ($quizAttempt?->passed ?? false)) ? 1 : 0);
@@ -179,6 +181,7 @@
                                 $__tCurrent = $__lIsCurrent && $currentTopicIndex === $__tIdx && !request()->has('quiz');
                                 $__tLocked  = $__lIsCurrent && in_array($__t->id, $lockedTopicIds);
                                 $__tLabel   = match($__t->type) {
+                                    'interactive_checkpoint' => 'QUICK CHECK',
                                     'video'       => 'VIDEO',
                                     'text'        => 'TEXT',
                                     'worksheet'   => 'FILE',
