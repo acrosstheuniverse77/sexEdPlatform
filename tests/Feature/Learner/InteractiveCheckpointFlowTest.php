@@ -79,6 +79,40 @@ class InteractiveCheckpointFlowTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_between_topic_checkpoint_appears_in_lesson_navigation(): void
+    {
+        [$learner, $question] = $this->checkpointFixture();
+
+        $this->actingAs($learner)
+            ->get(route('learner.lessons.show', $question->checkpointTopic->lesson))
+            ->assertOk()
+            ->assertSee('Quick Check')
+            ->assertSee('What does consent require?')
+            ->assertSee('Skip for now');
+    }
+
+    public function test_inside_topic_checkpoint_renders_between_content_blocks(): void
+    {
+        [$learner, $question] = $this->checkpointFixture('inside_topic');
+        $topic = $question->checkpointTopic;
+        $topic->update([
+            'type' => 'text',
+            'content_blocks' => [
+                ['type' => 'rich_text', 'html' => '<p>Before checkpoint</p>'],
+                ['type' => 'checkpoint', 'uuid' => $question->checkpoint_block_uuid, 'question_id' => $question->id],
+                ['type' => 'rich_text', 'html' => '<p>After checkpoint</p>'],
+            ],
+        ]);
+
+        $response = $this->actingAs($learner)
+            ->get(route('learner.lessons.show', $topic->lesson));
+
+        $response->assertOk()
+            ->assertSee('Before checkpoint', false)
+            ->assertSee('Quick Check')
+            ->assertSee('After checkpoint', false);
+    }
+
     private function checkpointFixture(string $placement = 'between_topics'): array
     {
         $learner = User::factory()->create(['role' => 'learner']);

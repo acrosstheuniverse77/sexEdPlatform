@@ -52,7 +52,24 @@
 
     <!-- Topic Content -->
     <div class="p-6 bg-white dark:bg-transparent">
-        @if($currentTopic->type === 'video')
+        @if($currentTopic->type === 'interactive_checkpoint')
+            @if($currentTopic->checkpointQuestion)
+                @include('learner.lessons.partials.interactive-checkpoint', ['question' => $currentTopic->checkpointQuestion])
+            @endif
+        @elseif(is_array($currentTopic->content_blocks))
+            <div class="space-y-6">
+                @foreach($currentTopic->content_blocks as $block)
+                    @if(($block['type'] ?? null) === 'rich_text')
+                        <div class="prose max-w-none dark:prose-invert">{!! $block['html'] ?? '' !!}</div>
+                    @elseif(($block['type'] ?? null) === 'checkpoint')
+                        @php $question = $currentTopic->checkpointQuestions->firstWhere('id', $block['question_id'] ?? null); @endphp
+                        @if($question)
+                            @include('learner.lessons.partials.interactive-checkpoint', ['question' => $question])
+                        @endif
+                    @endif
+                @endforeach
+            </div>
+        @elseif($currentTopic->type === 'video')
             <!-- Video Content -->
             <div class="space-y-4">
                 @if($currentTopic->video_file_url)

@@ -7,6 +7,7 @@ use App\Enums\EnrollmentStatus;
 use App\Models\Lesson;
 use App\Models\LessonTopic;
 use App\Models\LessonTopicProgress;
+use App\Models\InteractiveCheckpointProgress;
 use App\Models\QuizAttempt;
 use App\Models\UserProgress;
 use App\Services\GamificationService;
@@ -200,7 +201,12 @@ class LessonController extends Controller
         }
 
         // Get lesson topics with progress
-        $lessonTopics = $lesson->topics()->ordered()->get();
+        $lessonTopics = $lesson->topics()->ordered()->with('checkpointQuestions.options')->get();
+        $checkpointQuestionIds = $lessonTopics->flatMap->checkpointQuestions->pluck('id');
+        $checkpointProgress = InteractiveCheckpointProgress::where('user_id', $user->id)
+            ->whereIn('quiz_question_id', $checkpointQuestionIds)
+            ->get()
+            ->keyBy('quiz_question_id');
         $completedTopicIds = [];
         if ($lessonTopics->count() > 0) {
             $completedTopicIds = LessonTopicProgress::where('user_id', $user->id)
@@ -300,6 +306,7 @@ class LessonController extends Controller
             'quizAttempts',
             'questionTypeCounts',
             'lessonTopics',
+            'checkpointProgress',
             'completedTopicIds',
             'lockedTopicIds',
             'currentTopic',
