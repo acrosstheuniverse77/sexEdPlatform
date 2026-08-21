@@ -22,6 +22,7 @@ class LessonTopic extends Model
         'video_file_path',
         'caption_file_path',
         'text_content',
+        'content_blocks',
         'file_path',
         'worksheet_files',
         'quiz_id',
@@ -41,6 +42,7 @@ class LessonTopic extends Model
         'image_attachments' => 'array',
         'slideshow_data' => 'array',
         'worksheet_files' => 'array',
+        'content_blocks' => 'array',
     ];
 
     /**
@@ -65,6 +67,17 @@ class LessonTopic extends Model
     public function progress(): HasMany
     {
         return $this->hasMany(LessonTopicProgress::class);
+    }
+
+    public function checkpointQuestion()
+    {
+        return $this->hasOne(QuizQuestion::class, 'checkpoint_topic_id')
+            ->whereNull('checkpoint_block_uuid');
+    }
+
+    public function checkpointQuestions(): HasMany
+    {
+        return $this->hasMany(QuizQuestion::class, 'checkpoint_topic_id');
     }
 
     /**
@@ -98,6 +111,11 @@ class LessonTopic extends Model
     public function scopeOrdered($query)
     {
         return $query->orderBy('order');
+    }
+
+    public function scopeInstructional($query)
+    {
+        return $query->where('type', '!=', 'interactive_checkpoint');
     }
 
     /**
