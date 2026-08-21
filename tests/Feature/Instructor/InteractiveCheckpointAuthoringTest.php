@@ -11,6 +11,23 @@ use Tests\TestCase;
 
 class InteractiveCheckpointAuthoringTest extends TestCase
 {
+    public function test_topic_create_page_shows_checkpoint_authoring_controls(): void
+    {
+        $instructor = User::factory()->create(['role' => 'instructor']);
+        $instructor->assignRole('instructor');
+        $module = Module::factory()->create(['created_by' => $instructor->id, 'content_owner_type' => 'instructor']);
+        $lesson = Lesson::factory()->create(['module_id' => $module->id]);
+
+        $this->actingAs($instructor)
+            ->get(route('instructor.topics.create', ['lesson' => $lesson->id]))
+            ->assertOk()
+            ->assertSee('Interactive Checkpoint')
+            ->assertSee('Inside Topic')
+            ->assertSee('Between Topics')
+            ->assertSee('Question Type')
+            ->assertSee('Explanation');
+    }
+
     public function test_instructor_can_create_between_topic_checkpoint(): void
     {
         $instructor = User::factory()->create(['role' => 'instructor']);

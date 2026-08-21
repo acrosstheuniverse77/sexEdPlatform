@@ -111,7 +111,7 @@
                 <label class="block text-sm font-medium text-gray-700 mb-4">
                     Topic Type <span class="text-red-500">*</span>
                 </label>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <!-- Video Type -->
                     <label class="relative flex flex-col items-center p-6 border-2 border-gray-200 rounded-xl cursor-pointer hover:border-purple-400 hover:shadow-md transition-all topic-type-card">
                         <input 
@@ -158,6 +158,22 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
                         <span class="text-sm font-semibold text-gray-900">Worksheet</span>
+                    </label>
+
+                    <!-- Interactive Checkpoint Type -->
+                    <label class="relative flex flex-col items-center p-6 border-2 border-gray-200 rounded-xl cursor-pointer hover:border-purple-400 hover:shadow-md transition-all topic-type-card">
+                        <input
+                            type="radio"
+                            name="type"
+                            value="interactive_checkpoint"
+                            class="sr-only topic-type-radio"
+                            {{ old('type', $topic->type) === 'interactive_checkpoint' ? 'checked' : '' }}
+                            required
+                        >
+                        <svg class="w-12 h-12 text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span class="text-sm font-semibold text-gray-900 text-center">Interactive Checkpoint</span>
                     </label>
 
                 </div>
@@ -400,6 +416,34 @@
             </div>
         </div>
 
+        <!-- Interactive Checkpoint Content Section -->
+        <div id="interactive_checkpointContent" class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 content-section hidden">
+            <h2 class="text-xl font-semibold text-gray-900 mb-6">Edit Interactive Checkpoint</h2>
+            <div class="grid gap-4 md:grid-cols-2 mb-6">
+                <label class="rounded-xl border border-gray-200 p-4">
+                    <input type="radio" name="checkpoint_placement" value="inside_topic" class="text-purple-600">
+                    <span class="ml-2 font-semibold">Inside Topic</span>
+                    <p class="mt-1 text-sm text-gray-500">Place this checkpoint within the selected Topic's content.</p>
+                </label>
+                <label class="rounded-xl border border-gray-200 p-4">
+                    <input type="radio" name="checkpoint_placement" value="between_topics" class="text-purple-600" checked>
+                    <span class="ml-2 font-semibold">Between Topics</span>
+                    <p class="mt-1 text-sm text-gray-500">Place this checkpoint between Topics as a separate step in the Lesson learning flow.</p>
+                </label>
+            </div>
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Parent Topic for Inside Topic Placement</label>
+                <select name="parent_topic_id" class="w-full rounded-xl border-gray-200">
+                    @foreach($topic->lesson->topics as $lessonTopic)
+                        @if($lessonTopic->type !== 'interactive_checkpoint')
+                            <option value="{{ $lessonTopic->id }}">{{ $lessonTopic->title }}</option>
+                        @endif
+                    @endforeach
+                </select>
+            </div>
+            @include('instructor.quizzes.partials.question-fields', ['lesson' => $topic->lesson])
+        </div>
+
         <!-- Action Buttons -->
         <div class="flex items-center justify-end space-x-4">
             <a 
@@ -608,6 +652,5 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 </div>
 @endsection
-
 
 
