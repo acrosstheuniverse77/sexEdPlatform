@@ -341,6 +341,10 @@ Route::middleware('auth')->group(function () {
         Route::post('/topics/{topic}/complete', [LearnerLessonController::class, 'completeTopic'])->name('topics.complete');
         Route::post('/topics/{topic}/uncomplete', [LearnerLessonController::class, 'uncompleteTopic'])->name('topics.uncomplete');
         Route::post('/lessons/topics/{topic}/complete', [LearnerLessonController::class, 'completeTopic'])->name('lessons.topics.complete');
+        Route::post('/checkpoints/{question}/submit', [\App\Http\Controllers\Learner\InteractiveCheckpointController::class, 'submit'])
+            ->name('checkpoints.submit');
+        Route::post('/checkpoints/{question}/skip', [\App\Http\Controllers\Learner\InteractiveCheckpointController::class, 'skip'])
+            ->name('checkpoints.skip');
         Route::post('/topics/{topic}/translate', [TopicTranslationController::class, 'translate'])
             ->middleware('throttle:30,1')
             ->name('topics.translate');
