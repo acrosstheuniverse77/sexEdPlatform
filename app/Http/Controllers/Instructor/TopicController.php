@@ -8,12 +8,16 @@ use App\Models\Lesson;
 use App\Models\LessonTopic;
 use App\Models\Quiz;
 use App\Services\Content\ContentOwnershipGuard;
+use App\Services\Learning\QuestionAuthoringService;
 use App\Support\ContentPanelContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class TopicController extends Controller
 {
+    public function __construct(private QuestionAuthoringService $questionAuthoring) {}
+
     public function create(Request $request)
     {
         $lesson = Lesson::findOrFail($request->lesson);
@@ -32,6 +36,10 @@ class TopicController extends Controller
         $this->authorize('update', $lessonForAuthorization);
         $this->ensureAdminCanMutateLesson($lessonForAuthorization);
 
+        if ($request->input('type') === 'interactive_checkpoint') {
+            return $this->storeCheckpoint($request, $lessonForAuthorization);
+        }
+
         // Log the request for debugging
         \Log::info('Topic creation request START', [
             'type' => $request->input('type'),
@@ -48,7 +56,7 @@ class TopicController extends Controller
             $validated = $request->validate([
                 'lesson_id' => 'required|exists:lessons,id',
                 'title' => 'required|string|max:255',
-                'type' => 'required|in:video,text,worksheet,interactive',
+                'type' => 'required|in:video,text,worksheet,interactive,interactive_checkpoint',
                 'duration' => 'required|integer|min:1',
                 'is_prerequisite' => 'nullable|boolean',
                 
@@ -300,9 +308,12 @@ class TopicController extends Controller
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'type' => 'required|in:video,text,worksheet,interactive',
+            'type' => 'required|in:video,text,worksheet,interactive,interactive_checkpoint',
             'duration' => 'required|integer|min:1',
             'is_prerequisite' => 'nullable|boolean',
+            'checkpoint_placement' => 'nullable|required_if:type,interactive_checkpoint|in:inside_topic,between_topics',
+            'parent_topic_id' => 'nullable|required_if:checkpoint_placement,inside_topic|integer|exists:lesson_topics,id',
+            'insert_after_block' => 'nullable|integer|min:0',
             
             // Video fields
             'video_source' => 'nullable|required_if:type,video|in:url,upload',
@@ -549,6 +560,76 @@ class TopicController extends Controller
     private function routeName(string $suffix): string
     {
         return app(ContentPanelContext::class)->name($suffix);
+    }
+
+    private function storeCheckpoint(Request $request, Lesson $lesson)
+    {
+        $validated = $request->validate(array_merge([
+            'lesson_id' => ['required', 'exists:lessons,id'],
+            'title' => ['required', 'string', 'max:255'],
+            'duration' => ['nullable', 'integer', 'min:1'],
+            'checkpoint_placement' => ['required', 'in:inside_topic,between_topics'],
+            'parent_topic_id' => ['nullable', 'required_if:checkpoint_placement,inside_topic', 'integer', 'exists:lesson_topics,id'],
+            'insert_after_block' => ['nullable', 'integer', 'min:0'],
+        ], $this->questionAuthoring->rules()));
+
+        if ($validated['checkpoint_placement'] === 'inside_topic') {
+            $parentTopic = LessonTopic::where('lesson_id', $lesson->id)->findOrFail($validated['parent_topic_id']);
+            $blockUuid = (string) Str::uuid();
+            $question = $this->questionAuthoring->createQuestion($validated + ['image' => $request->file('image')], [
+                'quiz_id' => null,
+                'checkpoint_topic_id' => $parentTopic->id,
+                'checkpoint_block_uuid' => $blockUuid,
+                'order' => $parentTopic->checkpointQuestions()->count() + 1,
+            ]);
+
+            $blocks = $this->blocksForTopic($parentTopic);
+            $insertAfter = (int) ($validated['insert_after_block'] ?? 0);
+            array_splice($blocks, min($insertAfter + 1, count($blocks)), 0, [[
+                'type' => 'checkpoint',
+                'uuid' => $blockUuid,
+                'question_id' => $question->id,
+            ]]);
+
+            $parentTopic->update(['content_blocks' => array_values($blocks)]);
+
+            return redirect()->route($this->routeName('lessons.show'), $lesson)
+                ->with('success', 'Interactive checkpoint added to topic.');
+        }
+
+        $topic = $lesson->topics()->create([
+            'title' => $validated['title'],
+            'type' => 'interactive_checkpoint',
+            'duration' => $validated['duration'] ?? 1,
+            'is_prerequisite' => false,
+            'order' => $lesson->topics()->max('order') + 1,
+            'interactive_config' => ['placement' => 'between_topics'],
+        ]);
+
+        $this->questionAuthoring->createQuestion($validated + ['image' => $request->file('image')], [
+            'quiz_id' => null,
+            'checkpoint_topic_id' => $topic->id,
+            'checkpoint_block_uuid' => null,
+            'order' => 1,
+        ]);
+
+        $lesson->update(['duration' => $lesson->topics()->sum('duration')]);
+        $lesson->module->update(['duration_minutes' => $lesson->module->lessons()->sum('duration')]);
+
+        return redirect()->route($this->routeName('lessons.show'), $lesson)
+            ->with('success', 'Interactive checkpoint created successfully.');
+    }
+
+    private function blocksForTopic(LessonTopic $topic): array
+    {
+        if (is_array($topic->content_blocks) && count($topic->content_blocks) > 0) {
+            return $topic->content_blocks;
+        }
+
+        return [[
+            'type' => 'rich_text',
+            'html' => $topic->text_content ?? '',
+        ]];
     }
 
     /**
