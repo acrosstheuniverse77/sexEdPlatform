@@ -2,6 +2,7 @@ import './bootstrap';
 import Alpine from 'alpinejs';
 import collapse from '@alpinejs/collapse';
 import persist from '@alpinejs/persist';
+import { createQuestionAuthoring } from './question-authoring';
 import './toast'; // Toast notification system
 import './chat/store';
 import './chat/global-popup';
@@ -123,6 +124,7 @@ window.Alpine = Alpine;
 Alpine.plugin(collapse);
 Alpine.plugin(persist);
 Alpine.data('instructorSearch', createInstructorSearch);
+Alpine.data('questionAuthoring', createQuestionAuthoring);
 
 // Theme store — dark / light mode, persisted in localStorage
 Alpine.store('theme', {
