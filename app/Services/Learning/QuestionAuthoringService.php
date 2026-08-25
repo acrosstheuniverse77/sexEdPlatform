@@ -3,6 +3,7 @@
 namespace App\Services\Learning;
 
 use App\Models\QuizQuestion;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -38,6 +39,25 @@ class QuestionAuthoringService
         ];
     }
 
+    public function normalizeRequest(Request $request): void
+    {
+        $type = (string) $request->input('question_type');
+
+        if (!in_array($type, ['multiple_choice', 'true_false', 'multiple_select'], true)) {
+            $request->request->remove('options');
+            $request->request->remove('correct_options');
+        }
+
+        if (!in_array($type, ['fill_blank_text', 'fill_blank_select', 'identification'], true)) {
+            $request->request->remove('acceptable_answers');
+            $request->request->remove('case_sensitive');
+        }
+
+        if ($type !== 'fill_blank_select') {
+            $request->request->remove('word_bank');
+        }
+    }
+
     public function createQuestion(array $data, array $owner): QuizQuestion
     {
         return DB::transaction(function () use ($data, $owner): QuizQuestion {
@@ -66,15 +86,17 @@ class QuestionAuthoringService
 
     private function questionPayload(array $data, array $owner, ?string $existingImagePath = null): array
     {
+        $usesAcceptableAnswers = in_array($data['question_type'], ['fill_blank_text', 'fill_blank_select', 'identification'], true);
+
         return array_merge($owner, [
             'question_text' => $data['question_text'],
             'question_type' => $data['question_type'],
             'points' => (int) ($data['points'] ?? 1),
-            'acceptable_answers' => isset($data['acceptable_answers'])
+            'acceptable_answers' => $usesAcceptableAnswers && isset($data['acceptable_answers'])
                 ? implode('|', array_map('trim', $data['acceptable_answers']))
                 : null,
-            'case_sensitive' => !empty($data['case_sensitive']),
-            'word_bank' => !empty($data['word_bank'])
+            'case_sensitive' => $usesAcceptableAnswers && !empty($data['case_sensitive']),
+            'word_bank' => $data['question_type'] === 'fill_blank_select' && !empty($data['word_bank'])
                 ? array_map('trim', explode(',', $data['word_bank']))
                 : null,
             'image_path' => ($data['image'] ?? null) instanceof UploadedFile
@@ -88,7 +110,9 @@ class QuestionAuthoringService
     {
         $question->options()->delete();
 
-        if (!isset($data['options']) || !is_array($data['options'])) {
+        if (!in_array($data['question_type'], ['multiple_choice', 'true_false', 'multiple_select'], true)
+            || !isset($data['options'])
+            || !is_array($data['options'])) {
             return;
         }
 

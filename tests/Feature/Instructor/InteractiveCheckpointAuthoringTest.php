@@ -60,6 +60,71 @@ class InteractiveCheckpointAuthoringTest extends TestCase
         ]);
     }
 
+    public function test_admin_can_create_multiple_choice_checkpoint_when_hidden_acceptable_answer_field_is_empty(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $admin->assignRole('admin');
+        $module = Module::factory()->create([
+            'created_by' => $admin->id,
+            'content_owner_type' => 'admin',
+        ]);
+        $lesson = Lesson::factory()->create(['module_id' => $module->id]);
+
+        $this->actingAs($admin)
+            ->post(route('admin.topics.store'), [
+                'lesson_id' => $lesson->id,
+                'title' => 'Admin MC Checkpoint',
+                'type' => 'interactive_checkpoint',
+                'duration' => 1,
+                'checkpoint_placement' => 'between_topics',
+                'question_text' => 'Which answer is clear consent?',
+                'question_type' => 'multiple_choice',
+                'points' => 1,
+                'options' => ['Yes', 'Silence', 'Pressure', 'Maybe'],
+                'correct_options' => [0],
+                'acceptable_answers' => [''],
+            ])
+            ->assertRedirect(route('admin.lessons.show', $lesson));
+
+        $this->assertDatabaseHas('quiz_questions', [
+            'question_text' => 'Which answer is clear consent?',
+            'question_type' => 'multiple_choice',
+            'acceptable_answers' => null,
+        ]);
+    }
+
+    public function test_admin_can_create_identification_checkpoint_when_hidden_option_fields_are_empty(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $admin->assignRole('admin');
+        $module = Module::factory()->create([
+            'created_by' => $admin->id,
+            'content_owner_type' => 'admin',
+        ]);
+        $lesson = Lesson::factory()->create(['module_id' => $module->id]);
+
+        $this->actingAs($admin)
+            ->post(route('admin.topics.store'), [
+                'lesson_id' => $lesson->id,
+                'title' => 'Admin Identification Checkpoint',
+                'type' => 'interactive_checkpoint',
+                'duration' => 1,
+                'checkpoint_placement' => 'between_topics',
+                'question_text' => 'Name the concept.',
+                'question_type' => 'identification',
+                'points' => 1,
+                'options' => ['', '', '', ''],
+                'correct_options' => [],
+                'acceptable_answers' => ['Consent'],
+            ])
+            ->assertRedirect(route('admin.lessons.show', $lesson));
+
+        $question = QuizQuestion::where('question_text', 'Name the concept.')->firstOrFail();
+        $this->assertSame('identification', $question->question_type);
+        $this->assertSame('Consent', $question->acceptable_answers);
+        $this->assertCount(0, $question->options);
+    }
+
     public function test_instructor_can_add_inside_topic_checkpoint_block(): void
     {
         $instructor = User::factory()->create(['role' => 'instructor']);

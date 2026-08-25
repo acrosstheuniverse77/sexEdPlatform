@@ -564,6 +564,8 @@ class TopicController extends Controller
 
     private function storeCheckpoint(Request $request, Lesson $lesson)
     {
+        $this->questionAuthoring->normalizeRequest($request);
+
         $validated = $request->validate(array_merge([
             'lesson_id' => ['required', 'exists:lessons,id'],
             'title' => ['required', 'string', 'max:255'],

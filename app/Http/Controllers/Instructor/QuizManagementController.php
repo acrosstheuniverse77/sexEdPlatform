@@ -204,6 +204,8 @@ class QuizManagementController extends Controller
         $this->authorize('update', $quiz);
         $this->ensureAdminCanMutateQuiz($quiz);
 
+        $this->questionAuthoring->normalizeRequest($request);
+
         $validated = $request->validate($this->questionAuthoring->rules());
 
         if ($request->question_type === 'fill_blank_select' && $request->word_bank) {
@@ -265,6 +267,8 @@ class QuizManagementController extends Controller
         if ($question->quiz_id !== $quiz->id) {
             abort(404);
         }
+
+        $this->questionAuthoring->normalizeRequest($request);
 
         $validated = $request->validate($this->questionAuthoring->rules());
 
@@ -836,4 +840,3 @@ class QuizManagementController extends Controller
         return 'quiz-images/user-' . (int) Auth::id();
     }
 }
-
