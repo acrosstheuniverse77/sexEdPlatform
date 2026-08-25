@@ -194,8 +194,9 @@ class QuizManagementController extends Controller
         $this->ensureAdminCanMutateQuiz($quiz);
 
         $preselectedType = request()->query('type');
-        $validTypes = ['multiple_choice', 'true_false', 'multiple_select', 'fill_blank_text', 'fill_blank_select', 'identification'];
-        $selectedType = in_array($preselectedType, $validTypes) ? $preselectedType : null;
+        $selectedType = in_array($preselectedType, QuestionAuthoringService::TYPES, true)
+            ? $preselectedType
+            : null;
         return view('instructor.quizzes.add-question', compact('quiz', 'selectedType'));
     }
 
@@ -204,19 +205,10 @@ class QuizManagementController extends Controller
         $this->authorize('update', $quiz);
         $this->ensureAdminCanMutateQuiz($quiz);
 
-        $this->questionAuthoring->normalizeRequest($request);
-
-        $validated = $request->validate($this->questionAuthoring->rules());
-
-        if ($request->question_type === 'fill_blank_select' && $request->word_bank) {
-            $words = array_map('trim', explode(',', $request->word_bank));
-            if (count($words) > 10) {
-                return back()->withErrors(['word_bank' => 'Word bank cannot exceed 10 words.'])->withInput();
-            }
-        }
+        $validated = $this->questionAuthoring->validate($request);
 
         try {
-            $this->questionAuthoring->createQuestion($validated + ['image' => $request->file('image')], [
+            $this->questionAuthoring->createQuestion($validated, [
                 'quiz_id' => $quiz->id,
                 'order' => $quiz->questions()->max('order') + 1,
             ]);
@@ -268,19 +260,10 @@ class QuizManagementController extends Controller
             abort(404);
         }
 
-        $this->questionAuthoring->normalizeRequest($request);
-
-        $validated = $request->validate($this->questionAuthoring->rules());
-
-        if ($request->question_type === 'fill_blank_select' && $request->word_bank) {
-            $words = array_map('trim', explode(',', $request->word_bank));
-            if (count($words) > 10) {
-                return back()->withErrors(['word_bank' => 'Word bank cannot exceed 10 words.'])->withInput();
-            }
-        }
+        $validated = $this->questionAuthoring->validate($request);
 
         try {
-            $this->questionAuthoring->updateQuestion($question, $validated + ['image' => $request->file('image')]);
+            $this->questionAuthoring->updateQuestion($question, $validated);
 
             return redirect()->route($this->routeName('quizzes.show'), $quiz)
                 ->with('success', 'Question updated successfully!');

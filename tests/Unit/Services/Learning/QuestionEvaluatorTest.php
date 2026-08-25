@@ -56,6 +56,20 @@ class QuestionEvaluatorTest extends TestCase
         $this->assertFalse($this->evaluator->evaluate($question, ['sky', 'grass'])['is_correct']);
     }
 
+    public function test_fill_blank_text_keeps_legacy_single_blank_alternatives(): void
+    {
+        $question = $this->textQuestion('fill_blank_text', 'color|colour', false);
+
+        $this->assertTrue($this->evaluator->evaluate($question, ['colour'])['is_correct']);
+    }
+
+    public function test_fill_blank_select_keeps_legacy_pipe_delimited_order(): void
+    {
+        $question = $this->textQuestion('fill_blank_select', 'first|second', false, ['first', 'second']);
+
+        $this->assertTrue($this->evaluator->evaluate($question, ['first', 'second'])['is_correct']);
+    }
+
     public function test_identification_respects_case_sensitivity(): void
     {
         $question = $this->textQuestion('identification', 'Consent', true);
