@@ -306,29 +306,45 @@
         <!-- Interactive Checkpoint Content -->
         <div id="interactive_checkpointContent" class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 content-section hidden">
             <h2 class="text-xl font-semibold text-gray-900 mb-6">Create Interactive Checkpoint</h2>
-            <div class="grid gap-4 md:grid-cols-2 mb-6">
-                <label class="rounded-xl border border-gray-200 p-4">
-                    <input type="radio" name="checkpoint_placement" value="inside_topic" class="text-purple-600">
-                    <span class="ml-2 font-semibold">Inside Topic</span>
-                    <p class="mt-1 text-sm text-gray-500">Place this checkpoint within the selected Topic's content.</p>
-                </label>
-                <label class="rounded-xl border border-gray-200 p-4">
-                    <input type="radio" name="checkpoint_placement" value="between_topics" class="text-purple-600" checked>
-                    <span class="ml-2 font-semibold">Between Topics</span>
-                    <p class="mt-1 text-sm text-gray-500">Place this checkpoint between Topics as a separate step in the Lesson learning flow.</p>
-                </label>
+            @if($errors->any() && old('type') === 'interactive_checkpoint')
+                <div class="mb-5 rounded-2xl border border-red-200 bg-red-50 px-5 py-4" role="alert">
+                    <p class="text-sm font-semibold text-red-800">Please fix the checkpoint configuration.</p>
+                    <ul class="mt-1 list-inside list-disc text-xs text-red-700">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+                </div>
+            @endif
+            <div x-data="{ placement: @js(old('checkpoint_placement', 'between_topics')) }" class="mb-6 space-y-4">
+                <fieldset>
+                    <legend class="mb-3 text-sm font-semibold text-gray-900">Checkpoint Placement</legend>
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <label class="rounded-xl border border-gray-200 p-4" :class="placement === 'inside_topic' && 'border-purple-300 bg-purple-50'">
+                            <input type="radio" name="checkpoint_placement" value="inside_topic" x-model="placement" class="text-purple-600 focus:ring-purple-500">
+                            <span class="ml-2 font-semibold">Inside Topic</span>
+                            <span class="mt-1 block text-sm text-gray-500">Place this checkpoint within a selected Topic's content.</span>
+                        </label>
+                        <label class="rounded-xl border border-gray-200 p-4" :class="placement === 'between_topics' && 'border-purple-300 bg-purple-50'">
+                            <input type="radio" name="checkpoint_placement" value="between_topics" x-model="placement" class="text-purple-600 focus:ring-purple-500">
+                            <span class="ml-2 font-semibold">Between Topics</span>
+                            <span class="mt-1 block text-sm text-gray-500">Place this checkpoint as a separate step in the Lesson flow.</span>
+                        </label>
+                    </div>
+                </fieldset>
+                <div x-show="placement === 'inside_topic'">
+                    <label for="parent_topic_id" class="mb-2 block text-sm font-medium text-gray-700">Containing Topic</label>
+                    <select id="parent_topic_id" name="parent_topic_id" :disabled="placement !== 'inside_topic'" class="w-full rounded-xl border-gray-200 focus:border-purple-400 focus:ring-purple-300">
+                        @foreach($lesson->topics->where('type', '!=', 'interactive_checkpoint') as $lessonTopic)
+                            <option value="{{ $lessonTopic->id }}" @selected((int) old('parent_topic_id') === $lessonTopic->id)>{{ $lessonTopic->title }}</option>
+                        @endforeach
+                    </select>
+                    @error('parent_topic_id') <p class="mt-1 text-xs text-red-600" role="alert">{{ $message }}</p> @enderror
+                </div>
             </div>
-            <div class="mb-6">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Containing Topic for Inside Topic Placement</label>
-                <select name="parent_topic_id" class="w-full rounded-xl border-gray-200">
-                    @foreach($lesson->topics as $lessonTopic)
-                        @if($lessonTopic->type !== 'interactive_checkpoint')
-                            <option value="{{ $lessonTopic->id }}">{{ $lessonTopic->title }}</option>
-                        @endif
-                    @endforeach
-                </select>
-            </div>
-            @include('instructor.quizzes.partials.question-fields')
+            @include('instructor.quizzes.partials.question-fields', [
+                'selectedType' => old('question_type', 'multiple_choice'),
+                'allowTypeSwitch' => true,
+                'showPoints' => false,
+                'showExplanation' => true,
+                'editorUploadUrl' => route($contentRoutePrefix . '.upload.image'),
+            ])
         </div>
 
         <!-- Form Actions -->

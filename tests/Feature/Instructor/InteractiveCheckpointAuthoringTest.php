@@ -160,4 +160,82 @@ class InteractiveCheckpointAuthoringTest extends TestCase
         $this->assertSame(1, QuizQuestion::where('checkpoint_topic_id', $parentTopic->id)->checkpoint()->count());
         $this->assertSame(0, LessonTopic::where('lesson_id', $lesson->id)->where('type', 'interactive_checkpoint')->count());
     }
+
+    /**
+     * @dataProvider checkpointPayloadProvider
+     */
+    public function test_instructor_can_create_each_checkpoint_question_type(string $type, array $question): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture('instructor');
+
+        $this->actingAs($instructor)
+            ->post(route('instructor.topics.store'), array_merge([
+                'lesson_id' => $lesson->id,
+                'title' => "{$type} checkpoint",
+                'type' => 'interactive_checkpoint',
+                'duration' => 1,
+                'checkpoint_placement' => 'between_topics',
+                'question_type' => $type,
+                'question_text' => str_starts_with($type, 'fill_blank') ? '_____ follows _____.' : '<p>Question text</p>',
+                'points' => 1,
+                'explanation' => 'Optional learner feedback.',
+            ], $question))
+            ->assertRedirect(route('instructor.lessons.show', $lesson));
+
+        $saved = QuizQuestion::query()->where('question_type', $type)->latest('id')->firstOrFail();
+        $this->assertSame(1, $saved->points);
+        $this->assertSame('Optional learner feedback.', $saved->explanation);
+    }
+
+    public static function checkpointPayloadProvider(): array
+    {
+        return [
+            'multiple choice' => ['multiple_choice', ['options' => ['A', 'B'], 'correct_options' => [0]]],
+            'true false' => ['true_false', ['options' => ['stale', 'values'], 'correct_options' => [1]]],
+            'identification' => ['identification', ['acceptable_answers' => ['Consent', 'Permission'], 'case_sensitive' => 1]],
+            'fill blank text' => ['fill_blank_text', ['acceptable_answers' => ['alpha|Alpha', 'beta']]],
+            'fill blank word bank' => ['fill_blank_select', ['word_bank' => 'alpha, beta, extra', 'acceptable_answers' => ['alpha', 'beta']]],
+            'multiple select' => ['multiple_select', ['options' => ['A', 'B', 'C'], 'correct_options' => [0, 2]]],
+        ];
+    }
+
+    public function test_invalid_checkpoint_writes_no_topic_question_or_option(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture('instructor');
+        $topicCount = LessonTopic::count();
+        $questionCount = QuizQuestion::count();
+
+        $this->actingAs($instructor)
+            ->from(route('instructor.topics.create', ['lesson' => $lesson]))
+            ->post(route('instructor.topics.store'), [
+                'lesson_id' => $lesson->id,
+                'title' => 'Invalid checkpoint',
+                'type' => 'interactive_checkpoint',
+                'duration' => 1,
+                'checkpoint_placement' => 'between_topics',
+                'question_type' => 'multiple_choice',
+                'question_text' => '<p><br></p>',
+                'points' => 1,
+                'options' => ['Only one'],
+                'correct_options' => [],
+            ])
+            ->assertRedirect()
+            ->assertSessionHasErrors(['question_text', 'options', 'correct_options']);
+
+        $this->assertSame($topicCount, LessonTopic::count());
+        $this->assertSame($questionCount, QuizQuestion::count());
+    }
+
+    private function authoringFixture(string $role): array
+    {
+        $author = User::factory()->create(['role' => $role]);
+        $author->assignRole($role);
+        $module = Module::factory()->create([
+            'created_by' => $author->id,
+            'content_owner_type' => $role === 'admin' ? 'admin' : 'instructor',
+        ]);
+        $lesson = Lesson::factory()->create(['module_id' => $module->id]);
+
+        return [$author, $lesson];
+    }
 }
