@@ -25,16 +25,60 @@ test('multiple choice adds unlimited options and never removes below two', () =>
 });
 
 test('true false always owns two fixed rows with radio semantics', () => {
-    const state = createQuestionAuthoring({ type: 'true_false' });
+    const state = createQuestionAuthoring({
+        type: 'true_false',
+        options: [
+            { text: 'Yes', isCorrect: false },
+            { text: 'No', isCorrect: true },
+        ],
+    });
 
     assert.deepEqual(state.options.map(({ text, readonly }) => ({ text, readonly })), [
         { text: 'True', readonly: true },
         { text: 'False', readonly: true },
     ]);
+    assert.deepEqual(state.correctIndices(), []);
     state.setOnlyCorrect(1);
     assert.deepEqual(state.correctIndices(), [1]);
     assert.equal(state.canAddOptions(), false);
     assert.equal(state.canRemoveOptions(), false);
+});
+
+test('true false preserves correctness by canonical label when legacy rows are reversed', () => {
+    const state = createQuestionAuthoring({
+        type: 'true_false',
+        options: [
+            { text: 'False', isCorrect: true },
+            { text: 'True', isCorrect: false },
+        ],
+    });
+
+    assert.deepEqual(state.options.map((option) => option.text), ['True', 'False']);
+    assert.deepEqual(state.correctIndices(), [1]);
+});
+
+test('switching away from an identification image marks it for removal', () => {
+    const state = createQuestionAuthoring({
+        type: 'identification',
+        currentImageUrl: '/storage/existing.png',
+    });
+
+    state.switchType('multiple_choice');
+    state.switchType('identification');
+
+    assert.equal(state.currentImageUrl, null);
+    assert.equal(state.removeExistingImage, true);
+});
+
+test('validation rerender preserves identification image removal intent', () => {
+    const state = createQuestionAuthoring({
+        type: 'identification',
+        currentImageUrl: null,
+        removeExistingImage: true,
+    });
+
+    assert.equal(state.currentImageUrl, null);
+    assert.equal(state.removeExistingImage, true);
 });
 
 test('multiple select removes deleted answers from the correct set', () => {
@@ -126,4 +170,15 @@ test('the full switch sequence resets type state and retains common fields', () 
 
 test('rich to plain conversion removes markup and decodes visible text', () => {
     assert.equal(stripQuestionHtml('<p>Consent&nbsp;<strong>matters</strong></p>'), 'Consent matters');
+});
+
+test('disabled checkpoint fields skip client validation', () => {
+    const state = createQuestionAuthoring({ type: 'multiple_choice' });
+    let prevented = false;
+    state.$root = { closest: () => ({ disabled: true }) };
+
+    state.submit({ preventDefault: () => { prevented = true; } });
+
+    assert.equal(prevented, false);
+    assert.deepEqual(state.errors, {});
 });

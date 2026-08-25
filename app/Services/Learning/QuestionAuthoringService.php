@@ -43,17 +43,18 @@ class QuestionAuthoringService
     {
         return [
             'question_text' => ['required', 'string'],
-            'question_type' => ['required', 'in:' . implode(',', self::TYPES)],
+            'question_type' => ['required', 'in:'.implode(',', self::TYPES)],
             'points' => ['required', 'integer', 'min:1'],
-            'options' => ['required_if:question_type,' . implode(',', self::CHOICE_TYPES), 'array', 'min:2'],
+            'options' => ['required_if:question_type,'.implode(',', self::CHOICE_TYPES), 'array', 'min:2'],
             'options.*' => ['required_with:options', 'string'],
-            'correct_options' => ['required_if:question_type,' . implode(',', self::CHOICE_TYPES), 'array', 'min:1'],
+            'correct_options' => ['required_if:question_type,'.implode(',', self::CHOICE_TYPES), 'array', 'min:1'],
             'correct_options.*' => ['required_with:correct_options', 'integer', 'distinct'],
-            'acceptable_answers' => ['required_if:question_type,' . implode(',', self::TEXT_ANSWER_TYPES), 'array', 'min:1'],
+            'acceptable_answers' => ['required_if:question_type,'.implode(',', self::TEXT_ANSWER_TYPES), 'array', 'min:1'],
             'acceptable_answers.*' => ['required_with:acceptable_answers', 'string'],
             'case_sensitive' => ['nullable', 'boolean'],
             'word_bank' => ['nullable', 'required_if:question_type,fill_blank_select', 'string'],
             'image' => ['nullable', 'image', 'mimes:jpeg,jpg,png', 'max:2048'],
+            'remove_existing_image' => ['nullable', 'boolean'],
             'explanation' => ['nullable', 'string', 'max:5000'],
         ];
     }
@@ -68,7 +69,7 @@ class QuestionAuthoringService
                 (array) $request->input('options', []),
             ));
             $correct = array_values(array_map(
-                'intval',
+                fn ($index) => filter_var($index, FILTER_VALIDATE_INT) !== false ? (int) $index : $index,
                 (array) $request->input('correct_options', []),
             ));
             $request->merge([
@@ -118,7 +119,7 @@ class QuestionAuthoringService
         if (in_array($type, self::CHOICE_TYPES, true)) {
             $options = (array) $request->input('options', []);
             $correct = (array) $request->input('correct_options', []);
-            $invalidIndices = array_filter($correct, fn ($index) => !array_key_exists((int) $index, $options));
+            $invalidIndices = array_filter($correct, fn ($index) => ! array_key_exists((int) $index, $options));
 
             if ($invalidIndices !== []) {
                 $validator->errors()->add('correct_options', 'Every correct answer must refer to an answer option.');
@@ -126,8 +127,24 @@ class QuestionAuthoringService
             if (in_array($type, ['multiple_choice', 'true_false'], true) && count($correct) !== 1) {
                 $validator->errors()->add('correct_options', 'Select exactly one correct answer.');
             }
-            if ($type === 'true_false' && !in_array($correct[0] ?? null, [0, 1], true)) {
+            if ($type === 'true_false' && ! in_array($correct[0] ?? null, [0, 1], true)) {
                 $validator->errors()->add('correct_options', 'Select True or False as the correct answer.');
+            }
+        }
+
+        if (in_array($type, self::TEXT_ANSWER_TYPES, true)) {
+            foreach ((array) $request->input('acceptable_answers', []) as $answer) {
+                $invalid = match ($type) {
+                    'fill_blank_text' => str_contains($answer, ';')
+                        || collect(explode('|', $answer))->contains(fn ($alternative) => trim($alternative) === ''),
+                    'fill_blank_select' => str_contains($answer, ';') || str_contains($answer, '|'),
+                    'identification' => str_contains($answer, '|'),
+                    default => false,
+                };
+                if ($invalid) {
+                    $validator->errors()->add('acceptable_answers', 'Answers contain a reserved separator or an empty alternative.');
+                    break;
+                }
             }
         }
 
@@ -148,7 +165,7 @@ class QuestionAuthoringService
                 $validator->errors()->add('word_bank', 'Word bank cannot exceed 10 words.');
             }
             foreach ((array) $request->input('acceptable_answers', []) as $answer) {
-                if (!in_array($answer, $words, true)) {
+                if (! in_array($answer, $words, true)) {
                     $validator->errors()->add('acceptable_answers', 'Every correct answer must appear in the Word Bank.');
                     break;
                 }
@@ -158,8 +175,10 @@ class QuestionAuthoringService
 
     public function createQuestion(array $data, array $owner): QuizQuestion
     {
-        return DB::transaction(function () use ($data, $owner): QuizQuestion {
-            $question = QuizQuestion::create($this->questionPayload($data, $owner));
+        return $this->withinTransaction(function () use ($data, $owner): QuizQuestion {
+            $payload = $this->questionPayload($data, $owner);
+            $this->deleteNewImageOnRollback($data, $payload['image_path']);
+            $question = QuizQuestion::create($payload);
             $this->replaceOptions($question, $data);
 
             return $question->load('options');
@@ -170,19 +189,20 @@ class QuestionAuthoringService
     {
         $oldImagePath = $question->image_path;
 
-        $updated = DB::transaction(function () use ($question, $data): QuizQuestion {
-            $question->update($this->questionPayload($data, [], $question->image_path));
+        return $this->withinTransaction(function () use ($question, $data, $oldImagePath): QuizQuestion {
+            $payload = $this->questionPayload($data, [], $question->image_path);
+            $this->deleteNewImageOnRollback($data, $payload['image_path']);
+            $question->update($payload);
             $this->replaceOptions($question, $data);
+
+            $imageWasReplaced = ($data['image'] ?? null) instanceof UploadedFile;
+            $removeExisting = ! empty($data['remove_existing_image']);
+            if ($oldImagePath && ($imageWasReplaced || $question->question_type !== 'identification' || $removeExisting)) {
+                DB::afterCommit(fn () => Storage::disk('public')->delete($oldImagePath));
+            }
 
             return $question->refresh()->load('options');
         });
-
-        $imageWasReplaced = ($data['image'] ?? null) instanceof UploadedFile;
-        if ($oldImagePath && ($imageWasReplaced || $updated->question_type !== 'identification')) {
-            Storage::disk('public')->delete($oldImagePath);
-        }
-
-        return $updated;
     }
 
     private function questionPayload(array $data, array $owner, ?string $existingImagePath = null): array
@@ -201,14 +221,14 @@ class QuestionAuthoringService
             'question_type' => $data['question_type'],
             'points' => (int) $data['points'],
             'acceptable_answers' => $acceptableAnswers,
-            'case_sensitive' => $usesTextAnswers && !empty($data['case_sensitive']),
+            'case_sensitive' => $usesTextAnswers && ! empty($data['case_sensitive']),
             'word_bank' => $data['question_type'] === 'fill_blank_select'
                 ? array_map('trim', explode(',', $data['word_bank']))
                 : null,
             'image_path' => $usesImage
                 ? (($data['image'] ?? null) instanceof UploadedFile
                     ? $data['image']->store($this->imageDirectory(), 'public')
-                    : ($data['image_path'] ?? $existingImagePath))
+                    : (! empty($data['remove_existing_image']) ? null : ($data['image_path'] ?? $existingImagePath)))
                 : null,
             'explanation' => $data['explanation'] ?? null,
         ]);
@@ -218,9 +238,9 @@ class QuestionAuthoringService
     {
         $question->options()->delete();
 
-        if (!in_array($data['question_type'], ['multiple_choice', 'true_false', 'multiple_select'], true)
-            || !isset($data['options'])
-            || !is_array($data['options'])) {
+        if (! in_array($data['question_type'], ['multiple_choice', 'true_false', 'multiple_select'], true)
+            || ! isset($data['options'])
+            || ! is_array($data['options'])) {
             return;
         }
 
@@ -237,6 +257,18 @@ class QuestionAuthoringService
 
     private function imageDirectory(): string
     {
-        return 'quiz-images/user-' . (int) Auth::id();
+        return 'quiz-images/user-'.(int) Auth::id();
+    }
+
+    private function deleteNewImageOnRollback(array $data, ?string $imagePath): void
+    {
+        if (($data['image'] ?? null) instanceof UploadedFile && $imagePath) {
+            DB::afterRollBack(fn () => Storage::disk('public')->delete($imagePath));
+        }
+    }
+
+    private function withinTransaction(callable $callback): mixed
+    {
+        return DB::transactionLevel() > 0 ? $callback() : DB::transaction($callback);
     }
 }

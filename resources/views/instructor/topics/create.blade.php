@@ -338,13 +338,15 @@
                     @error('parent_topic_id') <p class="mt-1 text-xs text-red-600" role="alert">{{ $message }}</p> @enderror
                 </div>
             </div>
-            @include('instructor.quizzes.partials.question-fields', [
-                'selectedType' => old('question_type', 'multiple_choice'),
-                'allowTypeSwitch' => true,
-                'showPoints' => false,
-                'showExplanation' => true,
-                'editorUploadUrl' => route($contentRoutePrefix . '.upload.image'),
-            ])
+            <fieldset id="checkpointQuestionFields" @disabled(old('type') !== 'interactive_checkpoint')>
+                @include('instructor.quizzes.partials.question-fields', [
+                    'selectedType' => old('question_type', 'multiple_choice'),
+                    'allowTypeSwitch' => true,
+                    'showPoints' => false,
+                    'showExplanation' => true,
+                    'editorUploadUrl' => route($contentRoutePrefix . '.upload.image'),
+                ])
+            </fieldset>
         </div>
 
         <!-- Form Actions -->
@@ -544,6 +546,9 @@
 
             // Function to show content section based on type
             function showContentSection(type) {
+                const checkpointQuestionFields = document.getElementById('checkpointQuestionFields');
+                checkpointQuestionFields.disabled = type !== 'interactive_checkpoint';
+
                 contentSections.forEach(section => {
                     section.classList.add('hidden');
                 });

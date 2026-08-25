@@ -26,7 +26,7 @@ class TopicController extends Controller
         $this->authorize('update', $lesson);
         $this->ensureAdminCanMutateLesson($lesson);
         $quizzes = Quiz::select('id', 'title')->get();
-        
+
         return view('instructor.topics.create', compact('lesson', 'quizzes'));
     }
 
@@ -48,7 +48,7 @@ class TopicController extends Controller
             'title' => $request->input('title'),
             'has_images' => $request->hasFile('image_attachments'),
             'image_count' => $request->hasFile('image_attachments') ? count($request->file('image_attachments')) : 0,
-            'has_text' => !empty($request->input('text_content')),
+            'has_text' => ! empty($request->input('text_content')),
             'is_prerequisite_in_request' => $request->has('is_prerequisite'),
             'is_prerequisite_value' => $request->input('is_prerequisite'),
             'all_inputs' => $request->except(['_token', 'text_content']),
@@ -61,23 +61,23 @@ class TopicController extends Controller
                 'type' => 'required|in:video,text,worksheet,interactive,interactive_checkpoint',
                 'duration' => 'required|integer|min:1',
                 'is_prerequisite' => 'nullable|boolean',
-                
+
                 // Video fields
                 'video_source' => 'nullable|required_if:type,video|in:url,upload',
                 'video_url' => 'nullable|required_if:video_source,url|string',
                 'video_file' => 'nullable|required_if:video_source,upload|file|mimetypes:video/mp4,video/mpeg,video/quicktime,video/x-msvideo,video/webm|max:102400',
                 'video_description' => 'nullable|string',
-                
+
                 // Text fields (text_content is optional if images are provided)
                 'text_content' => 'nullable|string',
                 'image_attachments.*' => 'nullable|file|mimes:jpeg,jpg,png,gif,webp,svg|max:2048',
                 'excluded_image_indices' => 'nullable|array',
                 'excluded_image_indices.*' => 'integer',
-                
+
                 // Worksheet fields
                 'worksheet_files.*' => 'nullable|file|mimes:pdf,doc,docx|max:10240',
                 'worksheet_instructions' => 'nullable|string',
-                
+
                 // Interactive fields
                 'interactive_type' => 'nullable|required_if:type,interactive|in:activity,simulation,exercise',
                 'interactive_instructions' => 'nullable|string',
@@ -87,46 +87,47 @@ class TopicController extends Controller
         } catch (\Illuminate\Validation\ValidationException $e) {
             \Log::error('Validation failed', [
                 'errors' => $e->errors(),
-                'input' => $request->except(['_token', 'text_content'])
+                'input' => $request->except(['_token', 'text_content']),
             ]);
-            
+
             // Return JSON for AJAX requests
             if ($request->wantsJson() || $request->ajax()) {
                 return response()->json([
                     'success' => false,
-                    'errors' => $e->errors()
+                    'errors' => $e->errors(),
                 ], 422);
             }
-            
+
             throw $e;
         }
 
         // Validate that text topics have either text_content or image_attachments
         if ($validated['type'] === 'text') {
-            if (empty($request->input('text_content')) && !$request->hasFile('image_attachments')) {
+            if (empty($request->input('text_content')) && ! $request->hasFile('image_attachments')) {
                 \Log::warning('Text topic validation failed: no content or images');
-                
+
                 if ($request->wantsJson() || $request->ajax()) {
                     return response()->json([
                         'success' => false,
-                        'errors' => ['text_content' => ['Please provide either text content or image attachments.']]
+                        'errors' => ['text_content' => ['Please provide either text content or image attachments.']],
                     ], 422);
                 }
-                
+
                 return back()->withErrors(['text_content' => 'Please provide either text content or image attachments.'])->withInput();
             }
         }
 
         // Validate that worksheet topics have at least one file
         if ($validated['type'] === 'worksheet') {
-            if (!$request->hasFile('worksheet_files')) {
+            if (! $request->hasFile('worksheet_files')) {
                 \Log::warning('Worksheet topic validation failed: no files');
+
                 return back()->withErrors(['worksheet_files' => 'Please upload at least one worksheet file.'])->withInput();
             }
         }
 
         $lesson = Lesson::findOrFail($validated['lesson_id']);
-        
+
         \Log::info('Processing topic creation', ['lesson_id' => $lesson->id, 'type' => $validated['type']]);
 
         // Handle video
@@ -135,7 +136,7 @@ class TopicController extends Controller
                 $validated['video_file_path'] = $request->file('video_file')->store('videos', 'public');
                 $validated['video_provider'] = 'local';
                 $validated['video_id'] = null;
-            } elseif (!empty($validated['video_url'])) {
+            } elseif (! empty($validated['video_url'])) {
                 $videoData = VideoEmbedHelper::parseVideoUrl($validated['video_url']);
                 $validated['video_provider'] = $videoData['provider'];
                 $validated['video_id'] = $videoData['video_id'];
@@ -149,50 +150,51 @@ class TopicController extends Controller
         if ($request->hasFile('image_attachments')) {
             $excludedIndices = $request->input('excluded_image_indices', []);
             $imageFiles = $request->file('image_attachments');
-            
+
             \Log::info('Processing image attachments', [
                 'total_count' => count($imageFiles),
                 'excluded_count' => count($excludedIndices),
-                'excluded_indices' => $excludedIndices
+                'excluded_indices' => $excludedIndices,
             ]);
-            
+
             $imagePaths = [];
             $captions = $request->all(); // Get all request data for caption fields
-            
+
             foreach ($imageFiles as $index => $image) {
                 // Skip excluded images
                 if (in_array($index, $excludedIndices)) {
                     \Log::info('Skipping excluded image', ['index' => $index]);
+
                     continue;
                 }
-                
+
                 try {
                     $path = $image->store('lesson-images', 'public');
-                    
+
                     // Look for caption with this index
-                    $captionKey = 'image_captions_' . $index;
+                    $captionKey = 'image_captions_'.$index;
                     $caption = isset($captions[$captionKey]) ? $captions[$captionKey] : null;
-                    
+
                     $imagePaths[] = [
                         'path' => $path,
                         'caption' => $caption,
                         'original_name' => $image->getClientOriginalName(),
                     ];
-                    
+
                     \Log::info('Image stored', ['index' => $index, 'path' => $path, 'caption' => $caption]);
                 } catch (\Exception $e) {
                     \Log::error('Failed to store image', [
                         'index' => $index,
-                        'error' => $e->getMessage()
+                        'error' => $e->getMessage(),
                     ]);
                     throw $e;
                 }
             }
-            
+
             $validated['image_attachments'] = $imagePaths;
-            
+
             \Log::info('All images processed', ['stored_count' => count($imagePaths)]);
-            
+
             // Store data for both gallery and slideshow display (learner can toggle)
             $validated['slideshow_data'] = [
                 'enabled' => true,
@@ -207,7 +209,7 @@ class TopicController extends Controller
         // Handle worksheet file uploads (multiple files)
         if ($request->hasFile('worksheet_files')) {
             $worksheetPaths = [];
-            
+
             foreach ($request->file('worksheet_files') as $index => $file) {
                 $path = $file->store('worksheets', 'public');
                 $worksheetPaths[] = [
@@ -233,15 +235,15 @@ class TopicController extends Controller
 
         // Auto-increment order
         $validated['order'] = $lesson->topics()->max('order') + 1;
-        
+
         // Set prerequisite status - checkbox only sends value when checked
         // When unchecked, the field is not present in the request
         $validated['is_prerequisite'] = $request->has('is_prerequisite');
-        
+
         \Log::info('Final prerequisite value', [
             'is_prerequisite' => $validated['is_prerequisite'],
             'has_in_request' => $request->has('is_prerequisite'),
-            'input_value' => $request->input('is_prerequisite')
+            'input_value' => $request->input('is_prerequisite'),
         ]);
 
         // Clean up temporary fields that shouldn't be stored in database
@@ -258,17 +260,17 @@ class TopicController extends Controller
         } catch (\Exception $e) {
             \Log::error('Failed to create topic', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
-            
+
             if ($request->wantsJson() || $request->ajax()) {
                 return response()->json([
                     'success' => false,
-                    'errors' => ['error' => ['Failed to create topic: ' . $e->getMessage()]]
+                    'errors' => ['error' => ['Failed to create topic: '.$e->getMessage()]],
                 ], 500);
             }
-            
-            return back()->withErrors(['error' => 'Failed to create topic: ' . $e->getMessage()])->withInput();
+
+            return back()->withErrors(['error' => 'Failed to create topic: '.$e->getMessage()])->withInput();
         }
 
         // Update lesson duration (sum of all topics)
@@ -285,7 +287,7 @@ class TopicController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Topic created successfully!',
-                    'redirect' => route($this->routeName('lessons.show'), $lesson)
+                'redirect' => route($this->routeName('lessons.show'), $lesson),
             ]);
         }
 
@@ -311,7 +313,7 @@ class TopicController extends Controller
         }
 
         $quizzes = Quiz::select('id', 'title')->get();
-        
+
         return view('instructor.topics.edit', compact('topic', 'quizzes'));
     }
 
@@ -332,25 +334,25 @@ class TopicController extends Controller
             'checkpoint_placement' => 'nullable|required_if:type,interactive_checkpoint|in:inside_topic,between_topics',
             'parent_topic_id' => 'nullable|required_if:checkpoint_placement,inside_topic|integer|exists:lesson_topics,id',
             'insert_after_block' => 'nullable|integer|min:0',
-            
+
             // Video fields
             'video_source' => 'nullable|required_if:type,video|in:url,upload',
             'video_url' => 'nullable|string',
             'video_file' => 'nullable|file|mimetypes:video/mp4,video/mpeg,video/quicktime,video/x-msvideo,video/webm|max:102400',
             'video_description' => 'nullable|string',
-            
+
             // Text fields
             'text_content' => 'nullable|string',
             'image_attachments.*' => 'nullable|file|mimes:jpeg,jpg,png,gif,webp,svg|max:2048',
             'image_captions.*' => 'nullable|string',
             'delete_images' => 'nullable|array',
             'delete_images.*' => 'integer',
-            
+
             // Worksheet fields
             'worksheet_files.*' => 'nullable|file|mimes:pdf,doc,docx|max:10240',
             'worksheet_file' => 'nullable|file|mimes:pdf,doc,docx|max:10240',
             'worksheet_instructions' => 'nullable|string',
-            
+
             // Interactive fields
             'interactive_type' => 'nullable|required_if:type,interactive|in:activity,simulation,exercise',
             'activity_type' => 'nullable|in:activity,simulation,exercise',
@@ -362,14 +364,14 @@ class TopicController extends Controller
             $imagesMarkedForDelete = count($request->input('delete_images', []));
             $remainingExistingImages = max(0, $existingImages - $imagesMarkedForDelete);
 
-            if (empty($request->input('text_content')) && !$request->hasFile('image_attachments') && $remainingExistingImages === 0) {
+            if (empty($request->input('text_content')) && ! $request->hasFile('image_attachments') && $remainingExistingImages === 0) {
                 return back()->withErrors([
                     'text_content' => 'Please provide either text content or image attachments.',
                 ])->withInput();
             }
         }
 
-        if ($validated['type'] === 'worksheet' && !$request->hasFile('worksheet_files') && !$request->hasFile('worksheet_file') && empty($topic->worksheet_files) && empty($topic->file_path)) {
+        if ($validated['type'] === 'worksheet' && ! $request->hasFile('worksheet_files') && ! $request->hasFile('worksheet_file') && empty($topic->worksheet_files) && empty($topic->file_path)) {
             return back()->withErrors([
                 'worksheet_files' => 'Please upload at least one worksheet file.',
             ])->withInput();
@@ -385,7 +387,7 @@ class TopicController extends Controller
                 $validated['video_file_path'] = $request->file('video_file')->store('videos', 'public');
                 $validated['video_provider'] = 'local';
                 $validated['video_id'] = null;
-            } elseif (!empty($validated['video_url'])) {
+            } elseif (! empty($validated['video_url'])) {
                 $videoData = VideoEmbedHelper::parseVideoUrl($validated['video_url']);
                 $validated['video_provider'] = $videoData['provider'];
                 $validated['video_id'] = $videoData['video_id'];
@@ -412,6 +414,7 @@ class TopicController extends Controller
                     if (isset($oldImage['path'])) {
                         Storage::disk('public')->delete($oldImage['path']);
                     }
+
                     continue;
                 }
 
@@ -495,12 +498,12 @@ class TopicController extends Controller
 
         // Set prerequisite status based on checkbox presence
         $validated['is_prerequisite'] = $request->has('is_prerequisite');
-        
+
         \Log::info('UPDATE - Final prerequisite value', [
             'is_prerequisite' => $validated['is_prerequisite'],
             'has_in_request' => $request->has('is_prerequisite'),
             'input_value' => $request->input('is_prerequisite'),
-            'previous_value' => $topic->is_prerequisite
+            'previous_value' => $topic->is_prerequisite,
         ]);
 
         // Clean up temporary fields that shouldn't be stored in database
@@ -558,6 +561,7 @@ class TopicController extends Controller
         $this->authorize('update', $topic);
         $this->ensureAdminCanMutateTopic($topic);
         $this->assertInsideCheckpointBelongsToTopic($topic, $question);
+        $request->merge(['points' => 1]);
         $questionData = $this->questionAuthoring->validate($request);
 
         $this->questionAuthoring->updateQuestion($question, $questionData);
@@ -572,6 +576,7 @@ class TopicController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'duration' => ['required', 'integer', 'min:1'],
         ]);
+        $request->merge(['points' => 1]);
         $questionData = $this->questionAuthoring->validate($request);
         $question = $topic->checkpointQuestion()->with('options')->firstOrFail();
 
@@ -597,8 +602,7 @@ class TopicController extends Controller
         abort_unless(
             (int) $question->checkpoint_topic_id === (int) $topic->id
             && $question->checkpoint_block_uuid !== null
-            && collect($this->blocksForTopic($topic))->contains(fn ($block) =>
-                ($block['type'] ?? null) === 'checkpoint'
+            && collect($this->blocksForTopic($topic))->contains(fn ($block) => ($block['type'] ?? null) === 'checkpoint'
                 && ($block['uuid'] ?? null) === $question->checkpoint_block_uuid
                 && (int) ($block['question_id'] ?? 0) === (int) $question->id
             ),
@@ -658,6 +662,7 @@ class TopicController extends Controller
             'parent_topic_id' => ['nullable', 'required_if:checkpoint_placement,inside_topic', 'integer', 'exists:lesson_topics,id'],
             'insert_after_block' => ['nullable', 'integer', 'min:0'],
         ]);
+        $request->merge(['points' => 1]);
         $questionData = $this->questionAuthoring->validate($request);
 
         return DB::transaction(function () use ($placement, $questionData, $lesson) {
@@ -742,7 +747,7 @@ class TopicController extends Controller
                         'mime_type' => is_array($file) ? ($file['mime_type'] ?? null) : null,
                     ];
                 })
-                ->filter(fn ($file) => !empty($file['url']))
+                ->filter(fn ($file) => ! empty($file['url']))
                 ->values()
                 ->all();
         }
@@ -765,10 +770,10 @@ class TopicController extends Controller
                     'url' => $path ? Storage::url($path) : null,
                 ];
             })
-            ->filter(fn ($image) => !empty($image['url']))
+            ->filter(fn ($image) => ! empty($image['url']))
             ->values()
             ->all();
-        
+
         return response()->json([
             'id' => $topic->id,
             'title' => $topic->title,
@@ -802,7 +807,7 @@ class TopicController extends Controller
         $this->authorize('create', LessonTopic::class);
 
         $request->validate([
-            'file' => 'required|file|mimes:jpeg,jpg,png,gif,webp|max:5120'
+            'file' => 'required|file|mimes:jpeg,jpg,png,gif,webp|max:5120',
         ]);
 
         if ($request->hasFile('file')) {
@@ -810,7 +815,7 @@ class TopicController extends Controller
             $url = Storage::url($path);
 
             return response()->json([
-                'location' => $url
+                'location' => $url,
             ]);
         }
 
@@ -833,7 +838,7 @@ class TopicController extends Controller
 
     private function ensureAdminCanMutateLesson(Lesson $lesson): void
     {
-        if (!$this->isAdminPanel()) {
+        if (! $this->isAdminPanel()) {
             return;
         }
 
@@ -848,7 +853,7 @@ class TopicController extends Controller
 
     private function ensureAdminCanMutateTopic(LessonTopic $topic): void
     {
-        if (!$this->isAdminPanel()) {
+        if (! $this->isAdminPanel()) {
             return;
         }
 

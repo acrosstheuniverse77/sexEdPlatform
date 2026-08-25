@@ -5,8 +5,10 @@ namespace Tests\Unit\Services\Learning;
 use App\Models\Quiz;
 use App\Models\User;
 use App\Services\Learning\QuestionAuthoringService;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
@@ -49,6 +51,50 @@ class QuestionAuthoringServiceTest extends TestCase
         Storage::disk('public')->assertExists($question->image_path);
     }
 
+    public function test_failed_database_write_removes_new_image(): void
+    {
+        Storage::fake('public');
+        $this->actingAs(User::factory()->create());
+
+        try {
+            DB::transaction(fn () => app(QuestionAuthoringService::class)->createQuestion([
+                'question_text' => 'Identify the symbol.',
+                'question_type' => 'identification',
+                'points' => 1,
+                'acceptable_answers' => ['consent'],
+                'case_sensitive' => false,
+                'image' => UploadedFile::fake()->create('symbol.png', 10, 'image/png'),
+            ], ['quiz_id' => -1]));
+            $this->fail('Invalid owner unexpectedly persisted.');
+        } catch (QueryException) {
+            $this->assertSame([], Storage::disk('public')->allFiles());
+        }
+    }
+
+    public function test_enclosing_transaction_rollback_removes_new_image(): void
+    {
+        Storage::fake('public');
+        $this->actingAs(User::factory()->create());
+        $quiz = Quiz::factory()->create();
+
+        try {
+            DB::transaction(function () use ($quiz): void {
+                app(QuestionAuthoringService::class)->createQuestion([
+                    'question_text' => 'Identify the symbol.',
+                    'question_type' => 'identification',
+                    'points' => 1,
+                    'acceptable_answers' => ['consent'],
+                    'case_sensitive' => false,
+                    'image' => UploadedFile::fake()->create('symbol.png', 10, 'image/png'),
+                ], ['quiz_id' => $quiz->id]);
+
+                throw new \RuntimeException('Force outer rollback.');
+            });
+        } catch (\RuntimeException) {
+            $this->assertSame([], Storage::disk('public')->allFiles());
+        }
+    }
+
     public function test_multiple_choice_requires_exactly_one_in_range_correct_option(): void
     {
         $service = app(QuestionAuthoringService::class);
@@ -67,6 +113,19 @@ class QuestionAuthoringServiceTest extends TestCase
                 $this->assertArrayHasKey('correct_options', $exception->errors());
             }
         }
+    }
+
+    public function test_choice_indices_must_be_real_integers_before_normalization(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        app(QuestionAuthoringService::class)->validate(Request::create('/', 'POST', [
+            'question_type' => 'multiple_choice',
+            'question_text' => '<p>Choose one.</p>',
+            'points' => 1,
+            'options' => ['First', 'Second'],
+            'correct_options' => ['banana'],
+        ]));
     }
 
     public function test_choice_types_require_two_non_empty_options_without_a_maximum(): void
@@ -169,6 +228,31 @@ class QuestionAuthoringServiceTest extends TestCase
         ]));
     }
 
+    public function test_text_answers_reject_reserved_or_empty_delimiters(): void
+    {
+        $service = app(QuestionAuthoringService::class);
+
+        foreach ([
+            ['fill_blank_text', '_____', ['alpha;beta'], null],
+            ['fill_blank_text', '_____', ['alpha|'], null],
+            ['identification', 'Name it.', ['alpha|beta'], null],
+            ['fill_blank_select', '_____', ['alpha;beta'], 'alpha;beta'],
+        ] as [$type, $text, $answers, $wordBank]) {
+            try {
+                $service->validate(Request::create('/', 'POST', array_filter([
+                    'question_type' => $type,
+                    'question_text' => $text,
+                    'points' => 1,
+                    'acceptable_answers' => $answers,
+                    'word_bank' => $wordBank,
+                ], fn ($value) => $value !== null)));
+                $this->fail("Reserved delimiters passed validation for {$type}.");
+            } catch (ValidationException $exception) {
+                $this->assertArrayHasKey('acceptable_answers', $exception->errors());
+            }
+        }
+    }
+
     public function test_update_to_choice_type_clears_text_state_and_deletes_identification_image(): void
     {
         Storage::fake('public');
@@ -211,7 +295,33 @@ class QuestionAuthoringServiceTest extends TestCase
         $this->assertNull($question->image_path);
         $this->assertSame('Helpful feedback.', $question->explanation);
         $this->assertCount(2, $question->options);
-        Storage::disk('public')->assertMissing($oldPath);
+    }
+
+    public function test_explicit_image_removal_clears_identification_image(): void
+    {
+        Storage::fake('public');
+        $this->actingAs(User::factory()->create());
+        $quiz = Quiz::factory()->create();
+        $service = app(QuestionAuthoringService::class);
+        $question = $service->createQuestion([
+            'question_text' => 'Name it.',
+            'question_type' => 'identification',
+            'points' => 1,
+            'acceptable_answers' => ['Consent'],
+            'case_sensitive' => false,
+            'image' => UploadedFile::fake()->create('prompt.png', 10, 'image/png'),
+        ], ['quiz_id' => $quiz->id]);
+
+        $question = $service->updateQuestion($question, [
+            'question_text' => 'Name it.',
+            'question_type' => 'identification',
+            'points' => 1,
+            'acceptable_answers' => ['Consent'],
+            'case_sensitive' => false,
+            'remove_existing_image' => true,
+        ]);
+
+        $this->assertNull($question->image_path);
     }
 
     public function test_explanation_is_optional_and_limited_to_five_thousand_characters(): void

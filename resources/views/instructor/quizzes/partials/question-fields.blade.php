@@ -12,6 +12,7 @@
         ? collect($submittedOptions)->values()->map(fn ($text, $index) => ['text' => $text, 'isCorrect' => in_array($index, $submittedCorrect, true), 'readonly' => $selectedType === 'true_false'])->all()
         : $existingOptions->map(fn ($option) => ['text' => $option->option_text, 'isCorrect' => (bool) $option->is_correct, 'readonly' => $selectedType === 'true_false'])->all();
     $storedAnswers = (string) ($question->acceptable_answers ?? '');
+    $removeExistingImage = (bool) old('remove_existing_image', false);
 
     if (old('acceptable_answers') !== null) {
         $answers = array_values((array) old('acceptable_answers'));
@@ -45,7 +46,8 @@
         'answers' => $answers,
         'wordBank' => old('word_bank', isset($question) && is_array($question->word_bank) ? implode(', ', $question->word_bank) : ''),
         'caseSensitive' => (bool) old('case_sensitive', $question->case_sensitive ?? false),
-        'currentImageUrl' => $question->image_url ?? null,
+        'currentImageUrl' => $removeExistingImage ? null : ($question->image_url ?? null),
+        'removeExistingImage' => $removeExistingImage,
         'editorUploadUrl' => $editorUploadUrl,
         'typeMeta' => $typeMeta,
     ];
@@ -59,6 +61,7 @@
 
 <div x-data="questionAuthoring(@js($initialState))" class="space-y-6" data-question-authoring>
     <input type="hidden" name="question_type" :value="questionType">
+    <input type="hidden" name="remove_existing_image" :value="removeExistingImage ? 1 : 0">
 
     <section class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -97,8 +100,8 @@
     @if($showPoints)
         <div>
             <label for="points" class="mb-2 block text-sm font-semibold text-gray-700">Points <span class="text-red-500">*</span></label>
-            <input id="points" name="points" type="number" min="1" x-model.number="points" required class="w-32 rounded-xl border-gray-200 text-sm focus:border-purple-400 focus:ring-purple-300">
-            @error('points') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+            <input id="points" name="points" type="number" min="1" x-model.number="points" required aria-describedby="points_error" aria-invalid="{{ $errors->has('points') ? 'true' : 'false' }}" class="w-32 rounded-xl border-gray-200 text-sm focus:border-purple-400 focus:ring-purple-300">
+            @error('points') <p id="points_error" class="mt-1 text-xs text-red-600" role="alert">{{ $message }}</p> @enderror
         </div>
     @else
         <input type="hidden" name="points" value="1">
@@ -181,8 +184,8 @@
             <label for="image" class="block text-sm font-semibold text-gray-900">Question Image <span class="font-normal text-gray-400">(optional)</span></label>
             <p class="mb-3 text-xs text-gray-500">JPG or PNG, max 2 MB.</p>
             <img x-show="currentImageUrl" :src="currentImageUrl" alt="Current question image" class="mb-3 max-h-48 rounded-xl border border-gray-200 object-contain">
-            <input id="image" name="image" type="file" x-ref="imageInput" accept=".jpg,.jpeg,.png" class="block w-full text-sm text-gray-500 file:mr-3 file:rounded-xl file:border-0 file:bg-purple-50 file:px-4 file:py-2 file:font-semibold file:text-purple-700">
-            @error('image') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+            <input id="image" name="image" type="file" x-ref="imageInput" accept=".jpg,.jpeg,.png" aria-describedby="image_error" aria-invalid="{{ $errors->has('image') ? 'true' : 'false' }}" class="block w-full text-sm text-gray-500 file:mr-3 file:rounded-xl file:border-0 file:bg-purple-50 file:px-4 file:py-2 file:font-semibold file:text-purple-700">
+            @error('image') <p id="image_error" class="mt-1 text-xs text-red-600" role="alert">{{ $message }}</p> @enderror
         </section>
     </template>
 
@@ -190,8 +193,8 @@
         <section class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
             <label for="explanation" class="block text-sm font-semibold text-gray-900">Explanation <span class="font-normal text-gray-400">(Optional)</span></label>
             <p class="mb-3 text-xs text-gray-500">Shown after the learner answers. It is not shown when the learner skips.</p>
-            <textarea id="explanation" name="explanation" rows="4" maxlength="5000" x-model="explanation" class="w-full rounded-xl border-gray-200 text-sm focus:border-purple-400 focus:ring-purple-300"></textarea>
-            @error('explanation') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+            <textarea id="explanation" name="explanation" rows="4" maxlength="5000" x-model="explanation" aria-describedby="explanation_error" aria-invalid="{{ $errors->has('explanation') ? 'true' : 'false' }}" class="w-full rounded-xl border-gray-200 text-sm focus:border-purple-400 focus:ring-purple-300"></textarea>
+            @error('explanation') <p id="explanation_error" class="mt-1 text-xs text-red-600" role="alert">{{ $message }}</p> @enderror
         </section>
     @endif
 </div>

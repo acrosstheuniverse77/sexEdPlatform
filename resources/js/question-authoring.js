@@ -42,25 +42,34 @@ export function createQuestionAuthoring(config = {}) {
     const initialAnswers = Array.isArray(config.answers) && config.answers.length
         ? config.answers.map(String)
         : [''];
+    const initialOptions = type === 'true_false'
+        ? defaultOptions(type, nextKey).map((option) => ({
+            ...option,
+            isCorrect: Boolean(suppliedOptions.find(
+                (supplied) => String(supplied.text || '').trim().toLowerCase() === option.text.toLowerCase(),
+            )?.isCorrect),
+        }))
+        : (suppliedOptions.length
+            ? suppliedOptions.map((option) => ({
+                key: nextKey(),
+                text: String(option.text || ''),
+                isCorrect: Boolean(option.isCorrect),
+                readonly: Boolean(option.readonly),
+            }))
+            : defaultOptions(type, nextKey));
 
     return {
         questionType: type,
         questionText: config.questionText || '',
         points: Number(config.points || 1),
         explanation: config.explanation || '',
-        options: suppliedOptions.length
-            ? suppliedOptions.map((option) => ({
-                key: nextKey(),
-                text: String(option.text || ''),
-                isCorrect: Boolean(option.isCorrect),
-                readonly: type === 'true_false' || Boolean(option.readonly),
-            }))
-            : defaultOptions(type, nextKey),
+        options: initialOptions,
         answers: initialAnswers,
         answerKeys: initialAnswers.map(() => nextKey()),
         wordBank: config.wordBank || '',
         caseSensitive: Boolean(config.caseSensitive),
         currentImageUrl: config.currentImageUrl || null,
+        removeExistingImage: Boolean(config.removeExistingImage),
         typeMeta: config.typeMeta || {},
         errors: {},
         editorUploadUrl: config.editorUploadUrl || null,
@@ -198,6 +207,7 @@ export function createQuestionAuthoring(config = {}) {
 
         switchType(nextType) {
             if (!nextType || nextType === this.questionType) return;
+            if (this.questionType === 'identification') this.removeExistingImage = true;
             const wasRich = this.isRichType();
             this.syncEditor();
             if (wasRich && !this.isRichType(nextType)) {
@@ -259,6 +269,7 @@ export function createQuestionAuthoring(config = {}) {
         },
 
         submit(event) {
+            if (this.$root.closest('fieldset')?.disabled) return;
             this.syncEditor();
             this.errors = this.validationErrors();
             if (Object.keys(this.errors).length === 0) return;

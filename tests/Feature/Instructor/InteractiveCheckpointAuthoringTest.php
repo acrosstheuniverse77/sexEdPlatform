@@ -29,6 +29,17 @@ class InteractiveCheckpointAuthoringTest extends TestCase
             ->assertSee('Explanation');
     }
 
+    public function test_inactive_checkpoint_fields_are_disabled_in_generic_topic_form(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture('instructor');
+
+        $this->actingAs($instructor)
+            ->get(route('instructor.topics.create', ['lesson' => $lesson]))
+            ->assertOk()
+            ->assertSee('id="checkpointQuestionFields" disabled', false)
+            ->assertSee("checkpointQuestionFields.disabled = type !== 'interactive_checkpoint';", false);
+    }
+
     public function test_instructor_can_create_between_topic_checkpoint(): void
     {
         $instructor = User::factory()->create(['role' => 'instructor']);
@@ -45,7 +56,7 @@ class InteractiveCheckpointAuthoringTest extends TestCase
                 'checkpoint_placement' => 'between_topics',
                 'question_text' => 'Consent requires free agreement.',
                 'question_type' => 'true_false',
-                'points' => 1,
+                'points' => 37,
                 'options' => ['True', 'False'],
                 'correct_options' => [0],
                 'explanation' => 'Consent cannot be pressured.',
@@ -57,6 +68,7 @@ class InteractiveCheckpointAuthoringTest extends TestCase
         $this->assertDatabaseHas('quiz_questions', [
             'checkpoint_topic_id' => $topic->id,
             'question_type' => 'true_false',
+            'points' => 1,
             'explanation' => 'Consent cannot be pressured.',
         ]);
     }
@@ -247,6 +259,43 @@ class InteractiveCheckpointAuthoringTest extends TestCase
         $this->assertSame('between_topics', $topic->refresh()->interactive_config['placement']);
         $this->assertSame('identification', $question->refresh()->question_type);
         $this->assertNull($question->checkpoint_block_uuid);
+    }
+
+    public function test_validation_rerender_preserves_identification_image_removal_intent(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture('instructor');
+        $topic = LessonTopic::factory()->create([
+            'lesson_id' => $lesson->id,
+            'type' => 'interactive_checkpoint',
+            'interactive_config' => ['placement' => 'between_topics'],
+        ]);
+        $question = QuizQuestion::create([
+            'checkpoint_topic_id' => $topic->id,
+            'question_text' => 'Name it.',
+            'question_type' => 'identification',
+            'acceptable_answers' => 'Consent',
+            'image_path' => 'quiz-images/user-1/prompt.png',
+            'points' => 1,
+            'order' => 1,
+        ]);
+        $editUrl = route('instructor.topics.edit', $topic);
+
+        $this->actingAs($instructor)
+            ->from($editUrl)
+            ->put(route('instructor.topics.update', $topic), [
+                'title' => $topic->title,
+                'duration' => 1,
+                'question_type' => 'identification',
+                'question_text' => 'Name it.',
+                'acceptable_answers' => [''],
+                'remove_existing_image' => 1,
+            ])
+            ->assertRedirect($editUrl)
+            ->assertSessionHasErrors('acceptable_answers.0');
+
+        $this->get($editUrl)
+            ->assertOk()
+            ->assertDontSee($question->image_url);
     }
 
     public function test_inside_topic_checkpoint_edit_preserves_block_uuid_and_position(): void
