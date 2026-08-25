@@ -296,7 +296,7 @@
         <ul id="topics-sortable" class="space-y-2">
             @foreach($lesson->topics as $topic)
             <li data-topic-id="{{ $topic->id }}"
-                class="flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-purple-50/30 transition-colors">
+                class="flex flex-wrap items-center gap-3 px-4 py-3 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-purple-50/30 transition-colors">
 
                 {{-- Drag handle --}}
                  <div class="drag-handle w-5 flex items-center justify-center text-gray-300 flex-shrink-0 {{ $isReadOnlyAdminPanel ? 'cursor-not-allowed opacity-50' : 'hover:text-gray-400 cursor-grab active:cursor-grabbing' }}"
@@ -369,6 +369,13 @@
                         </button>
                     </form>
                 </div>
+                @foreach($topic->checkpointQuestions->whereNotNull('checkpoint_block_uuid') as $checkpoint)
+                    <a href="{{ $isReadOnlyAdminPanel ? '#' : route($contentRoutePrefix . '.topics.checkpoints.edit', [$topic, $checkpoint]) }}"
+                        @if($isReadOnlyAdminPanel) aria-disabled="true" tabindex="-1" @click.prevent @endif
+                        class="basis-full rounded-xl border border-purple-100 bg-purple-50 px-3 py-2 text-xs font-semibold text-purple-700 {{ $isReadOnlyAdminPanel ? 'pointer-events-none opacity-50' : 'hover:bg-purple-100' }}">
+                        Edit checkpoint: {{ \Illuminate\Support\Str::limit(strip_tags($checkpoint->question_text), 55) }}
+                    </a>
+                @endforeach
             </li>
             @endforeach
         </ul>
@@ -462,4 +469,3 @@
     @include('instructor.lessons.partials.quiz-modal')
 @endif
 @endsection
-

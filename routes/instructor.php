@@ -158,6 +158,10 @@ Route::prefix('instructor')->name('instructor.')->middleware(['auth', 'permissio
         ->name('topics.create');
     Route::post('topics', [Instructor\TopicController::class, 'store'])
         ->name('topics.store');
+    Route::get('topics/{topic}/checkpoints/{question}/edit', [Instructor\TopicController::class, 'editCheckpoint'])
+        ->name('topics.checkpoints.edit');
+    Route::put('topics/{topic}/checkpoints/{question}', [Instructor\TopicController::class, 'updateCheckpoint'])
+        ->name('topics.checkpoints.update');
     Route::get('topics/{topic}/edit', [Instructor\TopicController::class, 'edit'])
         ->name('topics.edit');
     Route::get('topics/{topic}/preview', [Instructor\TopicController::class, 'preview'])

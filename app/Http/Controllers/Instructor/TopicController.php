@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Lesson;
 use App\Models\LessonTopic;
 use App\Models\Quiz;
+use App\Models\QuizQuestion;
 use App\Services\Content\ContentOwnershipGuard;
 use App\Services\Learning\QuestionAuthoringService;
 use App\Support\ContentPanelContext;
@@ -297,6 +298,18 @@ class TopicController extends Controller
         $this->authorize('update', $topic);
         $this->ensureAdminCanMutateTopic($topic);
         $topic->load('lesson');
+
+        if ($topic->type === 'interactive_checkpoint') {
+            $question = $topic->checkpointQuestion()->with('options')->firstOrFail();
+
+            return view('instructor.topics.edit-checkpoint', [
+                'topic' => $topic,
+                'question' => $question,
+                'placement' => 'between_topics',
+                'formAction' => route($this->routeName('topics.update'), $topic),
+            ]);
+        }
+
         $quizzes = Quiz::select('id', 'title')->get();
         
         return view('instructor.topics.edit', compact('topic', 'quizzes'));
@@ -306,6 +319,10 @@ class TopicController extends Controller
     {
         $this->authorize('update', $topic);
         $this->ensureAdminCanMutateTopic($topic);
+
+        if ($topic->type === 'interactive_checkpoint') {
+            return $this->updateBetweenTopicCheckpoint($request, $topic);
+        }
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
@@ -519,6 +536,74 @@ class TopicController extends Controller
 
         return redirect()->route($this->routeName('lessons.show'), $topic->lesson)
             ->with('success', 'Topic updated successfully!');
+    }
+
+    public function editCheckpoint(LessonTopic $topic, QuizQuestion $question)
+    {
+        $this->authorize('update', $topic);
+        $this->ensureAdminCanMutateTopic($topic);
+        $topic->load('lesson');
+        $this->assertInsideCheckpointBelongsToTopic($topic, $question);
+
+        return view('instructor.topics.edit-checkpoint', [
+            'topic' => $topic,
+            'question' => $question->load('options'),
+            'placement' => 'inside_topic',
+            'formAction' => route($this->routeName('topics.checkpoints.update'), [$topic, $question]),
+        ]);
+    }
+
+    public function updateCheckpoint(Request $request, LessonTopic $topic, QuizQuestion $question)
+    {
+        $this->authorize('update', $topic);
+        $this->ensureAdminCanMutateTopic($topic);
+        $this->assertInsideCheckpointBelongsToTopic($topic, $question);
+        $questionData = $this->questionAuthoring->validate($request);
+
+        $this->questionAuthoring->updateQuestion($question, $questionData);
+
+        return redirect()->route($this->routeName('lessons.show'), $topic->lesson)
+            ->with('success', 'Interactive checkpoint updated successfully.');
+    }
+
+    private function updateBetweenTopicCheckpoint(Request $request, LessonTopic $topic)
+    {
+        $topicData = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'duration' => ['required', 'integer', 'min:1'],
+        ]);
+        $questionData = $this->questionAuthoring->validate($request);
+        $question = $topic->checkpointQuestion()->with('options')->firstOrFail();
+
+        DB::transaction(function () use ($topic, $topicData, $question, $questionData) {
+            $topic->update([
+                'title' => $topicData['title'],
+                'duration' => $topicData['duration'],
+                'interactive_config' => ['placement' => 'between_topics'],
+            ]);
+            $topic->lesson->update(['duration' => $topic->lesson->topics()->sum('duration')]);
+            $topic->lesson->module->update([
+                'duration_minutes' => $topic->lesson->module->lessons()->sum('duration'),
+            ]);
+            $this->questionAuthoring->updateQuestion($question, $questionData);
+        });
+
+        return redirect()->route($this->routeName('lessons.show'), $topic->lesson)
+            ->with('success', 'Interactive checkpoint updated successfully.');
+    }
+
+    private function assertInsideCheckpointBelongsToTopic(LessonTopic $topic, QuizQuestion $question): void
+    {
+        abort_unless(
+            (int) $question->checkpoint_topic_id === (int) $topic->id
+            && $question->checkpoint_block_uuid !== null
+            && collect($this->blocksForTopic($topic))->contains(fn ($block) =>
+                ($block['type'] ?? null) === 'checkpoint'
+                && ($block['uuid'] ?? null) === $question->checkpoint_block_uuid
+                && (int) ($block['question_id'] ?? 0) === (int) $question->id
+            ),
+            404,
+        );
     }
 
     public function destroy(LessonTopic $topic)

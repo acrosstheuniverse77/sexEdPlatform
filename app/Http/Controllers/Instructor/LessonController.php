@@ -118,7 +118,11 @@ class LessonController extends Controller
     {
         $this->authorize('view', $lesson);
 
-        $lesson->load(['module.creator', 'topics' => fn($q) => $q->orderBy('order'), 'quizzes.questions']);
+        $lesson->load([
+            'module.creator',
+            'topics' => fn ($query) => $query->orderBy('order')->with('checkpointQuestions'),
+            'quizzes.questions',
+        ]);
 
         $modules = Module::query()
             ->when($this->panelContext()->isInstructor(), fn ($query) => $query->where('created_by', Auth::id()))

@@ -7,6 +7,7 @@ use App\Models\LessonTopic;
 use App\Models\Module;
 use App\Models\QuizQuestion;
 use App\Models\User;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class InteractiveCheckpointAuthoringTest extends TestCase
@@ -161,9 +162,7 @@ class InteractiveCheckpointAuthoringTest extends TestCase
         $this->assertSame(0, LessonTopic::where('lesson_id', $lesson->id)->where('type', 'interactive_checkpoint')->count());
     }
 
-    /**
-     * @dataProvider checkpointPayloadProvider
-     */
+    #[DataProvider('checkpointPayloadProvider')]
     public function test_instructor_can_create_each_checkpoint_question_type(string $type, array $question): void
     {
         [$instructor, $lesson] = $this->authoringFixture('instructor');
@@ -224,6 +223,137 @@ class InteractiveCheckpointAuthoringTest extends TestCase
 
         $this->assertSame($topicCount, LessonTopic::count());
         $this->assertSame($questionCount, QuizQuestion::count());
+    }
+
+    public function test_between_topic_checkpoint_edit_updates_same_question_and_keeps_placement(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture('instructor');
+        $topic = LessonTopic::factory()->create(['lesson_id' => $lesson->id, 'type' => 'interactive_checkpoint', 'title' => 'Original title', 'duration' => 1, 'interactive_config' => ['placement' => 'between_topics']]);
+        $question = QuizQuestion::create(['quiz_id' => null, 'checkpoint_topic_id' => $topic->id, 'checkpoint_block_uuid' => null, 'question_text' => 'Original question', 'question_type' => 'true_false', 'points' => 1, 'order' => 1]);
+        $question->options()->createMany([
+            ['option_text' => 'True', 'is_correct' => true, 'order' => 0],
+            ['option_text' => 'False', 'is_correct' => false, 'order' => 1],
+        ]);
+
+        $this->actingAs($instructor)->get(route('instructor.topics.edit', $topic))->assertOk()->assertSee('Between Topics')->assertSee('Original question');
+        $this->actingAs($instructor)->put(route('instructor.topics.update', $topic), [
+            'title' => 'Updated title', 'duration' => 2, 'question_type' => 'identification',
+            'question_text' => '<p>Name the concept.</p>', 'points' => 1,
+            'acceptable_answers' => ['Consent'], 'explanation' => 'Updated explanation.',
+            'checkpoint_placement' => 'inside_topic',
+        ])->assertRedirect(route('instructor.lessons.show', $lesson));
+
+        $this->assertSame($question->id, $topic->checkpointQuestion()->value('id'));
+        $this->assertSame('between_topics', $topic->refresh()->interactive_config['placement']);
+        $this->assertSame('identification', $question->refresh()->question_type);
+        $this->assertNull($question->checkpoint_block_uuid);
+    }
+
+    public function test_inside_topic_checkpoint_edit_preserves_block_uuid_and_position(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture('instructor');
+        $topic = LessonTopic::factory()->create([
+            'lesson_id' => $lesson->id, 'type' => 'text',
+            'content_blocks' => [
+                ['type' => 'rich_text', 'html' => '<p>Before</p>'],
+                ['type' => 'checkpoint', 'uuid' => 'block-uuid', 'question_id' => 999],
+                ['type' => 'rich_text', 'html' => '<p>After</p>'],
+            ],
+        ]);
+        $question = QuizQuestion::create(['quiz_id' => null, 'checkpoint_topic_id' => $topic->id, 'checkpoint_block_uuid' => 'block-uuid', 'question_text' => 'Old question', 'question_type' => 'multiple_choice', 'points' => 1, 'order' => 1]);
+        $blocks = $topic->content_blocks;
+        $blocks[1]['question_id'] = $question->id;
+        $topic->update(['content_blocks' => $blocks]);
+        $question->options()->createMany([
+            ['option_text' => 'A', 'is_correct' => true, 'order' => 0],
+            ['option_text' => 'B', 'is_correct' => false, 'order' => 1],
+        ]);
+
+        $this->actingAs($instructor)->put(route('instructor.topics.checkpoints.update', [$topic, $question]), [
+            'question_type' => 'multiple_select', 'question_text' => '<p>Choose two.</p>', 'points' => 1,
+            'options' => ['A', 'B', 'C'], 'correct_options' => [0, 2],
+            'explanation' => 'Two answers are correct.', 'checkpoint_placement' => 'between_topics',
+        ])->assertRedirect(route('instructor.lessons.show', $lesson));
+
+        $this->assertSame($question->id, $question->refresh()->id);
+        $this->assertSame('block-uuid', $question->checkpoint_block_uuid);
+        $this->assertSame($blocks, $topic->refresh()->content_blocks);
+        $this->assertCount(2, $question->options()->where('is_correct', true)->get());
+    }
+
+    public function test_inside_checkpoint_route_rejects_a_question_from_another_topic(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture('instructor');
+        $topic = LessonTopic::factory()->create(['lesson_id' => $lesson->id, 'type' => 'text']);
+        $otherTopic = LessonTopic::factory()->create(['lesson_id' => $lesson->id, 'type' => 'text']);
+        $question = QuizQuestion::create(['quiz_id' => null, 'checkpoint_topic_id' => $otherTopic->id, 'checkpoint_block_uuid' => 'other-block', 'question_text' => 'Other question', 'question_type' => 'identification', 'acceptable_answers' => 'answer', 'points' => 1, 'order' => 1]);
+
+        $this->actingAs($instructor)->get(route('instructor.topics.checkpoints.edit', [$topic, $question]))->assertNotFound();
+    }
+
+    public function test_admin_can_edit_an_admin_owned_checkpoint_through_admin_routes(): void
+    {
+        [$admin, $lesson] = $this->authoringFixture('admin');
+        $topic = LessonTopic::factory()->create(['lesson_id' => $lesson->id, 'type' => 'interactive_checkpoint', 'interactive_config' => ['placement' => 'between_topics']]);
+        $question = QuizQuestion::create(['quiz_id' => null, 'checkpoint_topic_id' => $topic->id, 'question_text' => 'Admin checkpoint', 'question_type' => 'true_false', 'points' => 1, 'order' => 1]);
+        $question->options()->createMany([
+            ['option_text' => 'True', 'is_correct' => true, 'order' => 0],
+            ['option_text' => 'False', 'is_correct' => false, 'order' => 1],
+        ]);
+
+        $this->actingAs($admin)->get(route('admin.topics.edit', $topic))->assertOk()->assertSee('Admin checkpoint');
+        $this->actingAs($admin)->put(route('admin.topics.update', $topic), [
+            'title' => 'Updated by admin', 'duration' => 1, 'question_type' => 'true_false',
+            'question_text' => '<p>Updated statement.</p>', 'points' => 1,
+            'correct_options' => [1], 'explanation' => '',
+        ])->assertRedirect(route('admin.lessons.show', $lesson));
+
+        $this->assertTrue($question->refresh()->options[1]->is_correct);
+    }
+
+    public function test_instructor_cannot_edit_another_instructors_checkpoint(): void
+    {
+        [, $lesson] = $this->authoringFixture('instructor');
+        $other = User::factory()->create(['role' => 'instructor']);
+        $other->assignRole('instructor');
+        $topic = LessonTopic::factory()->create(['lesson_id' => $lesson->id, 'type' => 'interactive_checkpoint', 'interactive_config' => ['placement' => 'between_topics']]);
+        QuizQuestion::create(['quiz_id' => null, 'checkpoint_topic_id' => $topic->id, 'question_text' => 'Owned by someone else', 'question_type' => 'identification', 'acceptable_answers' => 'answer', 'points' => 1, 'order' => 1]);
+
+        $this->actingAs($other)->get(route('instructor.topics.edit', $topic))->assertForbidden();
+    }
+
+    #[DataProvider('checkpointPayloadProvider')]
+    public function test_between_topic_checkpoint_can_edit_to_every_question_type(string $type, array $payload): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture('instructor');
+        $topic = LessonTopic::factory()->create(['lesson_id' => $lesson->id, 'type' => 'interactive_checkpoint', 'title' => 'Editable checkpoint', 'duration' => 1, 'interactive_config' => ['placement' => 'between_topics']]);
+        $question = QuizQuestion::create(['quiz_id' => null, 'checkpoint_topic_id' => $topic->id, 'checkpoint_block_uuid' => null, 'question_text' => 'Old question', 'question_type' => 'multiple_choice', 'points' => 1, 'order' => 1]);
+        $question->options()->createMany([
+            ['option_text' => 'Old A', 'is_correct' => true, 'order' => 0],
+            ['option_text' => 'Old B', 'is_correct' => false, 'order' => 1],
+        ]);
+
+        $this->actingAs($instructor)->put(route('instructor.topics.update', $topic), array_merge([
+            'title' => 'Edited checkpoint', 'duration' => 2, 'question_type' => $type,
+            'question_text' => str_starts_with($type, 'fill_blank') ? '_____ follows _____.' : '<p>Edited question</p>',
+            'points' => 1, 'explanation' => 'Edited explanation.',
+        ], $payload))->assertRedirect(route('instructor.lessons.show', $lesson));
+
+        $question->refresh();
+        $this->assertSame($type, $question->question_type);
+        $this->assertSame('Edited explanation.', $question->explanation);
+        $this->assertSame($topic->id, $question->checkpoint_topic_id);
+        $this->assertSame('between_topics', $topic->refresh()->interactive_config['placement']);
+
+        if (in_array($type, ['multiple_choice', 'true_false', 'multiple_select'], true)) {
+            $expectedCount = $type === 'true_false' ? 2 : count($payload['options']);
+            $this->assertCount($expectedCount, $question->options()->get());
+            $this->assertNull($question->acceptable_answers);
+        } else {
+            $this->assertCount(0, $question->options()->get());
+            $separator = $type === 'identification' ? '|' : ';';
+            $this->assertSame(implode($separator, $payload['acceptable_answers']), $question->acceptable_answers);
+        }
     }
 
     private function authoringFixture(string $role): array
