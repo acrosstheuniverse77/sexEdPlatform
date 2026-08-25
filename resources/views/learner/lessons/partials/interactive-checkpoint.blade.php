@@ -7,6 +7,7 @@
 <section
     x-data="interactiveCheckpoint({
         type: '{{ $question->question_type }}',
+        questionId: {{ $question->id }},
         blankCount: {{ max(1, $blankCount) }},
         submitUrl: '{{ route('learner.checkpoints.submit', $question) }}',
         skipUrl: '{{ route('learner.checkpoints.skip', $question) }}',
@@ -88,7 +89,7 @@
         <button type="button" @click="skip()" class="text-sm font-semibold text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
             Skip for now
         </button>
-        <button type="button" x-show="feedback" class="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold dark:border-gray-700">
+        <button type="button" x-show="feedback" @click="continueLearning()" class="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold dark:border-gray-700">
             Continue
         </button>
     </div>
@@ -101,11 +102,15 @@
 @once
 @push('scripts')
 <script>
-function interactiveCheckpoint(config) {
-    const arrayTypes = ['multiple_select', 'fill_blank_text', 'fill_blank_select'];
+function emptyCheckpointAnswer(type, blankCount) {
+    if (type === 'multiple_select') return [];
+    if (['fill_blank_text', 'fill_blank_select'].includes(type)) return Array(blankCount).fill('');
+    return '';
+}
 
+function interactiveCheckpoint(config) {
     return {
-        answer: arrayTypes.includes(config.type) ? Array(config.blankCount).fill('') : '',
+        answer: emptyCheckpointAnswer(config.type, config.blankCount),
         feedback: false,
         isCorrect: null,
         explanation: null,
@@ -117,7 +122,7 @@ function interactiveCheckpoint(config) {
             const response = await fetch(config.submitUrl, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': config.csrf, 'Accept': 'application/json'},
-                body: JSON.stringify({answer: this.answer})
+                body: JSON.stringify({answer: this.answer}),
             });
             const data = await response.json();
             this.feedback = true;
@@ -127,16 +132,21 @@ function interactiveCheckpoint(config) {
         async skip() {
             await fetch(config.skipUrl, {
                 method: 'POST',
-                headers: {'X-CSRF-TOKEN': config.csrf, 'Accept': 'application/json'}
+                headers: {'X-CSRF-TOKEN': config.csrf, 'Accept': 'application/json'},
             });
             this.feedback = false;
+            this.explanation = null;
         },
         reset() {
-            this.answer = arrayTypes.includes(config.type) ? Array(config.blankCount).fill('') : '';
+            this.answer = emptyCheckpointAnswer(config.type, config.blankCount);
             this.feedback = false;
             this.isCorrect = null;
             this.explanation = null;
-        }
+        },
+        continueLearning() {
+            this.feedback = false;
+            this.$dispatch('checkpoint-continued', { questionId: config.questionId });
+        },
     };
 }
 </script>
