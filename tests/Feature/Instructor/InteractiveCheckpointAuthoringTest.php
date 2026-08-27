@@ -26,7 +26,9 @@ class InteractiveCheckpointAuthoringTest extends TestCase
             ->assertSee('Inside Topic')
             ->assertSee('Between Topics')
             ->assertSee('Question Type')
-            ->assertSee('Explanation');
+            ->assertSee('Explanation')
+            ->assertSee('data-topic-metadata', false)
+            ->assertSee("const showTopicMetadata = type !== 'interactive_checkpoint';", false);
     }
 
     public function test_inactive_checkpoint_fields_are_disabled_in_generic_topic_form(): void
@@ -71,6 +73,30 @@ class InteractiveCheckpointAuthoringTest extends TestCase
             'points' => 1,
             'explanation' => 'Consent cannot be pressured.',
         ]);
+    }
+
+    public function test_between_topic_checkpoint_needs_no_duration_and_forces_neutral_metadata(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture('instructor');
+
+        $this->actingAs($instructor)
+            ->post(route('instructor.topics.store'), [
+                'lesson_id' => $lesson->id,
+                'title' => 'Optional check',
+                'type' => 'interactive_checkpoint',
+                'checkpoint_placement' => 'between_topics',
+                'is_prerequisite' => 1,
+                'question_text' => 'Consent is freely given.',
+                'question_type' => 'true_false',
+                'options' => ['True', 'False'],
+                'correct_options' => [0],
+            ])
+            ->assertRedirect(route('instructor.lessons.show', $lesson));
+
+        $topic = $lesson->topics()->where('type', 'interactive_checkpoint')->firstOrFail();
+
+        $this->assertSame(0, $topic->duration);
+        $this->assertFalse($topic->is_prerequisite);
     }
 
     public function test_admin_can_create_multiple_choice_checkpoint_when_hidden_acceptable_answer_field_is_empty(): void
@@ -259,6 +285,39 @@ class InteractiveCheckpointAuthoringTest extends TestCase
         $this->assertSame('between_topics', $topic->refresh()->interactive_config['placement']);
         $this->assertSame('identification', $question->refresh()->question_type);
         $this->assertNull($question->checkpoint_block_uuid);
+    }
+
+    public function test_between_topic_checkpoint_edit_needs_no_duration_and_repairs_metadata(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture('instructor');
+        $topic = LessonTopic::factory()->create([
+            'lesson_id' => $lesson->id,
+            'type' => 'interactive_checkpoint',
+            'duration' => 12,
+            'is_prerequisite' => true,
+            'interactive_config' => ['placement' => 'between_topics'],
+        ]);
+        QuizQuestion::create([
+            'checkpoint_topic_id' => $topic->id,
+            'question_text' => 'Name the concept.',
+            'question_type' => 'identification',
+            'acceptable_answers' => 'Consent',
+            'points' => 1,
+            'order' => 1,
+        ]);
+
+        $this->actingAs($instructor)
+            ->put(route('instructor.topics.update', $topic), [
+                'title' => 'Updated check',
+                'question_text' => 'Name the concept.',
+                'question_type' => 'identification',
+                'acceptable_answers' => ['Consent'],
+            ])
+            ->assertRedirect(route('instructor.lessons.show', $lesson));
+
+        $topic->refresh();
+        $this->assertSame(0, $topic->duration);
+        $this->assertFalse($topic->is_prerequisite);
     }
 
     public function test_validation_rerender_preserves_identification_image_removal_intent(): void

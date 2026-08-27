@@ -25,14 +25,10 @@
         </section>
 
         @if($placement === 'between_topics')
-            <section class="grid gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:grid-cols-[1fr_auto]">
+            <section class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
                 <div>
                     <label for="title" class="block text-sm font-semibold text-gray-700">Checkpoint Title</label>
                     <input id="title" name="title" value="{{ old('title', $topic->title) }}" required maxlength="255" class="mt-2 w-full rounded-xl border-gray-200 focus:border-purple-400 focus:ring-purple-300">
-                </div>
-                <div>
-                    <label for="duration" class="block text-sm font-semibold text-gray-700">Duration</label>
-                    <input id="duration" name="duration" type="number" min="1" value="{{ old('duration', $topic->duration) }}" required class="mt-2 w-full rounded-xl border-gray-200 focus:border-purple-400 focus:ring-purple-300 sm:w-28">
                 </div>
             </section>
         @endif

@@ -574,7 +574,6 @@ class TopicController extends Controller
     {
         $topicData = $request->validate([
             'title' => ['required', 'string', 'max:255'],
-            'duration' => ['required', 'integer', 'min:1'],
         ]);
         $request->merge(['points' => 1]);
         $questionData = $this->questionAuthoring->validate($request);
@@ -583,10 +582,11 @@ class TopicController extends Controller
         DB::transaction(function () use ($topic, $topicData, $question, $questionData) {
             $topic->update([
                 'title' => $topicData['title'],
-                'duration' => $topicData['duration'],
+                'duration' => 0,
+                'is_prerequisite' => false,
                 'interactive_config' => ['placement' => 'between_topics'],
             ]);
-            $topic->lesson->update(['duration' => $topic->lesson->topics()->sum('duration')]);
+            $topic->lesson->update(['duration' => $topic->lesson->topics()->instructional()->sum('duration')]);
             $topic->lesson->module->update([
                 'duration_minutes' => $topic->lesson->module->lessons()->sum('duration'),
             ]);
@@ -635,7 +635,7 @@ class TopicController extends Controller
         $topic->delete();
 
         // Update lesson duration
-        $lesson->duration = $lesson->topics()->sum('duration');
+        $lesson->duration = $lesson->topics()->instructional()->sum('duration');
         $lesson->save();
 
         // Update module duration
@@ -657,7 +657,6 @@ class TopicController extends Controller
         $placement = $request->validate([
             'lesson_id' => ['required', 'exists:lessons,id'],
             'title' => ['required', 'string', 'max:255'],
-            'duration' => ['nullable', 'integer', 'min:1'],
             'checkpoint_placement' => ['required', 'in:inside_topic,between_topics'],
             'parent_topic_id' => ['nullable', 'required_if:checkpoint_placement,inside_topic', 'integer', 'exists:lesson_topics,id'],
             'insert_after_block' => ['nullable', 'integer', 'min:0'],
@@ -695,7 +694,7 @@ class TopicController extends Controller
             $topic = $lesson->topics()->create([
                 'title' => $placement['title'],
                 'type' => 'interactive_checkpoint',
-                'duration' => $placement['duration'] ?? 1,
+                'duration' => 0,
                 'is_prerequisite' => false,
                 'order' => $lesson->topics()->max('order') + 1,
                 'interactive_config' => ['placement' => 'between_topics'],
@@ -707,7 +706,7 @@ class TopicController extends Controller
                 'order' => 1,
             ]);
 
-            $lesson->update(['duration' => $lesson->topics()->sum('duration')]);
+            $lesson->update(['duration' => $lesson->topics()->instructional()->sum('duration')]);
             $lesson->module->update(['duration_minutes' => $lesson->module->lessons()->sum('duration')]);
 
             return redirect()->route($this->routeName('lessons.show'), $lesson)

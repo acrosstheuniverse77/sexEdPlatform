@@ -51,36 +51,38 @@
                 @enderror
             </div>
 
-            <!-- Duration -->
-            <div class="mb-6">
-                <label for="duration" class="block text-sm font-medium text-gray-700 mb-2">
-                    Duration (minutes) <span class="text-red-500">*</span>
-                </label>
-                <input type="number" name="duration" id="duration" value="{{ old('duration') }}" min="1"
-                    class="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-300 focus:border-purple-400 @error('duration') border-red-500 @enderror"
-                    required>
-                @error('duration')
-                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                @enderror
-            </div>
+            <fieldset data-topic-metadata @if(old('type') === 'interactive_checkpoint') hidden disabled @endif>
+                <!-- Duration -->
+                <div class="mb-6">
+                    <label for="duration" class="block text-sm font-medium text-gray-700 mb-2">
+                        Duration (minutes) <span class="text-red-500">*</span>
+                    </label>
+                    <input type="number" name="duration" id="duration" value="{{ old('duration') }}" min="1"
+                        class="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-300 focus:border-purple-400 @error('duration') border-red-500 @enderror"
+                        required>
+                    @error('duration')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
 
-            <!-- Prerequisite Checkbox -->
-            <div class="mb-6">
-                <label class="flex items-start gap-3 cursor-pointer group">
-                    <input type="checkbox" name="is_prerequisite" id="is_prerequisite" value="1"
-                        {{ old('is_prerequisite', true) ? 'checked' : '' }}
-                        class="w-5 h-5 mt-0.5 text-purple-700 border-2 border-gray-200 rounded focus:ring-2 focus:ring-purple-300 focus:ring-offset-0 cursor-pointer transition-all hover:border-purple-300">
-                    <div class="flex-1">
-                        <span class="text-sm font-semibold text-gray-900 group-hover:text-purple-700 transition-colors">
-                            Mark as Prerequisite Topic
-                        </span>
-                        <p class="text-xs text-gray-600 mt-1 leading-relaxed">
-                            If checked, learners must complete this topic before proceeding to the next prerequisite topic
-                            in sequence
-                        </p>
-                    </div>
-                </label>
-            </div>
+                <!-- Prerequisite Checkbox -->
+                <div class="mb-6">
+                    <label class="flex items-start gap-3 cursor-pointer group">
+                        <input type="checkbox" name="is_prerequisite" id="is_prerequisite" value="1"
+                            {{ old('is_prerequisite', true) ? 'checked' : '' }}
+                            class="w-5 h-5 mt-0.5 text-purple-700 border-2 border-gray-200 rounded focus:ring-2 focus:ring-purple-300 focus:ring-offset-0 cursor-pointer transition-all hover:border-purple-300">
+                        <div class="flex-1">
+                            <span class="text-sm font-semibold text-gray-900 group-hover:text-purple-700 transition-colors">
+                                Mark as Prerequisite Topic
+                            </span>
+                            <p class="text-xs text-gray-600 mt-1 leading-relaxed">
+                                If checked, learners must complete this topic before proceeding to the next prerequisite topic
+                                in sequence
+                            </p>
+                        </div>
+                    </label>
+                </div>
+            </fieldset>
 
             <!-- Topic Type Selection -->
             <div>
@@ -547,7 +549,11 @@
             // Function to show content section based on type
             function showContentSection(type) {
                 const checkpointQuestionFields = document.getElementById('checkpointQuestionFields');
+                const topicMetadata = document.querySelector('[data-topic-metadata]');
+                const showTopicMetadata = type !== 'interactive_checkpoint';
                 checkpointQuestionFields.disabled = type !== 'interactive_checkpoint';
+                topicMetadata.hidden = !showTopicMetadata;
+                topicMetadata.disabled = !showTopicMetadata;
 
                 contentSections.forEach(section => {
                     section.classList.add('hidden');
