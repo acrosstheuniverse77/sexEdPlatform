@@ -1,16 +1,31 @@
 const RICH_TYPES = ['multiple_choice', 'true_false', 'multiple_select', 'identification'];
 const CHOICE_TYPES = ['multiple_choice', 'true_false', 'multiple_select'];
 const BLANK_TYPES = ['fill_blank_text', 'fill_blank_select'];
+const HTML_ENTITIES = {
+    amp: '&', apos: "'", bull: '•', cent: '¢', copy: '©', deg: '°', divide: '÷',
+    emsp: ' ', ensp: ' ', euro: '€', gt: '>', hellip: '…', laquo: '«', ldquo: '“',
+    le: '≤', lsquo: '‘', lt: '<', mdash: '—', middot: '·', micro: 'µ', ndash: '–',
+    nbsp: ' ', ne: '≠', para: '¶', plusmn: '±', pound: '£', quot: '"', raquo: '»',
+    rdquo: '”', reg: '®', rsquo: '’', sect: '§', thinsp: ' ', times: '×', trade: '™', yen: '¥',
+};
+
+function decodeQuestionHtmlEntities(value) {
+    return value.replace(/&(#x[\da-f]+|#\d+|[a-z]+);/gi, (entity, name) => {
+        if (name[0] !== '#') return HTML_ENTITIES[name.toLowerCase()] ?? entity;
+
+        const hexadecimal = name[1].toLowerCase() === 'x';
+        const codePoint = Number.parseInt(name.slice(hexadecimal ? 2 : 1), hexadecimal ? 16 : 10);
+        return Number.isInteger(codePoint) && codePoint <= 0x10ffff && (codePoint < 0xd800 || codePoint > 0xdfff)
+            ? String.fromCodePoint(codePoint)
+            : '\uFFFD';
+    });
+}
 
 export function stripQuestionHtml(html = '') {
-    return String(html)
+    return decodeQuestionHtmlEntities(String(html)
         .replace(/<br\s*\/?>/gi, '\n')
         .replace(/<\/p>/gi, '\n')
-        .replace(/<[^>]*>/g, '')
-        .replace(/&nbsp;|&#160;/gi, ' ')
-        .replace(/&amp;/gi, '&')
-        .replace(/&lt;/gi, '<')
-        .replace(/&gt;/gi, '>')
+        .replace(/<[^>]*>/g, ''))
         .replace(/[ \t]+\n/g, '\n')
         .replace(/\n{2,}/g, '\n')
         .trim();

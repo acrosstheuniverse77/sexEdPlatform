@@ -173,6 +173,13 @@ test('rich to plain conversion removes markup and decodes visible text', () => {
     assert.equal(stripQuestionHtml('<p>Consent&nbsp;<strong>matters</strong></p>'), 'Consent matters');
 });
 
+test('rich to plain conversion decodes named and numeric HTML entities', () => {
+    assert.equal(
+        stripQuestionHtml('<p>&quot;It&apos;s&#x2014;safe&quot; &#169; &#128512;</p>'),
+        '"It\'s—safe" © 😀',
+    );
+});
+
 test('editor prefill preserves rich markup and cleans plain checkpoint text', () => {
     const html = '<p>HTML&nbsp;<strong>creates</strong> _____.</p><br><p>Choose carefully.</p>';
 

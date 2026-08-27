@@ -310,7 +310,8 @@ class InteractiveCheckpointAuthoringTest extends TestCase
             ->get(route('instructor.topics.edit', $topic))
             ->assertOk()
             ->assertSee('questionTextForEditor', false)
-            ->assertSee('HTML <strong>creates</strong> _____.', false);
+            ->assertSee("questionTextForEditor('\\u003Cp\\u003EHTML \\u003Cstrong\\u003Ecreates\\u003C\\/strong\\u003E _____.\\u003C\\/p\\u003E', 'fill_blank_select')", false)
+            ->assertDontSee('HTML <strong>creates</strong> _____.', false);
     }
 
     public function test_between_topic_checkpoint_edit_needs_no_duration_and_repairs_metadata(): void
