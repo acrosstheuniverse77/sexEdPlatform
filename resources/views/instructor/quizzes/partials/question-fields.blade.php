@@ -13,6 +13,7 @@
         : $existingOptions->map(fn ($option) => ['text' => $option->option_text, 'isCorrect' => (bool) $option->is_correct, 'readonly' => $selectedType === 'true_false'])->all();
     $storedAnswers = (string) ($question->acceptable_answers ?? '');
     $removeExistingImage = (bool) old('remove_existing_image', false);
+    $useQuestionTextForEditor = $useQuestionTextForEditor ?? false;
 
     if (old('acceptable_answers') !== null) {
         $answers = array_values((array) old('acceptable_answers'));
@@ -37,20 +38,6 @@
         'fill_blank_select' => ['label' => 'Fill in the Blanks — Word Bank', 'description' => 'Learners choose ordered answers from a Word Bank.', 'badge' => 'bg-orange-50 text-orange-700 border-orange-200'],
         'multiple_select' => ['label' => 'Multiple Select', 'description' => 'Learners select every correct answer.', 'badge' => 'bg-purple-50 text-purple-700 border-purple-200'],
     ];
-    $initialState = [
-        'type' => $selectedType,
-        'questionText' => $questionText,
-        'points' => old('points', $question->points ?? 1),
-        'explanation' => old('explanation', $question->explanation ?? ''),
-        'options' => $options,
-        'answers' => $answers,
-        'wordBank' => old('word_bank', isset($question) && is_array($question->word_bank) ? implode(', ', $question->word_bank) : ''),
-        'caseSensitive' => (bool) old('case_sensitive', $question->case_sensitive ?? false),
-        'currentImageUrl' => $removeExistingImage ? null : ($question->image_url ?? null),
-        'removeExistingImage' => $removeExistingImage,
-        'editorUploadUrl' => $editorUploadUrl,
-        'typeMeta' => $typeMeta,
-    ];
 @endphp
 
 @once
@@ -59,7 +46,20 @@
     @endpush
 @endonce
 
-<div x-data="questionAuthoring(@js($initialState))" class="space-y-6" data-question-authoring>
+<div x-data="questionAuthoring({
+    type: @js($selectedType),
+    questionText: @if($useQuestionTextForEditor) questionTextForEditor(@js($questionText), @js($selectedType)) @else @js($questionText) @endif,
+    points: @js(old('points', $question->points ?? 1)),
+    explanation: @js(old('explanation', $question->explanation ?? '')),
+    options: @js($options),
+    answers: @js($answers),
+    wordBank: @js(old('word_bank', isset($question) && is_array($question->word_bank) ? implode(', ', $question->word_bank) : '')),
+    caseSensitive: @js((bool) old('case_sensitive', $question->case_sensitive ?? false)),
+    currentImageUrl: @js($removeExistingImage ? null : ($question->image_url ?? null)),
+    removeExistingImage: @js($removeExistingImage),
+    editorUploadUrl: @js($editorUploadUrl),
+    typeMeta: @js($typeMeta),
+})" class="space-y-6" data-question-authoring>
     <input type="hidden" name="question_type" :value="questionType">
     <input type="hidden" name="remove_existing_image" :value="removeExistingImage ? 1 : 0">
 
@@ -192,7 +192,7 @@
     @if($showExplanation)
         <section class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
             <label for="explanation" class="block text-sm font-semibold text-gray-900">Explanation <span class="font-normal text-gray-400">(Optional)</span></label>
-            <p class="mb-3 text-xs text-gray-500">Shown after the learner answers. It is not shown when the learner skips.</p>
+            <p class="mb-3 text-xs text-gray-500">Shown after a correct answer. It is hidden after an incorrect answer or skip.</p>
             <textarea id="explanation" name="explanation" rows="4" maxlength="5000" x-model="explanation" aria-describedby="explanation_error" aria-invalid="{{ $errors->has('explanation') ? 'true' : 'false' }}" class="w-full rounded-xl border-gray-200 text-sm focus:border-purple-400 focus:ring-purple-300"></textarea>
             @error('explanation') <p id="explanation_error" class="mt-1 text-xs text-red-600" role="alert">{{ $message }}</p> @enderror
         </section>

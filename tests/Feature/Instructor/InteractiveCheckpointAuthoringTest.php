@@ -287,6 +287,32 @@ class InteractiveCheckpointAuthoringTest extends TestCase
         $this->assertNull($question->checkpoint_block_uuid);
     }
 
+    public function test_checkpoint_edit_serializes_question_text_for_the_correct_editor(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture('instructor');
+        $topic = LessonTopic::factory()->create([
+            'lesson_id' => $lesson->id,
+            'type' => 'interactive_checkpoint',
+            'duration' => 0,
+            'interactive_config' => ['placement' => 'between_topics'],
+        ]);
+        QuizQuestion::create([
+            'checkpoint_topic_id' => $topic->id,
+            'question_text' => '<p>HTML <strong>creates</strong> _____.</p>',
+            'question_type' => 'fill_blank_select',
+            'acceptable_answers' => 'structure',
+            'word_bank' => ['structure', 'style'],
+            'points' => 1,
+            'order' => 1,
+        ]);
+
+        $this->actingAs($instructor)
+            ->get(route('instructor.topics.edit', $topic))
+            ->assertOk()
+            ->assertSee('questionTextForEditor', false)
+            ->assertSee('HTML <strong>creates</strong> _____.', false);
+    }
+
     public function test_between_topic_checkpoint_edit_needs_no_duration_and_repairs_metadata(): void
     {
         [$instructor, $lesson] = $this->authoringFixture('instructor');

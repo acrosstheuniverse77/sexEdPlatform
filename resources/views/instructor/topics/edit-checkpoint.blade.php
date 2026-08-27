@@ -40,6 +40,7 @@
             'showPoints' => false,
             'showExplanation' => true,
             'editorUploadUrl' => route($contentRoutePrefix . '.upload.image'),
+            'useQuestionTextForEditor' => true,
         ])
 
         <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">

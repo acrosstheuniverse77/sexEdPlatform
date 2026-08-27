@@ -2,7 +2,7 @@ import './bootstrap';
 import Alpine from 'alpinejs';
 import collapse from '@alpinejs/collapse';
 import persist from '@alpinejs/persist';
-import { createQuestionAuthoring } from './question-authoring';
+import { createQuestionAuthoring, questionTextForEditor } from './question-authoring';
 import './toast'; // Toast notification system
 import './chat/store';
 import './chat/global-popup';
@@ -71,6 +71,7 @@ const createInstructorSearch = () => ({
 
 // Keep this on window for Blade usage: x-data="instructorSearch()"
 window.instructorSearch = createInstructorSearch;
+window.questionTextForEditor = questionTextForEditor;
 
 // Heavy libraries are loaded on-demand to keep the main bundle small.
 let cachedPdfJsLib = null;

@@ -12,8 +12,12 @@ export function stripQuestionHtml(html = '') {
         .replace(/&lt;/gi, '<')
         .replace(/&gt;/gi, '>')
         .replace(/[ \t]+\n/g, '\n')
-        .replace(/\n{3,}/g, '\n\n')
+        .replace(/\n{2,}/g, '\n')
         .trim();
+}
+
+export function questionTextForEditor(html = '', type = 'multiple_choice') {
+    return RICH_TYPES.includes(type) ? String(html) : stripQuestionHtml(html);
 }
 
 function defaultOptions(type, nextKey) {
@@ -60,7 +64,7 @@ export function createQuestionAuthoring(config = {}) {
 
     return {
         questionType: type,
-        questionText: config.questionText || '',
+        questionText: questionTextForEditor(config.questionText || '', type),
         points: Number(config.points || 1),
         explanation: config.explanation || '',
         options: initialOptions,

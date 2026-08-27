@@ -31,6 +31,7 @@ class QuizQuestionAuthoringRegressionTest extends TestCase
 
             $response->assertOk()->assertSee('questionAuthoring', false);
             foreach ($copy as $text) $response->assertSee($text, false);
+            $response->assertSee('Shown after a correct answer. It is hidden after an incorrect answer or skip.', false);
         }
     }
 

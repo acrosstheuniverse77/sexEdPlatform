@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
     createQuestionAuthoring,
+    questionTextForEditor,
     stripQuestionHtml,
 } from '../../resources/js/question-authoring.js';
 
@@ -170,6 +171,16 @@ test('the full switch sequence resets type state and retains common fields', () 
 
 test('rich to plain conversion removes markup and decodes visible text', () => {
     assert.equal(stripQuestionHtml('<p>Consent&nbsp;<strong>matters</strong></p>'), 'Consent matters');
+});
+
+test('editor prefill preserves rich markup and cleans plain checkpoint text', () => {
+    const html = '<p>HTML&nbsp;<strong>creates</strong> _____.</p><br><p>Choose carefully.</p>';
+
+    assert.equal(questionTextForEditor(html, 'multiple_choice'), html);
+    assert.equal(
+        questionTextForEditor(html, 'fill_blank_select'),
+        'HTML creates _____.\nChoose carefully.',
+    );
 });
 
 test('disabled checkpoint fields skip client validation', () => {
