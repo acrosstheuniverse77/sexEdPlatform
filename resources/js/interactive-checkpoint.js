@@ -45,6 +45,7 @@ export function createInteractiveCheckpoint(config = {}, request = globalThis.fe
                 this.state = data.status;
                 this.isCorrect = data.is_correct;
                 this.explanation = data.status === 'correct' ? data.explanation : null;
+                if (['correct', 'skipped'].includes(data.status)) this.claimForward();
             } catch (error) {
                 this.state = 'error';
                 this.error = error.message || 'Unable to save the checkpoint.';
@@ -62,13 +63,21 @@ export function createInteractiveCheckpoint(config = {}, request = globalThis.fe
                 this.state = data.status;
                 this.isCorrect = data.is_correct;
                 this.explanation = data.status === 'correct' ? data.explanation : null;
+                if (['correct', 'skipped'].includes(data.status)) this.claimForward();
             } catch (error) {
                 this.state = 'error';
                 this.error = error.message || 'Unable to skip the checkpoint.';
             }
         },
         continueLearning() {
+            if (config.continueUrl) {
+                window.location.assign(config.continueUrl);
+                return;
+            }
             this.$dispatch?.('checkpoint-continued', { questionId: config.questionId });
+        },
+        claimForward() {
+            this.$dispatch?.('checkpoint-active', { questionId: config.questionId });
         },
     };
 

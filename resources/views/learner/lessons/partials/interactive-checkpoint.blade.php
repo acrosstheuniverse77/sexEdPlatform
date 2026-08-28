@@ -2,6 +2,21 @@
     $progress = ($checkpointProgress ?? collect())->get($question->id);
     $blankCount = substr_count($question->question_text, '_____');
     $parts = $blankCount > 0 ? explode('_____', $question->question_text) : [];
+    $isStandaloneCheckpoint = $question->checkpoint_block_uuid === null;
+    $ownsFooterOnLoad = $isStandaloneCheckpoint || in_array($progress?->status, ['correct', 'skipped'], true);
+    $checkpointContinueUrl = null;
+
+    if ($isStandaloneCheckpoint && isset($currentTopic, $currentTopicIndex, $lessonTopics) && $currentTopic->id === $question->checkpoint_topic_id) {
+        if ($currentTopicIndex < $lessonTopics->count() - 1) {
+            $checkpointContinueUrl = route('learner.lessons.show', ['lesson' => $lesson->id, 'topic' => $currentTopicIndex + 1]);
+        } elseif ($lessonQuiz) {
+            $checkpointContinueUrl = route('learner.lessons.show', ['lesson' => $lesson->id, 'quiz' => 1]);
+        } elseif ($nextLesson) {
+            $checkpointContinueUrl = route('learner.lessons.show', $nextLesson);
+        } else {
+            $checkpointContinueUrl = route('learner.modules.show', $module);
+        }
+    }
 @endphp
 
 <section
@@ -15,7 +30,10 @@
         'csrf' => csrf_token(),
         'initialStatus' => $progress?->status,
         'initialExplanation' => $progress?->status === 'correct' ? $question->explanation : null,
+        'continueUrl' => $checkpointContinueUrl,
     ]))"
+    x-init="if (@js($ownsFooterOnLoad)) $dispatch('checkpoint-active', { questionId: {{ $question->id }} })"
+    @focusin="$dispatch('checkpoint-active', { questionId: {{ $question->id }} })"
     class="my-6 rounded-2xl border border-purple-200 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-900/10 p-5">
     <p class="text-xs font-bold uppercase tracking-widest text-purple-700 dark:text-purple-300">Quick Check</p>
     <h3 class="mt-2 text-base font-semibold text-gray-900 dark:text-white">

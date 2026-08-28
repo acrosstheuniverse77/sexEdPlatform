@@ -67,3 +67,22 @@ test('retry clears the answer and coordinator releases footer ownership', () => 
     coordinator.release(17);
     assert.equal(coordinator.footerForwardVisible(), true);
 });
+
+test('resolved inside checkpoint claims then releases footer ownership', async () => {
+    const checkpoint = createInteractiveCheckpoint({
+        type: 'identification', questionId: 17, submitUrl: '/submit', skipUrl: '/skip', csrf: 'token',
+    }, async () => ({
+        ok: true,
+        json: async () => ({ status: 'skipped', is_correct: null, explanation: null }),
+    }));
+    const events = [];
+    checkpoint.$dispatch = (name, detail) => events.push([name, detail]);
+
+    await checkpoint.skip();
+    checkpoint.continueLearning();
+
+    assert.deepEqual(events, [
+        ['checkpoint-active', { questionId: 17 }],
+        ['checkpoint-continued', { questionId: 17 }],
+    ]);
+});

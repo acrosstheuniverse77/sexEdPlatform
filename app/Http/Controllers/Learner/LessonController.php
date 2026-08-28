@@ -2,16 +2,15 @@
 
 namespace App\Http\Controllers\Learner;
 
-use App\Http\Controllers\Controller;
 use App\Enums\EnrollmentStatus;
+use App\Http\Controllers\Controller;
+use App\Models\InteractiveCheckpointProgress;
 use App\Models\Lesson;
 use App\Models\LessonTopic;
 use App\Models\LessonTopicProgress;
-use App\Models\InteractiveCheckpointProgress;
 use App\Models\QuizAttempt;
 use App\Models\UserProgress;
 use App\Services\GamificationService;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class LessonController extends Controller
@@ -29,11 +28,11 @@ class LessonController extends Controller
         $module = $lesson->module;
 
         // Security: Check if lesson is published.
-        if (!$lesson->is_published) {
+        if (! $lesson->is_published) {
             abort(404);
         }
 
-        if (!$module->isLearnerVisible()) {
+        if (! $module->isLearnerVisible()) {
             return redirect()->route('learner.modules.show', $module)
                 ->with('error', 'This module is currently deactivated. Lesson progression is temporarily unavailable.');
         }
@@ -44,7 +43,7 @@ class LessonController extends Controller
             ->where('status', EnrollmentStatus::Approved)
             ->exists();
 
-        if (!$isEnrolled) {
+        if (! $isEnrolled) {
             return redirect()->route('learner.modules.show', $module)
                 ->with('error', 'Please enroll in this module first.');
         }
@@ -55,13 +54,13 @@ class LessonController extends Controller
             ->orderBy('order')
             ->with([
                 'topics',
-                'quiz' => fn($q) => $q->where('is_active', true)->with('questions'),
+                'quiz' => fn ($q) => $q->where('is_active', true)->with('questions'),
             ])
             ->get();
 
         // Security: Check sequential access - must complete previous lessons first
-        $currentIndex = $allLessons->search(fn($l) => $l->id === $lesson->id);
-        
+        $currentIndex = $allLessons->search(fn ($l) => $l->id === $lesson->id);
+
         if ($currentIndex > 0) {
             // Check if all previous lessons are completed
             for ($i = 0; $i < $currentIndex; $i++) {
@@ -70,8 +69,8 @@ class LessonController extends Controller
                     ->where('lesson_id', $previousLesson->id)
                     ->where('completed', true)
                     ->exists();
-                
-                if (!$isCompleted) {
+
+                if (! $isCompleted) {
                     return redirect()->route('learner.lessons.show', $previousLesson)
                         ->with('error', 'Please complete the previous lessons first.');
                 }
@@ -172,7 +171,7 @@ class LessonController extends Controller
             && $finalQuizCompleted;
 
         // Get all completed topic IDs across the entire module (for sidebar display)
-        $allModuleTopicIds = $allLessons->flatMap(fn($l) => $l->topics->pluck('id'));
+        $allModuleTopicIds = $allLessons->flatMap(fn ($l) => $l->topics->pluck('id'));
         $allCompletedTopicIds = [];
         if ($allModuleTopicIds->isNotEmpty()) {
             $allCompletedTopicIds = LessonTopicProgress::where('user_id', $user->id)
@@ -217,6 +216,16 @@ class LessonController extends Controller
                 ->pluck('lesson_topic_id')
                 ->toArray();
         }
+        $resolvedCheckpointTopicIds = $checkpointProgress
+            ->filter(fn (InteractiveCheckpointProgress $progress) => in_array($progress->status, ['correct', 'skipped'], true))
+            ->filter(fn (InteractiveCheckpointProgress $progress) => $progress->checkpoint_block_uuid === null)
+            ->pluck('lesson_topic_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $resolvedLearningItemIds = array_values(array_unique([
+            ...array_map('intval', $completedTopicIds),
+            ...$resolvedCheckpointTopicIds,
+        ]));
 
         // Calculate locked topics based on prerequisite dependencies
         $lockedTopicIds = [];
@@ -234,7 +243,7 @@ class LessonController extends Controller
                         continue;
                     }
 
-                    if ($previousTopic->is_prerequisite && !in_array($previousTopic->id, $completedTopicIds)) {
+                    if ($previousTopic->is_prerequisite && ! in_array($previousTopic->id, $completedTopicIds)) {
                         $lockedTopicIds[] = $topic->id;
                         break;
                     }
@@ -246,53 +255,53 @@ class LessonController extends Controller
         // Determine current topic (allow navigation via URL parameter)
         $currentTopic = null;
         $currentTopicIndex = 0;
-        
+
         if ($lessonTopics->count() > 0) {
             // Check if specific topic requested via URL
             $requestedTopicIndex = request()->query('topic');
-            
+
             if ($requestedTopicIndex !== null && isset($lessonTopics[$requestedTopicIndex])) {
                 $requestedTopic = $lessonTopics[$requestedTopicIndex];
-                
+
                 // Only allow access if topic is not locked
-                if (!in_array($requestedTopic->id, $lockedTopicIds)) {
+                if (! in_array($requestedTopic->id, $lockedTopicIds)) {
                     $currentTopic = $requestedTopic;
                     $currentTopicIndex = $requestedTopicIndex;
                 } else {
                     // Redirect to first unlocked topic with error message
                     foreach ($lessonTopics as $index => $topic) {
-                        if (!in_array($topic->id, $lockedTopicIds)) {
+                        if (! in_array($topic->id, $lockedTopicIds)) {
                             return redirect()->route('learner.lessons.show', ['lesson' => $lesson->id, 'topic' => $index])
                                 ->with('error', 'Please complete the required prerequisite topics first.');
                         }
                     }
                 }
             }
-            
+
             // If no topic specified or requested was locked, find appropriate topic
-            if (!$currentTopic) {
+            if (! $currentTopic) {
                 // Find first incomplete unlocked topic
                 foreach ($lessonTopics as $index => $topic) {
-                    if (!in_array($topic->id, $completedTopicIds) && !in_array($topic->id, $lockedTopicIds)) {
+                    if (! in_array($topic->id, $resolvedLearningItemIds) && ! in_array($topic->id, $lockedTopicIds)) {
                         $currentTopic = $topic;
                         $currentTopicIndex = $index;
                         break;
                     }
                 }
-                
+
                 // If all unlocked topics are completed, show the last completed unlocked topic
-                if (!$currentTopic) {
+                if (! $currentTopic) {
                     for ($i = $lessonTopics->count() - 1; $i >= 0; $i--) {
-                        if (!in_array($lessonTopics[$i]->id, $lockedTopicIds)) {
+                        if (! in_array($lessonTopics[$i]->id, $lockedTopicIds)) {
                             $currentTopic = $lessonTopics[$i];
                             $currentTopicIndex = $i;
                             break;
                         }
                     }
                 }
-                
+
                 // Fallback to first topic if nothing found
-                if (!$currentTopic) {
+                if (! $currentTopic) {
                     $currentTopic = $lessonTopics->first();
                     $currentTopicIndex = 0;
                 }
@@ -318,6 +327,7 @@ class LessonController extends Controller
             'lessonTopics',
             'checkpointProgress',
             'completedTopicIds',
+            'resolvedCheckpointTopicIds',
             'lockedTopicIds',
             'currentTopic',
             'currentTopicIndex'
@@ -333,11 +343,11 @@ class LessonController extends Controller
         $module = $lesson->module;
 
         // Security checks
-        if (!$lesson->is_published) {
+        if (! $lesson->is_published) {
             abort(404);
         }
 
-        if (!$module->isLearnerVisible()) {
+        if (! $module->isLearnerVisible()) {
             return redirect()->route('learner.modules.show', $module)
                 ->with('error', 'This module is currently deactivated. Lesson progression is temporarily unavailable.');
         }
@@ -347,7 +357,7 @@ class LessonController extends Controller
             ->where('status', EnrollmentStatus::Approved)
             ->exists();
 
-        if (!$isEnrolled) {
+        if (! $isEnrolled) {
             return back()->with('error', 'You are not enrolled in this module.');
         }
 
@@ -389,11 +399,11 @@ class LessonController extends Controller
         $module = $lesson->module;
 
         // Security checks
-        if (!$lesson->is_published) {
+        if (! $lesson->is_published) {
             abort(404);
         }
 
-        if (!$module->isLearnerVisible()) {
+        if (! $module->isLearnerVisible()) {
             return redirect()->route('learner.modules.show', $module)
                 ->with('error', 'This module is currently deactivated. Lesson progression is temporarily unavailable.');
         }
@@ -403,22 +413,12 @@ class LessonController extends Controller
             ->where('status', EnrollmentStatus::Approved)
             ->exists();
 
-        if (!$isEnrolled) {
+        if (! $isEnrolled) {
             return back()->with('error', 'You are not enrolled in this module.');
         }
 
-        // Mark topic as completed
         if ($topic->type === 'interactive_checkpoint') {
-            $topic->markCompleted($user->id);
-
-            $nextTopicIndex = request()->input('next_topic_index');
-            if ($nextTopicIndex !== null) {
-                return redirect()->route('learner.lessons.show', ['lesson' => $lesson->id, 'topic' => $nextTopicIndex])
-                    ->with('success', 'Checkpoint completed.');
-            }
-
-            return redirect()->route('learner.lessons.show', $lesson)
-                ->with('success', 'Checkpoint completed.');
+            abort(404);
         }
 
         // Mark topic as completed
@@ -475,11 +475,11 @@ class LessonController extends Controller
         $lesson = $topic->lesson;
         $module = $lesson->module;
 
-        if (!$lesson->is_published) {
+        if (! $lesson->is_published) {
             abort(404);
         }
 
-        if (!$module->isLearnerVisible()) {
+        if (! $module->isLearnerVisible()) {
             return redirect()->route('learner.modules.show', $module)
                 ->with('error', 'This module is currently deactivated. Lesson progression is temporarily unavailable.');
         }
@@ -489,7 +489,7 @@ class LessonController extends Controller
             ->where('status', EnrollmentStatus::Approved)
             ->exists();
 
-        if (!$isEnrolled) {
+        if (! $isEnrolled) {
             return back()->with('error', 'You are not enrolled in this module.');
         }
 

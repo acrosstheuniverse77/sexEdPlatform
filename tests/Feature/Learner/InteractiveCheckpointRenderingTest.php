@@ -4,6 +4,7 @@ namespace Tests\Feature\Learner;
 
 use App\Enums\EnrollmentStatus;
 use App\Http\Middleware\EnsureProfileCompleted;
+use App\Models\InteractiveCheckpointProgress;
 use App\Models\Lesson;
 use App\Models\LessonTopic;
 use App\Models\Module;
@@ -110,6 +111,38 @@ class InteractiveCheckpointRenderingTest extends TestCase
             ->assertSee('Quick Check')
             ->assertSee($question->question_text)
             ->assertSee('Skip for now');
+    }
+
+    public function test_lesson_footer_has_one_coordinated_action_region(): void
+    {
+        [$learner, $topic] = $this->betweenCheckpointFixture();
+
+        $html = $this->actingAs($learner)
+            ->get(route('learner.lessons.show', $topic->lesson))
+            ->assertOk()
+            ->assertSee('checkpointCoordinator()', false)
+            ->getContent();
+
+        $this->assertSame(1, substr_count($html, 'data-lesson-footer'));
+    }
+
+    public function test_resolved_inside_checkpoint_claims_footer_on_reload(): void
+    {
+        [$learner, $topic, $question] = $this->insideCheckpointFixture('text');
+        InteractiveCheckpointProgress::create([
+            'user_id' => $learner->id,
+            'lesson_topic_id' => $topic->id,
+            'quiz_question_id' => $question->id,
+            'checkpoint_block_uuid' => $question->checkpoint_block_uuid,
+            'status' => 'correct',
+            'is_correct' => true,
+            'completed_at' => now(),
+        ]);
+
+        $this->assertStringContainsString(
+            'x-init="if (true) $dispatch(\'checkpoint-active\'',
+            $this->page($learner, $topic),
+        );
     }
 
     private function page(User $learner, LessonTopic $topic): string
