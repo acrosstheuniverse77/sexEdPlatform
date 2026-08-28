@@ -52,26 +52,27 @@
 
     <!-- Topic Content -->
     <div class="p-6 bg-white dark:bg-transparent">
+        @php
+            $richTextBlocks = $currentTopic->type === 'text' && is_array($currentTopic->content_blocks)
+                ? collect($currentTopic->content_blocks)->where('type', 'rich_text')->pluck('html')->filter()->all()
+                : [];
+            $topicTextContent = $richTextBlocks !== []
+                ? implode('', $richTextBlocks)
+                : $currentTopic->text_content;
+        @endphp
         @if($currentTopic->type === 'interactive_checkpoint')
             @if($currentTopic->checkpointQuestion)
                 @include('learner.lessons.partials.interactive-checkpoint', ['question' => $currentTopic->checkpointQuestion])
             @endif
-        @elseif(is_array($currentTopic->content_blocks))
-            <div class="space-y-6">
-                @foreach($currentTopic->content_blocks as $block)
-                    @if(($block['type'] ?? null) === 'rich_text')
-                        <div class="prose max-w-none dark:prose-invert">{!! $block['html'] ?? '' !!}</div>
-                    @elseif(($block['type'] ?? null) === 'checkpoint')
-                        @php $question = $currentTopic->checkpointQuestions->firstWhere('id', $block['question_id'] ?? null); @endphp
-                        @if($question)
-                            @include('learner.lessons.partials.interactive-checkpoint', ['question' => $question])
-                        @endif
-                    @endif
-                @endforeach
-            </div>
         @elseif($currentTopic->type === 'video')
             <!-- Video Content -->
             <div class="space-y-4">
+                @if($currentTopic->text_content)
+                    <div class="prose max-w-none">
+                        {!! $currentTopic->text_content !!}
+                    </div>
+                @endif
+
                 @if($currentTopic->video_file_url)
                     {{-- Plyr.js Video Player (bundled via npm) --}}
                     <div class="rounded-2xl overflow-hidden bg-black" style="aspect-ratio: 16/9;">
@@ -109,11 +110,6 @@
                     </div>
                 @endif
 
-                @if($currentTopic->text_content)
-                    <div class="prose max-w-none mt-6">
-                        {!! $currentTopic->text_content !!}
-                    </div>
-                @endif
             </div>
 
         @elseif($currentTopic->type === 'text')
@@ -316,7 +312,7 @@
                     </div>
                 @endif
 
-                @if($currentTopic->text_content)
+                @if($topicTextContent)
                     <div class="mt-6 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/40 p-4"
                          x-data="{
                             isPreparingAudio: false,
@@ -519,7 +515,7 @@
                         <div x-show="ttsError" class="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" x-text="ttsError"></div>
 
                         <div x-ref="lessonContent" class="prose dark:prose-invert max-w-none mt-4">
-                            {!! $currentTopic->text_content !!}
+                            {!! $topicTextContent !!}
                         </div>
                     </div>
                 @endif
@@ -727,6 +723,20 @@
                     </div>
                 @endif
             </div>
+        @endif
+
+        @if($currentTopic->type !== 'interactive_checkpoint' && is_array($currentTopic->content_blocks))
+            @foreach($currentTopic->content_blocks as $block)
+                @if(($block['type'] ?? null) === 'checkpoint')
+                    @php
+                        $question = $currentTopic->checkpointQuestions->firstWhere('id', (int) ($block['question_id'] ?? 0));
+                        $validBlock = $question && $question->checkpoint_block_uuid === ($block['uuid'] ?? null);
+                    @endphp
+                    @if($validBlock)
+                        @include('learner.lessons.partials.interactive-checkpoint', ['question' => $question])
+                    @endif
+                @endif
+            @endforeach
         @endif
     </div>
 
