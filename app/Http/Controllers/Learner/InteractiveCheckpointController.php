@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Learner;
 use App\Enums\EnrollmentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\InteractiveCheckpointProgress;
-use App\Models\LessonTopicProgress;
 use App\Models\QuizQuestion;
 use App\Services\Learning\QuestionEvaluator;
 use Illuminate\Http\JsonResponse;
@@ -21,14 +20,23 @@ class InteractiveCheckpointController extends Controller
         $question->load(['options', 'checkpointTopic.lesson.module']);
         $this->authorizeCheckpointAccess($question);
 
-        $validated = $request->validate(['answer' => ['nullable']]);
-        $result = $this->questionEvaluator->evaluate($question, $validated['answer'] ?? null);
-        $status = $result['is_correct'] ? 'correct' : 'incorrect';
-
         $progress = InteractiveCheckpointProgress::firstOrNew([
             'user_id' => Auth::id(),
             'quiz_question_id' => $question->id,
         ]);
+
+        if ($progress->status === 'correct') {
+            return response()->json([
+                'status' => 'correct',
+                'is_correct' => true,
+                'result' => $progress->latest_answer,
+                'explanation' => $question->explanation,
+            ]);
+        }
+
+        $validated = $request->validate(['answer' => ['nullable']]);
+        $result = $this->questionEvaluator->evaluate($question, $validated['answer'] ?? null);
+        $status = $result['is_correct'] ? 'correct' : 'incorrect';
 
         $progress->fill([
             'lesson_topic_id' => $question->checkpoint_topic_id,
@@ -38,16 +46,15 @@ class InteractiveCheckpointController extends Controller
             'is_correct' => $result['is_correct'],
             'attempt_count' => ((int) $progress->attempt_count) + 1,
             'answered_at' => now(),
-            'completed_at' => now(),
+            'skipped_at' => null,
+            'completed_at' => $result['is_correct'] ? now() : null,
         ])->save();
-
-        $this->markBetweenTopicCheckpointComplete($question);
 
         return response()->json([
             'status' => $status,
             'is_correct' => $result['is_correct'],
             'result' => $result,
-            'explanation' => $question->explanation,
+            'explanation' => $result['is_correct'] ? $question->explanation : null,
         ]);
     }
 
@@ -56,20 +63,29 @@ class InteractiveCheckpointController extends Controller
         $question->load(['checkpointTopic.lesson.module']);
         $this->authorizeCheckpointAccess($question);
 
-        InteractiveCheckpointProgress::updateOrCreate(
-            ['user_id' => Auth::id(), 'quiz_question_id' => $question->id],
-            [
-                'lesson_topic_id' => $question->checkpoint_topic_id,
-                'checkpoint_block_uuid' => $question->checkpoint_block_uuid,
-                'status' => 'skipped',
-                'latest_answer' => null,
-                'is_correct' => null,
-                'skipped_at' => now(),
-                'completed_at' => now(),
-            ],
-        );
+        $progress = InteractiveCheckpointProgress::firstOrNew([
+            'user_id' => Auth::id(),
+            'quiz_question_id' => $question->id,
+        ]);
 
-        $this->markBetweenTopicCheckpointComplete($question);
+        if ($progress->status === 'correct') {
+            return response()->json([
+                'status' => 'correct',
+                'is_correct' => true,
+                'result' => $progress->latest_answer,
+                'explanation' => $question->explanation,
+            ]);
+        }
+
+        $progress->fill([
+            'lesson_topic_id' => $question->checkpoint_topic_id,
+            'checkpoint_block_uuid' => $question->checkpoint_block_uuid,
+            'status' => 'skipped',
+            'latest_answer' => null,
+            'is_correct' => null,
+            'skipped_at' => now(),
+            'completed_at' => now(),
+        ])->save();
 
         return response()->json([
             'status' => 'skipped',
@@ -96,19 +112,5 @@ class InteractiveCheckpointController extends Controller
             ->exists();
 
         abort_unless($isEnrolled, 403);
-    }
-
-    private function markBetweenTopicCheckpointComplete(QuizQuestion $question): void
-    {
-        $topic = $question->checkpointTopic;
-
-        if ($topic?->type !== 'interactive_checkpoint' || $question->checkpoint_block_uuid !== null) {
-            return;
-        }
-
-        LessonTopicProgress::updateOrCreate(
-            ['user_id' => Auth::id(), 'lesson_topic_id' => $topic->id],
-            ['completed' => true, 'completed_at' => now()],
-        );
     }
 }

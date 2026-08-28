@@ -69,6 +69,42 @@ class InteractiveCheckpointFlowTest extends TestCase
         ]);
     }
 
+    public function test_correct_checkpoint_cannot_be_downgraded(): void
+    {
+        [$learner, $question] = $this->checkpointFixture();
+        $correct = $question->options()->where('is_correct', true)->firstOrFail();
+        $wrong = $question->options()->where('is_correct', false)->firstOrFail();
+
+        $this->actingAs($learner)
+            ->postJson(route('learner.checkpoints.submit', $question), ['answer' => $correct->id])
+            ->assertJsonPath('status', 'correct');
+        $this->postJson(route('learner.checkpoints.skip', $question))
+            ->assertJsonPath('status', 'correct');
+        $this->postJson(route('learner.checkpoints.submit', $question), ['answer' => $wrong->id])
+            ->assertJsonPath('status', 'correct');
+
+        $this->assertDatabaseHas('interactive_checkpoint_progress', [
+            'user_id' => $learner->id,
+            'quiz_question_id' => $question->id,
+            'status' => 'correct',
+            'attempt_count' => 1,
+        ]);
+    }
+
+    public function test_between_topic_checkpoint_uses_only_checkpoint_progress(): void
+    {
+        [$learner, $question] = $this->checkpointFixture();
+
+        $this->actingAs($learner)
+            ->postJson(route('learner.checkpoints.skip', $question))
+            ->assertOk();
+
+        $this->assertDatabaseMissing('lesson_topic_progress', [
+            'user_id' => $learner->id,
+            'lesson_topic_id' => $question->checkpoint_topic_id,
+        ]);
+    }
+
     public function test_unenrolled_learner_cannot_submit_checkpoint(): void
     {
         [, $question] = $this->checkpointFixture();
@@ -138,7 +174,7 @@ class InteractiveCheckpointFlowTest extends TestCase
         $this->actingAs($learner)
             ->postJson(route('learner.checkpoints.submit', $question), ['answer' => $wrongAnswer])
             ->assertOk()->assertJsonPath('is_correct', false)->assertJsonPath('status', 'incorrect')
-            ->assertJsonPath('explanation', 'Why this answer is correct.');
+            ->assertJsonPath('explanation', null);
 
         $this->actingAs($learner)
             ->postJson(route('learner.checkpoints.submit', $question), ['answer' => $correctAnswer])
@@ -147,14 +183,14 @@ class InteractiveCheckpointFlowTest extends TestCase
 
         $this->actingAs($learner)
             ->postJson(route('learner.checkpoints.skip', $question))
-            ->assertOk()->assertJsonPath('status', 'skipped')->assertJsonPath('explanation', null);
+            ->assertOk()->assertJsonPath('status', 'correct')->assertJsonPath('explanation', 'Why this answer is correct.');
 
         $this->assertSame(0, QuizAttempt::count());
         $this->assertSame($shieldBefore, UserDailyShield::getShields($learner->refresh()));
         $this->assertSame($pointsBefore, (int) $learner->gamification()->value('score'));
         $this->assertDatabaseHas('interactive_checkpoint_progress', [
             'user_id' => $learner->id, 'quiz_question_id' => $question->id,
-            'attempt_count' => 2, 'status' => 'skipped',
+            'attempt_count' => 2, 'status' => 'correct',
         ]);
     }
 
