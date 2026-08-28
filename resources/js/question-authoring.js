@@ -1,17 +1,16 @@
 const RICH_TYPES = ['multiple_choice', 'true_false', 'multiple_select', 'identification'];
 const CHOICE_TYPES = ['multiple_choice', 'true_false', 'multiple_select'];
 const BLANK_TYPES = ['fill_blank_text', 'fill_blank_select'];
-const HTML_ENTITIES = {
-    amp: '&', apos: "'", bull: '•', cent: '¢', copy: '©', deg: '°', divide: '÷',
-    emsp: ' ', ensp: ' ', euro: '€', gt: '>', hellip: '…', laquo: '«', ldquo: '“',
-    le: '≤', lsquo: '‘', lt: '<', mdash: '—', middot: '·', micro: 'µ', ndash: '–',
-    nbsp: ' ', ne: '≠', para: '¶', plusmn: '±', pound: '£', quot: '"', raquo: '»',
-    rdquo: '”', reg: '®', rsquo: '’', sect: '§', thinsp: ' ', times: '×', trade: '™', yen: '¥',
-};
-
 function decodeQuestionHtmlEntities(value) {
+    const textarea = globalThis.document?.createElement?.('textarea');
+    if (textarea) {
+        textarea.innerHTML = value;
+        return textarea.value;
+    }
+
+    const fallbackEntities = { amp: '&', apos: "'", gt: '>', lt: '<', nbsp: ' ', quot: '"' };
     return value.replace(/&(#x[\da-f]+|#\d+|[a-z]+);/gi, (entity, name) => {
-        if (name[0] !== '#') return HTML_ENTITIES[name.toLowerCase()] ?? entity;
+        if (name[0] !== '#') return fallbackEntities[name.toLowerCase()] ?? entity;
 
         const hexadecimal = name[1].toLowerCase() === 'x';
         const codePoint = Number.parseInt(name.slice(hexadecimal ? 2 : 1), hexadecimal ? 16 : 10);

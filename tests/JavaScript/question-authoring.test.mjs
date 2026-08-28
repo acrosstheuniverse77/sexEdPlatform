@@ -173,11 +173,31 @@ test('rich to plain conversion removes markup and decodes visible text', () => {
     assert.equal(stripQuestionHtml('<p>Consent&nbsp;<strong>matters</strong></p>'), 'Consent matters');
 });
 
-test('rich to plain conversion decodes named and numeric HTML entities', () => {
-    assert.equal(
-        stripQuestionHtml('<p>&quot;It&apos;s&#x2014;safe&quot; &#169; &#128512;</p>'),
-        '"It\'s—safe" © 😀',
-    );
+test('browser entity decoding handles named and numeric entities', () => {
+    const originalDocument = globalThis.document;
+    let assignedHtml = '';
+    Object.defineProperty(globalThis, 'document', {
+        configurable: true,
+        value: {
+            createElement: () => ({
+                set innerHTML(value) {
+                    assignedHtml = value;
+                    this.value = '\u00bd \u2192 \u{1f600}';
+                },
+                value: '',
+            }),
+        },
+    });
+
+    try {
+        assert.equal(stripQuestionHtml('<p>&frac12; &rarr; &#x1f600;</p>'), '\u00bd \u2192 \u{1f600}');
+        assert.equal(assignedHtml, '&frac12; &rarr; &#x1f600;\n');
+    } finally {
+        Object.defineProperty(globalThis, 'document', {
+            configurable: true,
+            value: originalDocument,
+        });
+    }
 });
 
 test('editor prefill preserves rich markup and cleans plain checkpoint text', () => {
