@@ -168,8 +168,7 @@ class InteractiveCheckpointFlowTest extends TestCase
             ->assertSee('Check Answer')
             ->assertSee('Retry')
             ->assertSee('Continue')
-            ->assertSee('Skip for now')
-            ->assertSee("if (type === 'multiple_select') return [];", false);
+            ->assertSee('Skip for now');
 
         $this->actingAs($learner)
             ->postJson(route('learner.checkpoints.submit', $question), ['answer' => $wrongAnswer])

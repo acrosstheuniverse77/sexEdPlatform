@@ -3,6 +3,8 @@ import Alpine from 'alpinejs';
 import collapse from '@alpinejs/collapse';
 import persist from '@alpinejs/persist';
 import { createQuestionAuthoring, questionTextForEditor } from './question-authoring';
+import { createCheckpointCoordinator, createInteractiveCheckpoint } from './interactive-checkpoint';
+import { createWordBank } from './word-bank';
 import './toast'; // Toast notification system
 import './chat/store';
 import './chat/global-popup';
@@ -72,6 +74,9 @@ const createInstructorSearch = () => ({
 // Keep this on window for Blade usage: x-data="instructorSearch()"
 window.instructorSearch = createInstructorSearch;
 window.questionTextForEditor = questionTextForEditor;
+window.interactiveCheckpoint = createInteractiveCheckpoint;
+window.checkpointCoordinator = createCheckpointCoordinator;
+window.wordBankQuestion = createWordBank;
 
 // Heavy libraries are loaded on-demand to keep the main bundle small.
 let cachedPdfJsLib = null;
