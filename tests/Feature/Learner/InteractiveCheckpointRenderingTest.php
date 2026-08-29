@@ -113,6 +113,21 @@ class InteractiveCheckpointRenderingTest extends TestCase
             ->assertSee('Skip for now');
     }
 
+    public function test_checkpoint_sidebar_uses_optional_quick_check_metadata(): void
+    {
+        [$learner, $topic] = $this->betweenCheckpointFixture();
+
+        $html = $this->actingAs($learner)
+            ->get(route('learner.lessons.show', $topic->lesson))
+            ->assertOk()
+            ->assertSee('QUICK CHECK · Optional', false)
+            ->getContent();
+
+        $checkpointRow = substr($html, strpos($html, $topic->title), 500);
+        $this->assertStringNotContainsString('0m', $checkpointRow);
+        $this->assertStringNotContainsString('Required', $checkpointRow);
+    }
+
     public function test_lesson_footer_has_one_coordinated_action_region(): void
     {
         [$learner, $topic] = $this->betweenCheckpointFixture();

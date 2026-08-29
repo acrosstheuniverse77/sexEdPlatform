@@ -220,7 +220,11 @@
                                     @if($__tLocked)
                                         <div class="py-0.5 cursor-not-allowed">
                                             <p class="text-sm font-medium text-gray-500 dark:text-gray-400 leading-snug">{{ $__t->title }}</p>
+                                            @if($__t->type === 'interactive_checkpoint')
+                                                <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">QUICK CHECK · Optional</p>
+                                            @else
                                             <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{{ $__t->duration }}m · {{ $__tLabel }}{{ $__t->is_prerequisite ? ' · Required' : '' }}</p>
+                                            @endif
                                         </div>
                                     @else
                                         <a href="{{ $__tUrl }}"
@@ -230,9 +234,13 @@
                                                        {{ $__tCurrent ? 'text-violet-700 dark:text-violet-300' : 'text-gray-700 dark:text-gray-200' }}">
                                                 {{ $__t->title }}
                                             </p>
+                                            @if($__t->type === 'interactive_checkpoint')
+                                                <p class="text-xs mt-0.5 {{ $__tCurrent ? 'text-violet-500' : 'text-gray-400 dark:text-gray-500' }}">QUICK CHECK · Optional</p>
+                                            @else
                                             <p class="text-xs mt-0.5 {{ $__tCurrent ? 'text-violet-500' : 'text-gray-400 dark:text-gray-500' }}">
                                                 {{ $__t->duration }}m · {{ $__tLabel }}{{ $__t->is_prerequisite ? ' · Required' : '' }}
                                             </p>
+                                            @endif
                                         </a>
                                     @endif
                                 </div>

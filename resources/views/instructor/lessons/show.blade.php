@@ -176,7 +176,24 @@
         $lessonStatusDotClass = 'bg-gray-500';
     }
 @endphp
-<div class="space-y-5">
+<div class="space-y-5" x-data="{
+    removeTopicOpen: false,
+    removeTopicTitle: '',
+    removeTopicAction: '',
+    removeTopicTrigger: null,
+    openRemoveTopic(title, action, trigger) {
+        this.removeTopicTitle = title;
+        this.removeTopicAction = action;
+        this.removeTopicTrigger = trigger;
+        this.removeTopicOpen = true;
+        this.$nextTick(() => this.$refs.removeTopicCancel.focus());
+    },
+    closeRemoveTopic() {
+        if (!this.removeTopicOpen) return;
+        this.removeTopicOpen = false;
+        this.$nextTick(() => this.removeTopicTrigger?.focus());
+    },
+}">
 
     {{-- Page Header --}}
     <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -355,19 +372,14 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5m-1.414-9.414a2 2 0 1 1 2.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                         </svg>
                     </a>
-                    <form action="{{ route($contentRoutePrefix . '.topics.destroy', $topic) }}" method="POST" class="inline"
-                          onsubmit="@if($isReadOnlyAdminPanel) return false; @else return confirm('Delete this topic?'); @endif">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit"
-                                @if($isReadOnlyAdminPanel) disabled @endif
-                                title="{{ $isReadOnlyAdminPanel ? $ownershipRestrictionTooltip : 'Delete' }}"
-                                class="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 transition-colors {{ $isReadOnlyAdminPanel ? 'cursor-not-allowed opacity-50' : 'hover:text-red-600 hover:bg-red-50' }}">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <polyline points="3 6 5 6 21 6"/><path stroke-linecap="round" stroke-linejoin="round" d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-                            </svg>
-                        </button>
-                    </form>
+                    <button type="button"
+                            @if($isReadOnlyAdminPanel) disabled @else @click="openRemoveTopic(@js($topic->title), @js(route($contentRoutePrefix . '.topics.destroy', $topic)), $event.currentTarget)" @endif
+                            title="{{ $isReadOnlyAdminPanel ? $ownershipRestrictionTooltip : 'Remove topic' }}"
+                            class="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 transition-colors {{ $isReadOnlyAdminPanel ? 'cursor-not-allowed opacity-50' : 'hover:bg-red-50 hover:text-red-600' }}">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"/><path stroke-linecap="round" stroke-linejoin="round" d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                        </svg>
+                    </button>
                 </div>
                 @foreach($topic->checkpointQuestions->whereNotNull('checkpoint_block_uuid') as $checkpoint)
                     <a href="{{ $isReadOnlyAdminPanel ? '#' : route($contentRoutePrefix . '.topics.checkpoints.edit', [$topic, $checkpoint]) }}"
@@ -444,6 +456,27 @@
         @endif
     </div>
 
+    <div x-show="removeTopicOpen" x-cloak @keydown.escape.window="closeRemoveTopic()"
+         class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/55 p-4 backdrop-blur-sm"
+         role="dialog" aria-modal="true" aria-labelledby="remove-topic-title" aria-describedby="remove-topic-description">
+        <div @click.outside="closeRemoveTopic()" class="w-full max-w-md overflow-hidden rounded-2xl border border-red-100 bg-white shadow-2xl">
+            <div class="border-b border-red-100 bg-red-50 px-6 py-4">
+                <p class="text-xs font-bold uppercase tracking-[0.18em] text-red-600">Destructive action</p>
+                <h2 id="remove-topic-title" class="mt-1 text-lg font-bold text-gray-900">Remove Topic</h2>
+            </div>
+            <div class="px-6 py-5">
+                <p id="remove-topic-description" class="text-sm leading-6 text-gray-600">
+                    Remove <strong class="font-semibold text-gray-900" x-text="removeTopicTitle"></strong>? Its associated inside-topic checkpoints will also be removed. This cannot be undone.
+                </p>
+                <form :action="removeTopicAction" method="POST" class="mt-6 flex justify-end gap-3">
+                    @csrf
+                    @method('DELETE')
+                    <button x-ref="removeTopicCancel" type="button" @click="closeRemoveTopic()" class="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50">Cancel</button>
+                    <button type="submit" class="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700">Remove Topic</button>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
 
 {{-- Topic Preview Modal --}}

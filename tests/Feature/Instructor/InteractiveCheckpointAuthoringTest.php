@@ -31,6 +31,24 @@ class InteractiveCheckpointAuthoringTest extends TestCase
             ->assertSee("const showTopicMetadata = type !== 'interactive_checkpoint';", false);
     }
 
+    public function test_lesson_details_uses_accessible_topic_removal_modal(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture('instructor');
+        LessonTopic::factory()->create([
+            'lesson_id' => $lesson->id,
+            'title' => 'Topic to remove',
+        ]);
+
+        $this->actingAs($instructor)
+            ->get(route('instructor.lessons.show', $lesson))
+            ->assertOk()
+            ->assertSee('role="dialog"', false)
+            ->assertSee('aria-modal="true"', false)
+            ->assertSee('Remove Topic')
+            ->assertSee('associated inside-topic checkpoints')
+            ->assertDontSee("confirm('Delete this topic?')", false);
+    }
+
     public function test_inactive_checkpoint_fields_are_disabled_in_generic_topic_form(): void
     {
         [$instructor, $lesson] = $this->authoringFixture('instructor');
