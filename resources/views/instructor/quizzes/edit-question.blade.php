@@ -23,7 +23,7 @@
             'selectedType' => $question->question_type,
             'allowTypeSwitch' => true,
             'showPoints' => true,
-            'showExplanation' => false,
+            'showExplanation' => true,
             'editorUploadUrl' => route($contentRoutePrefix . '.upload.image'),
         ])
 

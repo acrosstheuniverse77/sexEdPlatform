@@ -47,7 +47,7 @@
                 'selectedType' => $selectedType,
                 'allowTypeSwitch' => false,
                 'showPoints' => true,
-                'showExplanation' => false,
+                'showExplanation' => true,
                 'editorUploadUrl' => route($contentRoutePrefix . '.upload.image'),
             ])
 
