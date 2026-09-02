@@ -20,6 +20,7 @@ use App\Http\Controllers\Learner\ParentVisibilityController;
 use App\Http\Controllers\Learner\InstructorApplicationController as LearnerInstructorApplicationController;
 use App\Http\Controllers\Learner\InstructorProfileController as LearnerInstructorProfileController;
 use App\Http\Controllers\Learner\AdminCreatorProfileController as LearnerAdminCreatorProfileController;
+use App\Http\Controllers\Learner\InteractiveActivityController as LearnerInteractiveActivityController;
 use App\Http\Controllers\Chat\ConversationController as ChatConversationController;
 use App\Http\Controllers\Chat\MessageController as ChatMessageController;
 use App\Http\Controllers\Chat\MessageRequestController as ChatMessageRequestController;
@@ -345,6 +346,20 @@ Route::middleware('auth')->group(function () {
             ->name('checkpoints.submit');
         Route::post('/checkpoints/{question}/skip', [\App\Http\Controllers\Learner\InteractiveCheckpointController::class, 'skip'])
             ->name('checkpoints.skip');
+        Route::get('/interactive-activities/{interactiveActivity}', [LearnerInteractiveActivityController::class, 'show'])
+            ->name('interactive-activities.show');
+        Route::post('/interactive-activities/{interactiveActivity}/match', [LearnerInteractiveActivityController::class, 'match'])
+            ->name('interactive-activities.match');
+        Route::post('/interactive-activities/{interactiveActivity}/check-sequence', [LearnerInteractiveActivityController::class, 'checkSequence'])
+            ->name('interactive-activities.check-sequence');
+        Route::put('/interactive-activities/{interactiveActivity}/state', [LearnerInteractiveActivityController::class, 'saveState'])
+            ->name('interactive-activities.state');
+        Route::post('/interactive-activities/{interactiveActivity}/skip', [LearnerInteractiveActivityController::class, 'skip'])
+            ->name('interactive-activities.skip');
+        Route::post('/interactive-activities/{interactiveActivity}/resume', [LearnerInteractiveActivityController::class, 'resume'])
+            ->name('interactive-activities.resume');
+        Route::post('/interactive-activities/{interactiveActivity}/practice', [LearnerInteractiveActivityController::class, 'practice'])
+            ->name('interactive-activities.practice');
         Route::post('/topics/{topic}/translate', [TopicTranslationController::class, 'translate'])
             ->middleware('throttle:30,1')
             ->name('topics.translate');
