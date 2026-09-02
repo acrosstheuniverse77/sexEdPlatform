@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -67,6 +68,17 @@ class LessonTopic extends Model
     public function progress(): HasMany
     {
         return $this->hasMany(LessonTopicProgress::class);
+    }
+
+    public function interactiveActivities(): HasMany
+    {
+        return $this->hasMany(InteractiveActivity::class);
+    }
+
+    public function standaloneInteractiveActivity(): HasOne
+    {
+        return $this->hasOne(InteractiveActivity::class)
+            ->where('placement', 'between_topics');
     }
 
     public function checkpointQuestion()
