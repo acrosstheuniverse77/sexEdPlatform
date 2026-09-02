@@ -116,7 +116,7 @@ class LessonController extends Controller
 
         $lesson->load([
             'module.creator',
-            'topics' => fn ($query) => $query->orderBy('order')->with('checkpointQuestions'),
+            'topics' => fn ($query) => $query->orderBy('order')->with(['checkpointQuestions', 'interactiveActivities']),
             'quizzes.questions',
         ]);
 

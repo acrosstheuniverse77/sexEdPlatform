@@ -181,6 +181,10 @@
     removeTopicTitle: '',
     removeTopicAction: '',
     removeTopicTrigger: null,
+    removeActivityOpen: false,
+    removeActivityTitle: '',
+    removeActivityAction: '',
+    removeActivityTrigger: null,
     openRemoveTopic(title, action, trigger) {
         this.removeTopicTitle = title;
         this.removeTopicAction = action;
@@ -192,6 +196,18 @@
         if (!this.removeTopicOpen) return;
         this.removeTopicOpen = false;
         this.$nextTick(() => this.removeTopicTrigger?.focus());
+    },
+    openRemoveActivity(title, action, trigger) {
+        this.removeActivityTitle = title;
+        this.removeActivityAction = action;
+        this.removeActivityTrigger = trigger;
+        this.removeActivityOpen = true;
+        this.$nextTick(() => this.$refs.removeActivityCancel.focus());
+    },
+    closeRemoveActivity() {
+        if (!this.removeActivityOpen) return;
+        this.removeActivityOpen = false;
+        this.$nextTick(() => this.removeActivityTrigger?.focus());
     },
 }">
 
@@ -364,6 +380,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
                         </svg>
                     </button>
+                    @if($topic->type !== 'interactive' || $topic->interactiveActivities->isEmpty())
                     <a href="{{ $isReadOnlyAdminPanel ? '#' : route($contentRoutePrefix . '.topics.edit', $topic) }}"
                        @if($isReadOnlyAdminPanel) aria-disabled="true" tabindex="-1" @click.prevent @endif
                        title="{{ $isReadOnlyAdminPanel ? $ownershipRestrictionTooltip : 'Edit' }}"
@@ -380,7 +397,26 @@
                             <polyline points="3 6 5 6 21 6"/><path stroke-linecap="round" stroke-linejoin="round" d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
                         </svg>
                     </button>
+                    @endif
                 </div>
+                @foreach($topic->interactiveActivities as $activity)
+                    <div class="basis-full flex flex-wrap items-center justify-between gap-3 rounded-xl border border-orange-100 bg-orange-50/70 px-3 py-2.5">
+                        <div class="min-w-0">
+                            <p class="text-xs font-bold uppercase tracking-wide text-orange-700">{{ ucfirst($activity->activity_type->value) }} activity</p>
+                            <p class="truncate text-sm font-semibold text-gray-800">{{ $activity->title }}</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <a href="{{ $isReadOnlyAdminPanel ? '#' : route($contentRoutePrefix . '.interactive-activities.edit', $activity) }}"
+                               @if($isReadOnlyAdminPanel) aria-disabled="true" tabindex="-1" @click.prevent @endif
+                               title="{{ $isReadOnlyAdminPanel ? $ownershipRestrictionTooltip : 'Edit activity' }}"
+                               class="rounded-lg px-2.5 py-1.5 text-xs font-semibold {{ $isReadOnlyAdminPanel ? 'cursor-not-allowed text-gray-400' : 'text-orange-700 hover:bg-orange-100' }}">Edit</a>
+                            <button type="button"
+                                    @if($isReadOnlyAdminPanel) disabled @else @click="openRemoveActivity(@js($activity->title), @js(route($contentRoutePrefix . '.interactive-activities.destroy', $activity)), $event.currentTarget)" @endif
+                                    title="{{ $isReadOnlyAdminPanel ? $ownershipRestrictionTooltip : 'Remove activity' }}"
+                                    class="rounded-lg px-2.5 py-1.5 text-xs font-semibold {{ $isReadOnlyAdminPanel ? 'cursor-not-allowed text-gray-400' : 'text-red-600 hover:bg-red-100' }}">Remove</button>
+                        </div>
+                    </div>
+                @endforeach
                 @foreach($topic->checkpointQuestions->whereNotNull('checkpoint_block_uuid') as $checkpoint)
                     <a href="{{ $isReadOnlyAdminPanel ? '#' : route($contentRoutePrefix . '.topics.checkpoints.edit', [$topic, $checkpoint]) }}"
                         @if($isReadOnlyAdminPanel) aria-disabled="true" tabindex="-1" @click.prevent @endif
@@ -454,6 +490,27 @@
             @endforeach
         </div>
         @endif
+    </div>
+    <div x-show="removeActivityOpen" x-cloak @keydown.escape.window="closeRemoveActivity()"
+         class="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/55 p-4 backdrop-blur-sm"
+         role="dialog" aria-modal="true" aria-labelledby="remove-activity-title" aria-describedby="remove-activity-description">
+        <div @click.outside="closeRemoveActivity()" class="w-full max-w-md overflow-hidden rounded-2xl border border-red-100 bg-white shadow-2xl">
+            <div class="border-b border-red-100 bg-red-50 px-6 py-4">
+                <p class="text-xs font-bold uppercase tracking-[0.18em] text-red-600">Destructive action</p>
+                <h2 id="remove-activity-title" class="mt-1 text-lg font-bold text-gray-900">Remove Activity</h2>
+            </div>
+            <div class="px-6 py-5">
+                <p id="remove-activity-description" class="text-sm leading-6 text-gray-600">
+                    Remove <strong class="font-semibold text-gray-900" x-text="removeActivityTitle"></strong>? The activity will be removed; its parent topic will remain. This cannot be undone.
+                </p>
+                <form :action="removeActivityAction" method="POST" class="mt-6 flex justify-end gap-3">
+                    @csrf
+                    @method('DELETE')
+                    <button x-ref="removeActivityCancel" type="button" @click="closeRemoveActivity()" class="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50">Cancel</button>
+                    <button type="submit" class="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-red-700">Remove Activity</button>
+                </form>
+            </div>
+        </div>
     </div>
 
     <div x-show="removeTopicOpen" x-cloak @keydown.escape.window="closeRemoveTopic()"

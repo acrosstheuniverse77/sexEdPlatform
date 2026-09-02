@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Tests\Feature\Instructor;
 
 use App\Models\InteractiveActivity;
+use App\Models\InteractiveActivityProgress;
 use App\Models\Lesson;
 use App\Models\LessonTopic;
 use App\Models\Module;
 use App\Models\User;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class InteractiveActivityAuthoringTest extends TestCase
@@ -185,6 +187,212 @@ class InteractiveActivityAuthoringTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_wording_only_edit_preserves_revision_and_answer_edit_increments_once(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture();
+        [$parent, $activity] = $this->insideActivity($lesson);
+
+        $this->actingAs($instructor)
+            ->put(route('instructor.interactive-activities.update', $activity), $this->activityPayload($activity, [
+                'title' => 'Updated wording',
+                'instructions' => 'New instructions',
+            ]))
+            ->assertRedirect(route('instructor.lessons.show', $lesson));
+
+        $this->assertSame(1, $activity->refresh()->revision);
+
+        $configuration = $activity->configuration;
+        $configuration['pairs'][0]['right']['value'] = 'A freely chosen agreement';
+
+        $this->actingAs($instructor)
+            ->put(route('instructor.interactive-activities.update', $activity), $this->activityPayload($activity, [
+                'configuration' => $configuration,
+            ]))
+            ->assertRedirect(route('instructor.lessons.show', $lesson));
+
+        $this->assertSame(2, $activity->refresh()->revision);
+
+        $this->actingAs($instructor)
+            ->put(route('instructor.interactive-activities.update', $activity), $this->activityPayload($activity))
+            ->assertRedirect(route('instructor.lessons.show', $lesson));
+
+        $this->assertSame(2, $activity->refresh()->revision);
+        $this->assertTrue($parent->fresh()->interactiveActivities()->whereKey($activity->id)->exists());
+    }
+
+    public function test_instructor_can_open_activity_editor(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture();
+        [, $activity] = $this->insideActivity($lesson);
+
+        $this->actingAs($instructor)
+            ->get(route('instructor.interactive-activities.edit', $activity))
+            ->assertOk()
+            ->assertSee('Edit interactive activity')
+            ->assertSee('Existing activity');
+    }
+
+    public function test_lesson_details_shows_activity_actions_and_distinct_warning(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture();
+        [, $activity] = $this->insideActivity($lesson);
+
+        $this->actingAs($instructor)
+            ->get(route('instructor.lessons.show', $lesson))
+            ->assertOk()
+            ->assertSee(route('instructor.interactive-activities.edit', $activity))
+            ->assertSee('Remove Activity')
+            ->assertSee('The activity will be removed; its parent topic will remain.');
+    }
+
+    public function test_activity_type_is_immutable(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture();
+        [, $activity] = $this->insideActivity($lesson);
+
+        $this->actingAs($instructor)
+            ->put(route('instructor.interactive-activities.update', $activity), [
+                ...$this->activityPayload($activity),
+                'activity_type' => 'sequencing',
+                'configuration' => $this->sequencingConfiguration(),
+            ])
+            ->assertSessionHasErrors('activity_type');
+
+        $this->assertSame('matching', $activity->refresh()->activity_type->value);
+    }
+
+    public function test_inside_activity_can_move_to_another_parent_and_removes_old_reference(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture();
+        [$oldParent, $activity] = $this->insideActivity($lesson);
+        $newParent = LessonTopic::factory()->create(['lesson_id' => $lesson->id, 'order' => 2]);
+
+        $this->actingAs($instructor)
+            ->put(route('instructor.interactive-activities.update', $activity), $this->activityPayload($activity, [
+                'parent_topic_id' => $newParent->id,
+            ]))
+            ->assertRedirect(route('instructor.lessons.show', $lesson));
+
+        $activity->refresh();
+        $this->assertSame($newParent->id, $activity->lesson_topic_id);
+        $this->assertSame('inside_topic', $activity->placement);
+        $this->assertFalse(collect($oldParent->fresh()->content_blocks)->contains('activity_id', $activity->id));
+        $this->assertContains([
+            'type' => 'interactive_activity',
+            'uuid' => $activity->block_uuid,
+            'activity_id' => $activity->id,
+        ], $newParent->fresh()->content_blocks);
+    }
+
+    public function test_activity_can_move_between_and_inside_without_orphaning_hosts(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture();
+        $host = LessonTopic::factory()->create([
+            'lesson_id' => $lesson->id,
+            'type' => 'interactive',
+            'duration' => 55,
+            'order' => 1,
+            'is_prerequisite' => true,
+        ]);
+        $activity = InteractiveActivity::create([
+            'lesson_topic_id' => $host->id,
+            'placement' => 'between_topics',
+            'block_uuid' => null,
+            'activity_type' => 'matching',
+            'title' => 'Move me',
+            'configuration' => $this->storedMatchingConfiguration(),
+            'revision' => 1,
+        ]);
+        $parent = LessonTopic::factory()->create(['lesson_id' => $lesson->id, 'order' => 2]);
+
+        $this->actingAs($instructor)
+            ->put(route('instructor.interactive-activities.update', $activity), $this->activityPayload($activity, [
+                'placement' => 'inside_topic',
+                'parent_topic_id' => $parent->id,
+            ]))
+            ->assertRedirect(route('instructor.lessons.show', $lesson));
+
+        $activity->refresh();
+        $this->assertDatabaseMissing('lesson_topics', ['id' => $host->id]);
+        $this->assertSame($parent->id, $activity->lesson_topic_id);
+        $this->assertContains('interactive_activity', array_column($parent->fresh()->content_blocks, 'type'));
+
+        $this->actingAs($instructor)
+            ->put(route('instructor.interactive-activities.update', $activity), $this->activityPayload($activity, [
+                'placement' => 'between_topics',
+                'parent_topic_id' => null,
+            ]))
+            ->assertRedirect(route('instructor.lessons.show', $lesson));
+
+        $activity->refresh();
+        $this->assertSame('between_topics', $activity->placement);
+        $this->assertNull($activity->block_uuid);
+        $this->assertSame('interactive', $activity->lessonTopic->type);
+        $this->assertFalse(collect($parent->fresh()->content_blocks)->contains('activity_id', $activity->id));
+        $this->assertFalse($activity->lessonTopic->is_prerequisite);
+        $this->assertSame(0, $activity->lessonTopic->duration);
+    }
+
+    public function test_deleting_inside_activity_preserves_parent_and_removes_progress(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture();
+        [$parent, $activity] = $this->insideActivity($lesson);
+        $learner = User::factory()->create(['role' => 'learner']);
+        InteractiveActivityProgress::factory()->create([
+            'user_id' => $learner->id,
+            'interactive_activity_id' => $activity->id,
+            'activity_revision' => 1,
+        ]);
+
+        $this->actingAs($instructor)
+            ->delete(route('instructor.interactive-activities.destroy', $activity))
+            ->assertRedirect(route('instructor.lessons.show', $lesson));
+
+        $this->assertDatabaseMissing('interactive_activities', ['id' => $activity->id]);
+        $this->assertDatabaseMissing('interactive_activity_progress', ['interactive_activity_id' => $activity->id]);
+        $this->assertDatabaseHas('lesson_topics', ['id' => $parent->id]);
+        $this->assertFalse(collect($parent->fresh()->content_blocks)->contains('activity_id', $activity->id));
+    }
+
+    public function test_deleting_between_activity_removes_host_and_resequences_topics(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture();
+        $first = LessonTopic::factory()->create(['lesson_id' => $lesson->id, 'order' => 1]);
+        $host = LessonTopic::factory()->create(['lesson_id' => $lesson->id, 'type' => 'interactive', 'order' => 2, 'duration' => 0]);
+        $last = LessonTopic::factory()->create(['lesson_id' => $lesson->id, 'order' => 3]);
+        $activity = InteractiveActivity::create([
+            'lesson_topic_id' => $host->id,
+            'placement' => 'between_topics',
+            'block_uuid' => null,
+            'activity_type' => 'matching',
+            'title' => 'Delete me',
+            'configuration' => $this->storedMatchingConfiguration(),
+            'revision' => 1,
+        ]);
+
+        $this->actingAs($instructor)
+            ->delete(route('instructor.interactive-activities.destroy', $activity))
+            ->assertRedirect(route('instructor.lessons.show', $lesson));
+
+        $this->assertDatabaseMissing('lesson_topics', ['id' => $host->id]);
+        $this->assertSame([$first->id, $last->id], $lesson->topics()->orderBy('order')->pluck('id')->all());
+        $this->assertSame([1, 2], $lesson->topics()->orderBy('order')->pluck('order')->all());
+    }
+
+    public function test_admin_cannot_delete_activity_from_instructor_owned_content(): void
+    {
+        [, $lesson] = $this->authoringFixture();
+        [, $activity] = $this->insideActivity($lesson);
+        $admin = User::factory()->create(['role' => 'admin']);
+        $admin->assignRole('admin');
+
+        $this->actingAs($admin)
+            ->delete(route('admin.interactive-activities.destroy', $activity))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('interactive_activities', ['id' => $activity->id]);
+    }
+
     /** @return array<string, mixed> */
     private function matchingConfiguration(): array
     {
@@ -206,6 +414,60 @@ class InteractiveActivityAuthoringTest extends TestCase
                 ['value' => 'Negotiate'],
             ],
         ];
+    }
+
+    /** @return array<string, mixed> */
+    private function storedMatchingConfiguration(): array
+    {
+        return [
+            'schema_version' => 1,
+            'pairs' => [
+                ['id' => 'pair-1', 'left' => ['id' => 'left-1', 'kind' => 'text', 'value' => 'Consent'], 'right' => ['id' => 'right-1', 'kind' => 'text', 'value' => 'Agreement']],
+                ['id' => 'pair-2', 'left' => ['id' => 'left-2', 'kind' => 'text', 'value' => 'Boundary'], 'right' => ['id' => 'right-2', 'kind' => 'text', 'value' => 'Limit']],
+            ],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function activityPayload(InteractiveActivity $activity, array $overrides = []): array
+    {
+        return array_merge([
+            'lesson_id' => $activity->lessonTopic->lesson_id,
+            'type' => 'interactive',
+            'activity_type' => $activity->activity_type->value,
+            'placement' => $activity->placement,
+            'parent_topic_id' => $activity->placement === 'inside_topic' ? $activity->lesson_topic_id : null,
+            'title' => $activity->title,
+            'instructions' => $activity->instructions,
+            'explanation' => $activity->explanation,
+            'configuration' => $activity->configuration,
+        ], $overrides);
+    }
+
+    /** @return array{LessonTopic, InteractiveActivity} */
+    private function insideActivity(Lesson $lesson): array
+    {
+        $parent = LessonTopic::factory()->create([
+            'lesson_id' => $lesson->id,
+            'content_blocks' => [['type' => 'rich_text', 'html' => '<p>Parent</p>']],
+        ]);
+        $blockUuid = (string) Str::uuid();
+        $activity = InteractiveActivity::create([
+            'lesson_topic_id' => $parent->id,
+            'placement' => 'inside_topic',
+            'block_uuid' => $blockUuid,
+            'activity_type' => 'matching',
+            'title' => 'Existing activity',
+            'configuration' => $this->storedMatchingConfiguration(),
+            'revision' => 1,
+        ]);
+        $parent->update(['content_blocks' => [[
+            'type' => 'interactive_activity',
+            'uuid' => $blockUuid,
+            'activity_id' => $activity->id,
+        ]]]);
+
+        return [$parent, $activity];
     }
 
     /** @return array{User, Lesson} */
