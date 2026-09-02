@@ -167,7 +167,12 @@ class InteractiveActivityAuthoringService
     private function addDefaultTextKinds(array $configuration, string $activityType): array
     {
         if ($activityType === InteractiveActivityType::MATCHING->value) {
-            foreach ($configuration['pairs'] ?? [] as $index => $pair) {
+            $pairs = $configuration['pairs'] ?? null;
+            if (! is_array($pairs)) {
+                return $configuration;
+            }
+
+            foreach ($pairs as $index => $pair) {
                 if (! is_array($pair['left'] ?? null) || ! is_array($pair['right'] ?? null)) {
                     continue;
                 }
@@ -176,7 +181,16 @@ class InteractiveActivityAuthoringService
                 $configuration['pairs'][$index]['right']['kind'] ??= 'text';
             }
         } else {
-            foreach ($configuration['items'] ?? [] as $index => $item) {
+            $items = $configuration['items'] ?? null;
+            if (! is_array($items)) {
+                return $configuration;
+            }
+
+            foreach ($items as $index => $item) {
+                if (! is_array($item)) {
+                    continue;
+                }
+
                 $configuration['items'][$index]['kind'] ??= 'text';
             }
         }
