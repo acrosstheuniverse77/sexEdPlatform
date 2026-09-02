@@ -763,6 +763,7 @@
             </div>
 
             {{-- Navigation buttons moved to the persistent bottom action bar in show.blade.php --}}
+            @if(! $currentTopic->isOptionalInteraction())
             <div class="hidden">
                 <div>
                     @if($currentTopicIndex > 0)
@@ -875,6 +876,7 @@
                         @endif
                     @endif
                 </div>
+            @endif
         </div>
     </div>
 </div>

@@ -257,6 +257,9 @@ class LessonController extends Controller
         // Determine current topic (allow navigation via URL parameter)
         $currentTopic = null;
         $currentTopicIndex = 0;
+        $hasInstructionalTopics = $lessonTopics->contains(
+            fn (LessonTopic $topic) => ! $topic->isOptionalInteraction(),
+        );
 
         if ($lessonTopics->count() > 0) {
             // Check if specific topic requested via URL
@@ -284,6 +287,10 @@ class LessonController extends Controller
             if (! $currentTopic) {
                 // Find first incomplete unlocked topic
                 foreach ($lessonTopics as $index => $topic) {
+                    if ($hasInstructionalTopics && $topic->isOptionalInteraction()) {
+                        continue;
+                    }
+
                     if (! in_array($topic->id, $resolvedLearningItemIds) && ! in_array($topic->id, $lockedTopicIds)) {
                         $currentTopic = $topic;
                         $currentTopicIndex = $index;
@@ -294,6 +301,10 @@ class LessonController extends Controller
                 // If all unlocked topics are completed, show the last completed unlocked topic
                 if (! $currentTopic) {
                     for ($i = $lessonTopics->count() - 1; $i >= 0; $i--) {
+                        if ($hasInstructionalTopics && $lessonTopics[$i]->isOptionalInteraction()) {
+                            continue;
+                        }
+
                         if (! in_array($lessonTopics[$i]->id, $lockedTopicIds)) {
                             $currentTopic = $lessonTopics[$i];
                             $currentTopicIndex = $i;

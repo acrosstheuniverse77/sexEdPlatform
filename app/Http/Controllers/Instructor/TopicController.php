@@ -58,7 +58,7 @@ class TopicController extends Controller
             $validated = $request->validate([
                 'lesson_id' => 'required|exists:lessons,id',
                 'title' => 'required|string|max:255',
-                'type' => 'required|in:video,text,worksheet,interactive,interactive_checkpoint',
+                'type' => 'required|in:video,text,worksheet',
                 'duration' => 'required|integer|min:1',
                 'is_prerequisite' => 'nullable|boolean',
 
@@ -78,9 +78,6 @@ class TopicController extends Controller
                 'worksheet_files.*' => 'nullable|file|mimes:pdf,doc,docx|max:10240',
                 'worksheet_instructions' => 'nullable|string',
 
-                // Interactive fields
-                'interactive_type' => 'nullable|required_if:type,interactive|in:activity,simulation,exercise',
-                'interactive_instructions' => 'nullable|string',
             ]);
 
             \Log::info('Validation passed', ['validated' => array_keys($validated)]);
@@ -225,14 +222,6 @@ class TopicController extends Controller
             $validated['text_content'] = $request->input('worksheet_instructions');
         }
 
-        // Handle interactive configuration
-        if ($validated['type'] === 'interactive') {
-            $validated['interactive_config'] = [
-                'type' => $request->input('interactive_type'),
-                'instructions' => $request->input('interactive_instructions'),
-            ];
-        }
-
         // Auto-increment order
         $validated['order'] = $lesson->topics()->max('order') + 1;
 
@@ -247,7 +236,7 @@ class TopicController extends Controller
         ]);
 
         // Clean up temporary fields that shouldn't be stored in database
-        $temporaryFields = ['video_source', 'video_url', 'video_file', 'video_description', 'image_captions', 'worksheet_instructions', 'interactive_type', 'interactive_instructions'];
+        $temporaryFields = ['video_source', 'video_url', 'video_file', 'video_description', 'image_captions', 'worksheet_instructions'];
         foreach ($temporaryFields as $field) {
             unset($validated[$field]);
         }
@@ -328,7 +317,7 @@ class TopicController extends Controller
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
-            'type' => 'required|in:video,text,worksheet,interactive,interactive_checkpoint',
+            'type' => 'required|in:video,text,worksheet',
             'duration' => 'required|integer|min:1',
             'is_prerequisite' => 'nullable|boolean',
             'checkpoint_placement' => 'nullable|required_if:type,interactive_checkpoint|in:inside_topic,between_topics',
@@ -353,10 +342,6 @@ class TopicController extends Controller
             'worksheet_file' => 'nullable|file|mimes:pdf,doc,docx|max:10240',
             'worksheet_instructions' => 'nullable|string',
 
-            // Interactive fields
-            'interactive_type' => 'nullable|required_if:type,interactive|in:activity,simulation,exercise',
-            'activity_type' => 'nullable|in:activity,simulation,exercise',
-            'interactive_instructions' => 'nullable|string',
         ]);
 
         if ($validated['type'] === 'text') {
@@ -487,15 +472,6 @@ class TopicController extends Controller
             $validated['text_content'] = $request->input('worksheet_instructions');
         }
 
-        // Handle interactive configuration
-        if ($validated['type'] === 'interactive') {
-            $interactiveType = $request->input('interactive_type', $request->input('activity_type'));
-            $validated['interactive_config'] = [
-                'type' => $interactiveType,
-                'instructions' => $request->input('interactive_instructions'),
-            ];
-        }
-
         // Set prerequisite status based on checkbox presence
         $validated['is_prerequisite'] = $request->has('is_prerequisite');
 
@@ -516,9 +492,6 @@ class TopicController extends Controller
             'worksheet_instructions',
             'worksheet_file',
             'worksheet_files',
-            'interactive_type',
-            'activity_type',
-            'interactive_instructions',
             'delete_images',
         ];
         foreach ($temporaryFields as $field) {

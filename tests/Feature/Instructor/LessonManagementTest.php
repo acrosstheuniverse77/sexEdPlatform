@@ -50,4 +50,39 @@ class LessonManagementTest extends TestCase
         $this->assertSame(6, $lesson->fresh()->duration);
         $this->assertSame(6, $module->fresh()->duration_minutes);
     }
+
+    public function test_generic_topic_authoring_rejects_legacy_interactive_topics(): void
+    {
+        $instructor = User::factory()->createOne();
+        $instructor->assignRole('instructor');
+        $module = Module::factory()->create(['created_by' => $instructor->id]);
+        $lesson = Lesson::factory()->create(['module_id' => $module->id]);
+        $topic = LessonTopic::factory()->create(['lesson_id' => $lesson->id, 'type' => 'text']);
+
+        $this->actingAs($instructor)
+            ->post(route('instructor.topics.store'), [
+                'lesson_id' => $lesson->id,
+                'title' => 'Legacy interactive',
+                'type' => 'interactive',
+                'duration' => 99,
+                'is_prerequisite' => 1,
+            ])
+            ->assertSessionHasErrors('type');
+
+        $this->assertSame(1, $lesson->topics()->count());
+
+        $this->actingAs($instructor)
+            ->put(route('instructor.topics.update', $topic), [
+                'title' => 'Legacy interactive update',
+                'type' => 'interactive',
+                'duration' => 99,
+                'is_prerequisite' => 1,
+            ])
+            ->assertSessionHasErrors('type');
+
+        $topic->refresh();
+        $this->assertSame('text', $topic->type);
+        $this->assertSame(5, $topic->duration);
+        $this->assertFalse($topic->is_prerequisite);
+    }
 }

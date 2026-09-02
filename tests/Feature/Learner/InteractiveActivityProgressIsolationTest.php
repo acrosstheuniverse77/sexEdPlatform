@@ -64,6 +64,50 @@ class InteractiveActivityProgressIsolationTest extends TestCase
         $this->assertDatabaseMissing('lesson_topic_progress', ['user_id' => $learner->id, 'lesson_topic_id' => $activity->id]);
     }
 
+    public function test_default_navigation_skips_an_optional_interaction_between_required_topics(): void
+    {
+        [$learner, $lesson, $required, , $following] = $this->fixture();
+        LessonTopicProgress::create(['user_id' => $learner->id, 'lesson_topic_id' => $required->id, 'completed' => true, 'completed_at' => now()]);
+
+        $this->actingAs($learner)
+            ->get(route('learner.lessons.show', $lesson))
+            ->assertOk()
+            ->assertViewHas('currentTopic', fn (LessonTopic $topic) => $topic->is($following));
+    }
+
+    public function test_explicit_optional_interaction_has_no_completion_form(): void
+    {
+        [$learner, $lesson, , $activity] = $this->fixture();
+        LessonTopicProgress::create([
+            'user_id' => $learner->id,
+            'lesson_topic_id' => $activity->id,
+            'completed' => true,
+            'completed_at' => now(),
+        ]);
+
+        $this->actingAs($learner)
+            ->get(route('learner.lessons.show', ['lesson' => $lesson->id, 'topic' => 1]))
+            ->assertOk()
+            ->assertViewHas('currentTopic', fn (LessonTopic $topic) => $topic->is($activity))
+            ->assertSee('Continue')
+            ->assertDontSee('Mark Complete')
+            ->assertDontSee('Mark as Incomplete')
+            ->assertDontSee(route('learner.topics.complete', $activity))
+            ->assertDontSee(route('learner.topics.uncomplete', $activity));
+    }
+
+    public function test_default_navigation_fallback_skips_an_optional_interaction(): void
+    {
+        [$learner, $lesson, $required, , $following] = $this->fixture();
+        LessonTopicProgress::create(['user_id' => $learner->id, 'lesson_topic_id' => $required->id, 'completed' => true, 'completed_at' => now()]);
+        LessonTopicProgress::create(['user_id' => $learner->id, 'lesson_topic_id' => $following->id, 'completed' => true, 'completed_at' => now()]);
+
+        $this->actingAs($learner)
+            ->get(route('learner.lessons.show', $lesson))
+            ->assertOk()
+            ->assertViewHas('currentTopic', fn (LessonTopic $topic) => $topic->is($following));
+    }
+
     /** @return array{User, Lesson, LessonTopic, LessonTopic, LessonTopic} */
     private function fixture(): array
     {

@@ -413,7 +413,7 @@
         {{-- ── Bottom Action Bar — sticky, always visible ── --}}
         @if($currentTopic && !request()->has('quiz'))
             @php
-                $__barDone = $currentTopic->type !== 'interactive_checkpoint'
+                $__barDone = ! $currentTopic->isOptionalInteraction()
                     && in_array($currentTopic->id, $completedTopicIds);
             @endphp
             <div data-lesson-footer
