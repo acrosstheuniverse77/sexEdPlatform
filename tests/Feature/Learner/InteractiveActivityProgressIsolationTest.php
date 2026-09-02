@@ -72,6 +72,7 @@ class InteractiveActivityProgressIsolationTest extends TestCase
         $this->actingAs($learner)
             ->get(route('learner.lessons.show', $lesson))
             ->assertOk()
+            ->assertSee('1/2 topics')
             ->assertViewHas('currentTopic', fn (LessonTopic $topic) => $topic->is($following));
     }
 

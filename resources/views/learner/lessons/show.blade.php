@@ -7,7 +7,7 @@
 
 @section('progress-bar')
     @php
-        $requiredTopics = $lessonTopics->where('type', '!=', 'interactive_checkpoint');
+        $requiredTopics = $lessonTopics->filter(fn ($topic) => ! $topic->isOptionalInteraction());
         $topicCount  = $requiredTopics->count();
         $doneCount   = $requiredTopics->whereIn('id', $completedTopicIds)->count();
         $progressPct = $topicCount > 0 ? round(($doneCount / $topicCount) * 100) : 0;
@@ -104,7 +104,7 @@
                     $__lIsCurrent   = $__l->id === $lesson->id;
                     $__lIsLocked    = in_array($__l->id, $sidebarLockedIds);
                     $__lTopics      = $__l->topics;
-                    $__lRequiredTopics = $__lTopics->where('type', '!=', 'interactive_checkpoint');
+                    $__lRequiredTopics = $__lTopics->filter(fn ($topic) => ! $topic->isOptionalInteraction());
                     $__lTopicCount  = $__lRequiredTopics->count();
                     $__lDoneCount   = $__lRequiredTopics->filter(fn($t) => in_array($t->id, $allCompletedTopicIds))->count();
                     $__lQuiz        = $__l->quiz;
