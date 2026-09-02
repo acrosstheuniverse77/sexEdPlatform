@@ -70,6 +70,7 @@ class InteractiveActivityController extends Controller
             'working_state' => ['sometimes', 'array'],
         ]);
         $this->authorizeActivity($request, $interactiveActivity);
+        $this->ensureActivityType($interactiveActivity, InteractiveActivityType::SEQUENCING);
 
         return $this->evaluationResponse($interactiveActivity, $this->progress->evaluate(
             Auth::user(),
@@ -89,6 +90,9 @@ class InteractiveActivityController extends Controller
             'state' => ['required', 'array'],
         ]);
         $this->authorizeActivity($request, $interactiveActivity);
+        if ($interactiveActivity->activity_type === InteractiveActivityType::SEQUENCING) {
+            $this->validateSequenceState($interactiveActivity, $validated['state']);
+        }
         $progress = $this->progress->saveWorkingState(Auth::user(), $interactiveActivity, $validated['state']);
 
         return response()->json($this->stateResponse($interactiveActivity, $progress));
@@ -143,6 +147,17 @@ class InteractiveActivityController extends Controller
     {
         if ($activity->activity_type !== $expected) {
             abort(response()->json(['message' => 'This endpoint does not support the activity type.'], 422));
+        }
+    }
+
+    /** @param array<string, mixed> $state */
+    private function validateSequenceState(InteractiveActivity $activity, array $state): void
+    {
+        $itemOrder = $state['item_order'] ?? null;
+        $itemIds = collect($activity->configuration['items'] ?? [])->pluck('id')->values()->all();
+
+        if (! is_array($itemOrder) || $itemOrder !== array_values($itemOrder) || count($itemOrder) !== count($itemIds) || count(array_unique($itemOrder)) !== count($itemOrder) || array_diff($itemOrder, $itemIds) !== [] || array_diff($itemIds, $itemOrder) !== []) {
+            abort(response()->json(['message' => 'The sequence state is invalid.'], 422));
         }
     }
 
