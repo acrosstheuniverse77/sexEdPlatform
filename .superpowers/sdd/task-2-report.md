@@ -1,94 +1,76 @@
-# Task 2: Safe Human-Readable Checkpoint Editing
+# Task 2 Report: Registry, Configuration Validation, and Native Shuffling
 
 ## Implementation
 
-- Added `questionTextForEditor(html, type)`: rich question types retain stored HTML; plain fill-in-the-blank types use the existing HTML-to-text sanitizer.
-- Applied that conversion when authoring state is created and exposed it as `window.questionTextForEditor` for Blade checkpoint initialization.
-- Changed the checkpoint edit form to pass every initial authoring value through `@js`, including type, question text, explanation, options, acceptable answers, Word Bank, case sensitivity, and image URL.
-- Collapsed adjacent newline boundaries in `stripQuestionHtml`, so `<br>` beside paragraph markup produces the single visual line break required by the editor prefill contract.
-- Updated explanation help text to: `Shown after a correct answer. It is hidden after an incorrect answer or skip.`
+- Added the `InteractiveActivityHandler` contract with the required handler, normalization, learner-payload, evaluation, fingerprint, and preview APIs.
+- Added `InteractiveActivityRegistry`, which resolves Matching and Sequencing handlers from either `InteractiveActivityType` or its backed string value and rejects unsupported types.
+- Added strict, typed Matching and Sequencing handlers. They validate schema version 1 and text envelopes, normalize display values, reject normalized duplicates, preserve only IDs found in stored configuration, generate server UUIDs for new IDs, and produce canonical configuration shapes.
+- Matching accepts 2–12 pairs; Sequencing accepts 3–12 items and assigns continuous one-based `correct_position` values.
+- Both handlers use native `Random\Randomizer`; initial orders are deterministically shuffled and rotated/reversed if the shuffle would be canonical.
+- Learner payloads exclude Matching pair relationships and Sequencing `correct_position`; evaluations reject unknown, missing, and duplicate IDs before updating state.
+- Answer fingerprints use normalized canonical answer material, excluding UUIDs and display-only metadata.
 
 ## TDD evidence
 
-### RED
+### Existing RED evidence retained
 
-1. Added the requested JavaScript `questionTextForEditor` test and checkpoint-edit feature regression test before production code.
-2. Ran:
+Before changing the interrupted suite, focused PHPUnit reported:
 
-   ```powershell
-   node --test tests/JavaScript/question-authoring.test.mjs
-   ```
+```text
+FAILURES!
+Tests: 8, Assertions: 31, Failures: 2.
+```
 
-   Result: failed as expected with `SyntaxError: ... does not provide an export named 'questionTextForEditor'` (1 failing test file).
+Both failures expected pre-normalization client IDs, while normalization intentionally replaces unrecognized IDs with server UUIDs. The tests were corrected to derive learner IDs and deterministic expected orders from the normalized configuration. JSON secrecy assertions and rejection assertions remain in place.
 
-3. Ran:
+### New RED/GREEN cycle
 
-   ```powershell
-   php artisan test tests/Feature/Instructor/InteractiveCheckpointAuthoringTest.php tests/Feature/Instructor/QuizQuestionAuthoringRegressionTest.php
-   ```
+Added coverage requiring the Matching and Sequencing envelope `kind` fields to be supplied and equal to `text`.
 
-   Result in the workspace sandbox: failed before test execution with Symfony's known Windows cwd error: `The provided cwd "C:\Users\Jaded\ConciousConnections" does not exist.` The same command was retried escalated and completed with no output/error.
+RED:
 
-### GREEN
+```text
+FAILURES!
+Tests: 8, Assertions: 41, Failures: 1.
+```
 
-1. Ran:
+The missing-kind configuration was accepted because the rules used `sometimes`.
 
-   ```powershell
-   node --test tests/JavaScript/question-authoring.test.mjs
-   ```
+GREEN:
 
-   Result: 12 tests passed, 0 failed.
+```text
+OK (8 tests, 42 assertions)
+```
 
-2. Ran:
+The minimal implementation change made `kind` required with `in:text` in both handlers.
 
-   ```powershell
-   php artisan test tests/Feature/Instructor/InteractiveCheckpointAuthoringTest.php tests/Feature/Instructor/QuizQuestionAuthoringRegressionTest.php
-   ```
+## Verification
 
-   Result: completed successfully through the escalated Windows execution path; no test runner output was emitted.
+- `php vendor/bin/phpunit tests/Unit/Services/Learning/InteractiveActivityHandlerTest.php --do-not-cache-result`
+  - Passed: 8 tests, 42 assertions.
+- `vendor/bin/pint app/Contracts/Learning/InteractiveActivityHandler.php app/Services/Learning/InteractiveActivities/InteractiveActivityRegistry.php app/Services/Learning/InteractiveActivities/MatchingActivityHandler.php app/Services/Learning/InteractiveActivities/SequencingActivityHandler.php tests/Unit/Services/Learning/InteractiveActivityHandlerTest.php`
+  - Passed; it fixed two spacing issues in the handler files.
 
-3. Ran:
+`php artisan test` could not launch its child test process in this environment because Symfony reported its supplied `C:\Users\Jaded\ConciousConnections` cwd as nonexistent. Direct PHPUnit against the same focused test file completed successfully.
 
-   ```powershell
-   pnpm.cmd build
-   ```
+## Files
 
-   Result: Vite 7.3.0 built successfully (`80 modules transformed`, `built in 13.00s`). Generated `public/build` artifacts were intentionally not staged.
-
-4. Ran `git diff --check`; result: no whitespace errors.
-
-## Files changed
-
-- `resources/js/question-authoring.js`
-- `resources/js/app.js`
-- `resources/views/instructor/topics/edit-checkpoint.blade.php`
-- `resources/views/instructor/quizzes/partials/question-fields.blade.php`
-- `tests/JavaScript/question-authoring.test.mjs`
-- `tests/Feature/Instructor/InteractiveCheckpointAuthoringTest.php`
-- `tests/Feature/Instructor/QuizQuestionAuthoringRegressionTest.php`
-
-Commit: `70ee178 fix: render checkpoint editor content safely`
+- `app/Contracts/Learning/InteractiveActivityHandler.php`
+- `app/Services/Learning/InteractiveActivities/InteractiveActivityRegistry.php`
+- `app/Services/Learning/InteractiveActivities/MatchingActivityHandler.php`
+- `app/Services/Learning/InteractiveActivities/SequencingActivityHandler.php`
+- `tests/Unit/Services/Learning/InteractiveActivityHandlerTest.php`
+- `.superpowers/sdd/task-2-report.md`
 
 ## Self-review
 
-- The conversion lives at the shared authoring boundary, so plain types cannot receive serialized rich markup even from non-checkpoint callers.
-- The checkpoint Blade path uses `@js` for each server-supplied authoring value; rich HTML is passed as data, not interpolated into JavaScript source.
-- No dependencies or speculative abstractions were added.
-- Only the seven Task 2 code/test files will be staged. Pre-existing and build-generated artifacts remain unstaged.
+Reviewed the implementation against every Task 2 requirement:
+
+- Registry enum/string resolution and unregistered rejection: covered and implemented.
+- Bounds, normalized duplicate detection, schema validation, text envelope validation, existing-ID preservation, and server UUID replacement: covered and implemented.
+- Sequencing position canonicalization, deterministic non-canonical shuffle behavior, learner secrecy, evaluation input rejection, and canonical fingerprints: covered and implemented.
+- All new PHP files declare strict types; shuffling uses `Random\Randomizer`; no dependencies were added.
 
 ## Concerns
 
-- Laravel's test command cannot create its child process under the sandbox's Windows cwd mapping. It completed without output via the approved escalated execution path; the JavaScript tests and production build produced explicit passing output.
-
-## Review fixes (2026-08-27)
-
-- `stripQuestionHtml` now decodes common named HTML entities plus decimal and hexadecimal numeric entities with Unicode code-point validation. This keeps Node tests compatible without adding a browser-only DOM dependency.
-- Updated the checkpoint edit feature assertion to require the exact safely escaped `@js` payload (`\u003C...\u003E`) and to reject raw `<strong>` markup, preserving the JSON-boundary coverage.
-- No checkpoint feedback rendering or controller code was changed; that remains Task 3 scope.
-
-### TDD evidence
-
-1. Added `rich to plain conversion decodes named and numeric HTML entities` before changing production code.
-2. **RED:** `node --test tests/JavaScript/question-authoring.test.mjs` produced 12 passing tests and 1 expected failure: literal `&quot;It&apos;s&#x2014;safe&quot; &#169; &#128512;` rather than decoded text.
-3. **GREEN:** the same focused Node command produced 13 passing tests and 0 failures.
-4. Focused PHP tests first failed under the normal sandbox with Symfony's known Windows cwd error. The immediate escalated retry completed with no runner output, so its pass/fail result is not independently observable from this run.
+No Task 2 implementation concerns. The Artisan test-launch cwd issue is environmental; focused direct PHPUnit is green.
