@@ -11,6 +11,9 @@ export function createInteractiveActivityAuthoring(options = {}) {
         parentTopicId: options.parentTopicId ?? '',
         insertAfterBlock: Number.isInteger(options.insertAfterBlock) ? options.insertAfterBlock : 0,
         blockOptions: Array.isArray(options.blockOptions) ? copy(options.blockOptions) : [],
+        validationErrors: options.validationErrors && typeof options.validationErrors === 'object'
+            ? copy(options.validationErrors)
+            : {},
         pairs: Array.isArray(options.pairs) && options.pairs.length > 0
             ? copy(options.pairs)
             : [defaultPair(), defaultPair()],
@@ -23,6 +26,11 @@ export function createInteractiveActivityAuthoring(options = {}) {
         setActivityType(type) {
             this.activityType = type === 'sequencing' ? 'sequencing' : 'matching';
             return this;
+        },
+
+        errorFor(key) {
+            const messages = this.validationErrors[key];
+            return Array.isArray(messages) ? (messages[0] ?? '') : '';
         },
 
         addPair() {

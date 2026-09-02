@@ -36,6 +36,7 @@
          parentTopicId: @js(old('parent_topic_id', $fieldActivity?->placement === 'inside_topic' ? $fieldActivity->lesson_topic_id : '')),
          insertAfterBlock: @js((int) old('insert_after_block', $activityInsertAfterBlock)),
          blockOptions: @js($activityBlockOptions),
+         validationErrors: @js($errors->getMessages()),
          pairs: @js(old('configuration.pairs', $fieldActivity?->activity_type?->value === 'matching' ? ($fieldActivity->configuration['pairs'] ?? []) : [])),
          items: @js(old('configuration.items', $fieldActivity?->activity_type?->value === 'sequencing' ? ($fieldActivity->configuration['items'] ?? []) : [])),
      })"
@@ -80,20 +81,21 @@
 
     <div x-show="placement === 'inside_topic'" class="mb-6 space-y-4">
         <label for="activity_parent_topic_id" class="block text-sm font-semibold text-gray-900">Containing Topic</label>
-        <select id="activity_parent_topic_id" name="parent_topic_id" x-model="parentTopicId" @change="insertAfterBlock = 0" :disabled="placement !== 'inside_topic'" class="w-full rounded-xl border-gray-200 focus:border-purple-400 focus:ring-purple-300">
+        <select id="activity_parent_topic_id" name="parent_topic_id" x-model="parentTopicId" @change="insertAfterBlock = 0" :disabled="placement !== 'inside_topic'" aria-describedby="activity-parent-topic-error" aria-invalid="{{ $errors->has('parent_topic_id') ? 'true' : 'false' }}" class="w-full rounded-xl border-gray-200 focus:border-purple-400 focus:ring-purple-300">
             <option value="">Select an instructional Topic</option>
             @foreach($eligibleActivityTopics as $lessonTopic)
                 <option value="{{ $lessonTopic->id }}">{{ $lessonTopic->title }}</option>
             @endforeach
         </select>
         <label for="activity_insert_after_block" class="block text-sm font-semibold text-gray-900">Insert after block</label>
-        <select id="activity_insert_after_block" name="insert_after_block" x-model.number="insertAfterBlock" :disabled="placement !== 'inside_topic'" class="w-full rounded-xl border-gray-200 focus:border-purple-400 focus:ring-purple-300">
+        <select id="activity_insert_after_block" name="insert_after_block" x-model.number="insertAfterBlock" :disabled="placement !== 'inside_topic'" aria-describedby="activity-insert-after-block-error" aria-invalid="{{ $errors->has('insert_after_block') ? 'true' : 'false' }}" class="w-full rounded-xl border-gray-200 focus:border-purple-400 focus:ring-purple-300">
             <option value="0">Topic body</option>
             <template x-for="option in blockOptions.filter(option => String(option.topic_id) === String(parentTopicId))" :key="`${option.topic_id}-${option.block_index}`">
                 <option :value="option.block_index" x-text="option.label"></option>
             </template>
         </select>
-        @error('parent_topic_id') <p class="text-xs text-red-600" role="alert">{{ $message }}</p> @enderror
+        @error('parent_topic_id') <p id="activity-parent-topic-error" class="text-xs text-red-600" role="alert">{{ $message }}</p> @enderror
+        @error('insert_after_block') <p id="activity-insert-after-block-error" class="text-xs text-red-600" role="alert">{{ $message }}</p> @enderror
     </div>
 
     @if($activityConfigurationHasErrors)

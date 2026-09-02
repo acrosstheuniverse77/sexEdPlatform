@@ -12,15 +12,17 @@
                 <span aria-live="polite" x-text="`${index + 1} of ${items.length}`"></span>
                 <span class="sr-only" aria-live="polite" x-text="dragIndex === index ? `Dragging item ${index + 1} of ${items.length}` : ''"></span>
             </div>
-            <label class="text-xs font-semibold text-gray-700">Item text
+            <label class="text-xs font-semibold text-gray-700">
+                <span x-text="`Item ${index + 1} text`"></span>
                 <input type="hidden" :name="`configuration[items][${index}][id]`" :value="item.id || ''" :disabled="activityType !== 'sequencing'">
                 <input type="hidden" :name="`configuration[items][${index}][kind]`" value="text" :disabled="activityType !== 'sequencing'">
-                <input type="text" :name="`configuration[items][${index}][value]`" x-model="item.value" maxlength="500" required :disabled="activityType !== 'sequencing'" aria-describedby="activity-configuration-error" class="mt-1 w-full rounded-lg border-gray-300 text-sm">
+                <input type="text" :id="`activity-item-${index}`" :name="`configuration[items][${index}][value]`" x-model="item.value" maxlength="500" required :disabled="activityType !== 'sequencing'" :aria-describedby="`activity-configuration-error activity-item-${index}-error`" :aria-invalid="errorFor(`configuration.items.${index}.value`) ? 'true' : 'false'" class="mt-1 w-full rounded-lg border-gray-300 text-sm">
+                <span class="sr-only" role="alert" :id="`activity-item-${index}-error`" x-show="errorFor(`configuration.items.${index}.value`)" x-text="errorFor(`configuration.items.${index}.value`)"></span>
             </label>
             <div class="flex items-end gap-1">
-                <button type="button" @click="moveItem(index, -1)" :disabled="index === 0" aria-label="Move item up" class="rounded-lg border border-gray-300 px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-40">↑</button>
-                <button type="button" @click="moveItem(index, 1)" :disabled="index === items.length - 1" aria-label="Move item down" class="rounded-lg border border-gray-300 px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-40">↓</button>
-                <button type="button" @click="removeItem(index)" :disabled="items.length <= 3" aria-label="Remove item" class="rounded-lg border border-red-200 px-2 py-1.5 text-xs text-red-600 disabled:cursor-not-allowed disabled:opacity-40">Remove</button>
+                <button type="button" @click="moveItem(index, -1)" :disabled="index === 0" :aria-label="`Move ${item.value || ('item ' + (index + 1))} up`" class="rounded-lg border border-gray-300 px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-40">↑</button>
+                <button type="button" @click="moveItem(index, 1)" :disabled="index === items.length - 1" :aria-label="`Move ${item.value || ('item ' + (index + 1))} down`" class="rounded-lg border border-gray-300 px-2 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-40">↓</button>
+                <button type="button" @click="removeItem(index)" :disabled="items.length <= 3" :aria-label="`Remove ${item.value || ('item ' + (index + 1))}`" class="rounded-lg border border-red-200 px-2 py-1.5 text-xs text-red-600 disabled:cursor-not-allowed disabled:opacity-40">Remove</button>
             </div>
         </div>
     </template>

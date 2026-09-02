@@ -62,3 +62,12 @@ test('initial values with quotes and line breaks serialize safely', () => {
     assert.equal(authoring.configuration().pairs[0].left.value, 'She said "yes"');
     assert.equal(JSON.parse(authoring.serializedConfiguration()).pairs[0].right.value, 'Line 1\nLine 2');
 });
+
+test('authoring exposes field-specific validation messages', () => {
+    const authoring = createInteractiveActivityAuthoring({
+        validationErrors: { 'configuration.items.0.value': ['Item text is required.'] },
+    });
+
+    assert.equal(authoring.errorFor('configuration.items.0.value'), 'Item text is required.');
+    assert.equal(authoring.errorFor('configuration.items.1.value'), '');
+});
