@@ -8,12 +8,19 @@
         @endif
     @endforeach
 @endif
-@php($activityBlockOptions = $eligibleActivityTopics->flatMap(function ($topic) {
-    return collect($topic->content_blocks ?? [])->keys()->map(fn ($blockIndex) => [
-        'topic_id' => (string) $topic->id,
-        'block_index' => (int) $blockIndex,
-        'label' => $topic->title.' - block '.((int) $blockIndex + 1),
-    ]);
+@php($activityBlockOptions = $eligibleActivityTopics->flatMap(function ($topic) use ($fieldActivity) {
+    return collect($topic->content_blocks ?? [])
+        ->filter(fn ($block) => ! ($fieldActivity
+            && $topic->is($fieldActivity->lessonTopic)
+            && is_array($block)
+            && ($block['type'] ?? null) === 'interactive_activity'
+            && (int) ($block['activity_id'] ?? 0) === (int) $fieldActivity->id))
+        ->keys()
+        ->map(fn ($blockIndex) => [
+            'topic_id' => (string) $topic->id,
+            'block_index' => (int) $blockIndex,
+            'label' => $topic->title.' - block '.((int) $blockIndex + 1),
+        ]);
 })->values())
 <div id="interactiveActivityFields"
      x-data="interactiveActivityAuthoring({
@@ -79,6 +86,10 @@
         </select>
         @error('parent_topic_id') <p class="text-xs text-red-600" role="alert">{{ $message }}</p> @enderror
     </div>
+
+    @if($errors->any())
+        <p id="activity-configuration-error" class="text-xs text-red-600" role="alert">Review the activity fields above and correct any highlighted values.</p>
+    @endif
 
     <div x-show="activityType === 'matching'">
         @include('instructor.topics.partials.matching-builder')

@@ -59,9 +59,12 @@ export function createInteractiveActivityAuthoring(options = {}) {
             return this;
         },
 
-        startItemDrag(index) {
+        startItemDrag(index, event = null) {
             this.dragIndex = index;
             this.dragOverIndex = index;
+            if (event?.currentTarget?.hasPointerCapture?.(event.pointerId)) {
+                event.currentTarget.releasePointerCapture(event.pointerId);
+            }
             return this;
         },
 

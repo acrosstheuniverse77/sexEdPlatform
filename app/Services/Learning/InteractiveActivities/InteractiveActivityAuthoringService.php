@@ -144,8 +144,21 @@ class InteractiveActivityAuthoringService
                 $targetBlockUuid = $sameParent ? $stored->block_uuid : (string) Str::uuid();
 
                 if ($sameParent) {
+                    $insertAfter = (int) ($data['insert_after_block'] ?? 0);
+                    $currentBlockIndex = null;
+                    foreach ($this->blocksForTopic($targetTopic) as $blockIndex => $block) {
+                        if (is_array($block) && ($block['uuid'] ?? null) === $stored->block_uuid && (int) ($block['activity_id'] ?? 0) === (int) $stored->id) {
+                            $currentBlockIndex = $blockIndex;
+                            break;
+                        }
+                    }
+
+                    if ($currentBlockIndex !== null && $currentBlockIndex <= $insertAfter) {
+                        $insertAfter--;
+                    }
+
                     $targetTopic->update(['content_blocks' => $this->removeActivityBlock($targetTopic, $stored)]);
-                    $this->addActivityBlock($targetTopic, $targetBlockUuid, $stored->id, (int) ($data['insert_after_block'] ?? 0));
+                    $this->addActivityBlock($targetTopic, $targetBlockUuid, $stored->id, $insertAfter);
                 } else {
                     if ($oldPlacement === 'inside_topic') {
                         $oldTopic->update(['content_blocks' => $this->removeActivityBlock($oldTopic, $stored)]);

@@ -370,7 +370,7 @@ class InteractiveActivityAuthoringTest extends TestCase
 
         $this->actingAs($instructor)
             ->put(route('instructor.interactive-activities.update', $activity), $this->activityPayload($activity, [
-                'insert_after_block' => 1,
+                'insert_after_block' => 2,
             ]))
             ->assertRedirect(route('instructor.lessons.show', $lesson));
 
