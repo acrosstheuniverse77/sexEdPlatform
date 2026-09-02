@@ -282,12 +282,27 @@ class InteractiveActivityAuthoringService
     private function addActivityBlock(LessonTopic $topic, string $blockUuid, int $activityId, int $insertAfter): void
     {
         $blocks = $this->blocksForTopic($topic);
-        array_splice($blocks, min(max(0, $insertAfter) + 1, count($blocks)), 0, [[
+        array_splice($blocks, $this->activityInsertionOffset($blocks, $insertAfter), 0, [[
             'type' => 'interactive_activity',
             'uuid' => $blockUuid,
             'activity_id' => $activityId,
         ]]);
         $topic->update(['content_blocks' => array_values($blocks)]);
+    }
+
+    private function activityInsertionOffset(array $blocks, int $insertAfter): int
+    {
+        if ($insertAfter <= 0) {
+            foreach ($blocks as $index => $block) {
+                if (is_array($block) && in_array($block['type'] ?? null, ['checkpoint', 'interactive_activity'], true)) {
+                    return $index;
+                }
+            }
+
+            return count($blocks);
+        }
+
+        return min($insertAfter + 1, count($blocks));
     }
 
     private function removeActivityBlock(LessonTopic $topic, InteractiveActivity $activity): array

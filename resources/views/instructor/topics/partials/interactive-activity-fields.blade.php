@@ -10,11 +10,16 @@
 @endif
 @php($activityBlockOptions = $eligibleActivityTopics->flatMap(function ($topic) use ($fieldActivity) {
     return collect($topic->content_blocks ?? [])
-        ->filter(fn ($block) => ! ($fieldActivity
-            && $topic->is($fieldActivity->lessonTopic)
-            && is_array($block)
-            && ($block['type'] ?? null) === 'interactive_activity'
-            && (int) ($block['activity_id'] ?? 0) === (int) $fieldActivity->id))
+        ->filter(function ($block) use ($topic, $fieldActivity) {
+            if (! is_array($block) || ! in_array($block['type'] ?? null, ['checkpoint', 'interactive_activity'], true)) {
+                return false;
+            }
+
+            return ! ($fieldActivity
+                && $topic->is($fieldActivity->lessonTopic)
+                && ($block['type'] ?? null) === 'interactive_activity'
+                && (int) ($block['activity_id'] ?? 0) === (int) $fieldActivity->id);
+        })
         ->keys()
         ->map(fn ($blockIndex) => [
             'topic_id' => (string) $topic->id,
@@ -22,6 +27,8 @@
             'label' => $topic->title.' - block '.((int) $blockIndex + 1),
         ]);
 })->values())
+@php($activityConfigurationHasErrors = collect($errors->keys())->contains(fn ($key) => str_starts_with($key, 'configuration') || str_starts_with($key, 'pairs') || str_starts_with($key, 'items')))
+@php($activityConfigurationError = collect($errors->keys())->filter(fn ($key) => str_starts_with($key, 'configuration') || str_starts_with($key, 'pairs') || str_starts_with($key, 'items'))->map(fn ($key) => $errors->first($key))->filter()->first() ?: 'Review the activity fields above and correct any highlighted values.')
 <div id="interactiveActivityFields"
      x-data="interactiveActivityAuthoring({
          activityType: @js(old('activity_type', $fieldActivity?->activity_type?->value ?? 'matching')),
@@ -37,7 +44,7 @@
      x-cloak>
     <input type="hidden" name="activity_type" x-model="activityType">
 
-    <fieldset class="mb-6">
+    <fieldset class="mb-6" aria-describedby="activity-type-error">
         <legend class="mb-3 text-sm font-semibold text-gray-900">Activity type</legend>
         <div class="grid gap-4 md:grid-cols-2">
             <label class="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-gray-200 p-4 transition-colors"
@@ -52,8 +59,9 @@
             </label>
         </div>
     </fieldset>
+    @error('activity_type') <p id="activity-type-error" class="-mt-4 mb-6 text-xs text-red-600" role="alert">{{ $message }}</p> @enderror
 
-    <fieldset class="mb-6">
+    <fieldset class="mb-6" aria-describedby="activity-placement-error">
         <legend class="mb-3 text-sm font-semibold text-gray-900">Activity placement</legend>
         <div class="grid gap-4 md:grid-cols-2">
             <label class="cursor-pointer rounded-xl border-2 border-gray-200 p-4" :class="placement === 'between_topics' && 'border-purple-400 bg-purple-50'">
@@ -68,6 +76,7 @@
             </label>
         </div>
     </fieldset>
+    @error('placement') <p id="activity-placement-error" class="-mt-4 mb-6 text-xs text-red-600" role="alert">{{ $message }}</p> @enderror
 
     <div x-show="placement === 'inside_topic'" class="mb-6 space-y-4">
         <label for="activity_parent_topic_id" class="block text-sm font-semibold text-gray-900">Containing Topic</label>
@@ -87,8 +96,8 @@
         @error('parent_topic_id') <p class="text-xs text-red-600" role="alert">{{ $message }}</p> @enderror
     </div>
 
-    @if($errors->any())
-        <p id="activity-configuration-error" class="text-xs text-red-600" role="alert">Review the activity fields above and correct any highlighted values.</p>
+    @if($activityConfigurationHasErrors)
+        <p id="activity-configuration-error" class="text-xs text-red-600" role="alert">{{ $activityConfigurationError }}</p>
     @endif
 
     <div x-show="activityType === 'matching'">
