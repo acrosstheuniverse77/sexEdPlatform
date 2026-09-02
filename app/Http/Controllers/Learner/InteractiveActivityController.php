@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Learner;
 
 use App\Enums\EnrollmentStatus;
+use App\Enums\InteractiveActivityType;
 use App\Http\Controllers\Controller;
 use App\Models\InteractiveActivity;
 use App\Models\InteractiveActivityProgress;
@@ -45,6 +46,7 @@ class InteractiveActivityController extends Controller
             'working_state' => ['sometimes', 'array'],
         ]);
         $this->authorizeActivity($request, $interactiveActivity);
+        $this->ensureActivityType($interactiveActivity, InteractiveActivityType::MATCHING);
 
         return $this->evaluationResponse($interactiveActivity, $this->progress->evaluate(
             Auth::user(),
@@ -137,6 +139,13 @@ class InteractiveActivityController extends Controller
         }
     }
 
+    private function ensureActivityType(InteractiveActivity $activity, InteractiveActivityType $expected): void
+    {
+        if ($activity->activity_type !== $expected) {
+            abort(response()->json(['message' => 'This endpoint does not support the activity type.'], 422));
+        }
+    }
+
     /** @param array<string, mixed> $result */
     private function evaluationResponse(InteractiveActivity $activity, array $result): JsonResponse
     {
@@ -144,6 +153,8 @@ class InteractiveActivityController extends Controller
         $presentation = $practice
             ? null
             : $this->presenter->present($activity, $result['progress']);
+
+        $statusCode = ($result['rejection_reason'] ?? null) === 'invalid_answer' ? 422 : 200;
 
         return response()->json([
             'available' => $presentation['available'] ?? true,
@@ -157,7 +168,7 @@ class InteractiveActivityController extends Controller
             'attempt_count' => $result['attempt_count'],
             'payload' => $result['payload'] ?? ($presentation['payload'] ?? null),
             'explanation' => $result['explanation'],
-        ]);
+        ], $statusCode);
     }
 
     /** @return array<string, mixed> */

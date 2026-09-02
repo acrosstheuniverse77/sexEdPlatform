@@ -6,6 +6,8 @@ import { createQuestionAuthoring, questionTextForEditor } from './question-autho
 import { createCheckpointCoordinator, createInteractiveCheckpoint } from './interactive-checkpoint';
 import { createWordBank } from './word-bank';
 import { createInteractiveActivityAuthoring } from './interactive-activity-authoring';
+import { createInteractiveActivity } from './interactive-activity';
+import { createMatchingActivity } from './matching-activity';
 import './toast'; // Toast notification system
 import './chat/store';
 import './chat/global-popup';
@@ -79,6 +81,8 @@ window.interactiveCheckpoint = createInteractiveCheckpoint;
 window.checkpointCoordinator = createCheckpointCoordinator;
 window.wordBankQuestion = createWordBank;
 window.interactiveActivityAuthoring = createInteractiveActivityAuthoring;
+window.interactiveActivity = createInteractiveActivity;
+window.matchingActivity = createMatchingActivity;
 
 // Heavy libraries are loaded on-demand to keep the main bundle small.
 let cachedPdfJsLib = null;

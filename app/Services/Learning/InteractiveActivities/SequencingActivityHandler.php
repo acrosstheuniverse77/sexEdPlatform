@@ -78,7 +78,7 @@ class SequencingActivityHandler implements InteractiveActivityHandler
         $canonical = array_map(static fn (array $item): string => $item['id'], $configuration['items']);
 
         if (! is_array($order) || count($order) !== count($canonical) || count(array_unique($order)) !== count($order) || array_diff($order, $canonical) !== []) {
-            return $this->result(false, false, false, $workingState);
+            return $this->result(false, false, false, $workingState, 'invalid_answer');
         }
 
         $workingState['item_order'] = array_values($order);
@@ -122,8 +122,14 @@ class SequencingActivityHandler implements InteractiveActivityHandler
         return mb_strtolower((string) preg_replace('/\s+/u', ' ', trim($value)));
     }
 
-    private function result(bool $accepted, bool $correct, bool $complete, array $workingState): array
+    private function result(bool $accepted, bool $correct, bool $complete, array $workingState, ?string $rejectionReason = null): array
     {
-        return ['accepted' => $accepted, 'is_correct' => $correct, 'is_complete' => $complete, 'working_state' => $workingState];
+        $result = ['accepted' => $accepted, 'is_correct' => $correct, 'is_complete' => $complete, 'working_state' => $workingState];
+
+        if ($rejectionReason !== null) {
+            $result['rejection_reason'] = $rejectionReason;
+        }
+
+        return $result;
     }
 }

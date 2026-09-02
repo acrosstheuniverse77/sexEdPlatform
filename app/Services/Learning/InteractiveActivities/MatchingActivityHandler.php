@@ -107,7 +107,7 @@ class MatchingActivityHandler implements InteractiveActivityHandler
         }
 
         if (! is_string($leftId) || ! is_string($rightId) || ! isset($mapping[$leftId]) || ! in_array($rightId, $mapping, true) || $this->containsId($pairs, 'left_id', $leftId) || $this->containsId($pairs, 'right_id', $rightId)) {
-            return $this->result(false, false, false, $workingState);
+            return $this->result(false, false, false, $workingState, 'invalid_answer');
         }
 
         $correct = $mapping[$leftId] === $rightId;
@@ -168,8 +168,14 @@ class MatchingActivityHandler implements InteractiveActivityHandler
         return $ids;
     }
 
-    private function result(bool $accepted, bool $correct, bool $complete, array $workingState): array
+    private function result(bool $accepted, bool $correct, bool $complete, array $workingState, ?string $rejectionReason = null): array
     {
-        return ['accepted' => $accepted, 'is_correct' => $correct, 'is_complete' => $complete, 'working_state' => $workingState];
+        $result = ['accepted' => $accepted, 'is_correct' => $correct, 'is_complete' => $complete, 'working_state' => $workingState];
+
+        if ($rejectionReason !== null) {
+            $result['rejection_reason'] = $rejectionReason;
+        }
+
+        return $result;
     }
 }

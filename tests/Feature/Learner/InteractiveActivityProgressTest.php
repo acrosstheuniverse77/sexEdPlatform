@@ -125,7 +125,7 @@ class InteractiveActivityProgressTest extends TestCase
         $this->actingAs($learner)
             ->getJson(route('learner.interactive-activities.show', $activity));
 
-        $response = $this->actingAs($learner)
+        $this->actingAs($learner)
             ->postJson(route('learner.interactive-activities.match', $activity), [
                 'revision' => 1,
                 'left_id' => 'left-1',
@@ -169,7 +169,7 @@ class InteractiveActivityProgressTest extends TestCase
                 'left_id' => 'unknown',
                 'right_id' => 'right-1',
             ])
-            ->assertOk()
+            ->assertStatus(422)
             ->assertJsonPath('accepted', false)
             ->assertJsonPath('attempt_count', 0)
             ->assertJsonMissingPath('configuration')
