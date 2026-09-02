@@ -114,6 +114,23 @@ class InteractiveActivityHandlerTest extends UnitTestCase
         ]));
     }
 
+    public function test_handlers_reject_null_stored_schema_versions(): void
+    {
+        $this->assertValidationFails(fn (): array => (new MatchingActivityHandler)->normalize([
+            'pairs' => [
+                $this->pair('a', 'b', 'c', 'One', 'Two'),
+                $this->pair('d', 'e', 'f', 'Three', 'Four'),
+            ],
+        ], ['schema_version' => null]));
+        $this->assertValidationFails(fn (): array => (new SequencingActivityHandler)->normalize([
+            'items' => [
+                $this->item('a', 'One', 1),
+                $this->item('b', 'Two', 2),
+                $this->item('c', 'Three', 3),
+            ],
+        ], ['schema_version' => null]));
+    }
+
     public function test_initial_states_are_deterministic_and_never_correct(): void
     {
         $matching = new MatchingActivityHandler;
@@ -139,9 +156,19 @@ class InteractiveActivityHandlerTest extends UnitTestCase
             $this->pair('pair-uuid', 'left-item-uuid', 'right-item-uuid', 'One', 'First'),
             $this->pair('pair-uuid-2', 'left-item-uuid-2', 'right-item-uuid-2', 'Two', 'Second'),
         ]]);
+        $leftIds = array_map(static fn (array $pair): string => $pair['left']['id'], $configuration['pairs']);
         $rightIds = array_map(static fn (array $pair): string => $pair['right']['id'], $configuration['pairs']);
-        $encoded = json_encode($matching->learnerPayload($configuration, ['right_order' => array_reverse($rightIds), 'matched' => []]), JSON_THROW_ON_ERROR);
+        $payload = $matching->learnerPayload($configuration, [
+            'right_order' => array_reverse($rightIds),
+            'matched' => [['left_id' => $leftIds[0], 'right_id' => $rightIds[0]]],
+        ]);
+        $encoded = json_encode($payload, JSON_THROW_ON_ERROR);
         $this->assertStringNotContainsString('pair-uuid', $encoded);
+        $this->assertArrayNotHasKey('matched', $payload);
+        $this->assertSame([$leftIds[0]], $payload['completed_left_item_ids']);
+        $this->assertSame([$rightIds[0]], $payload['completed_right_item_ids']);
+        $this->assertStringNotContainsString('"left_id"', $encoded);
+        $this->assertStringNotContainsString('"right_id"', $encoded);
 
         $sequencing = new SequencingActivityHandler;
         $configuration = $sequencing->normalize(['items' => [
@@ -150,6 +177,27 @@ class InteractiveActivityHandlerTest extends UnitTestCase
         $itemIds = array_column($configuration['items'], 'id');
         $encoded = json_encode($sequencing->learnerPayload($configuration, ['item_order' => [$itemIds[1], $itemIds[0], $itemIds[2]]]), JSON_THROW_ON_ERROR);
         $this->assertStringNotContainsString('correct_position', $encoded);
+    }
+
+    public function test_matching_learner_payload_exposes_completed_ids_as_independent_sets(): void
+    {
+        $handler = new MatchingActivityHandler;
+        $pairs = [
+            $this->pair('pair-a', 'left-a', 'right-b', 'One', 'First'),
+            $this->pair('pair-b', 'left-b', 'right-a', 'Two', 'Second'),
+        ];
+        $configuration = $handler->normalize(['pairs' => $pairs], ['schema_version' => 1, 'pairs' => $pairs]);
+
+        $payload = $handler->learnerPayload($configuration, [
+            'right_order' => ['right-a', 'right-b'],
+            'matched' => [
+                ['left_id' => 'left-b', 'right_id' => 'right-a'],
+                ['left_id' => 'left-a', 'right_id' => 'right-b'],
+            ],
+        ]);
+
+        $this->assertSame(['left-a', 'left-b'], $payload['completed_left_item_ids']);
+        $this->assertSame(['right-a', 'right-b'], $payload['completed_right_item_ids']);
     }
 
     public function test_evaluation_rejects_unknown_missing_and_duplicate_ids_before_evaluation(): void

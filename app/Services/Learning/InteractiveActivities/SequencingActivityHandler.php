@@ -103,7 +103,7 @@ class SequencingActivityHandler implements InteractiveActivityHandler
 
     private function validate(array $configuration, ?array $existingConfiguration): void
     {
-        if (isset($existingConfiguration['schema_version']) && $existingConfiguration['schema_version'] !== 1) {
+        if ($existingConfiguration !== null && array_key_exists('schema_version', $existingConfiguration) && $existingConfiguration['schema_version'] !== 1) {
             throw ValidationException::withMessages(['configuration.schema_version' => 'Unsupported schema version.']);
         }
 

@@ -85,11 +85,13 @@ class MatchingActivityHandler implements InteractiveActivityHandler
             $left[] = $pair['left'];
             $rightById[$pair['right']['id']] = $pair['right'];
         }
+        $matches = $workingState['matched'] ?? [];
 
         return [
             'left_items' => $left,
             'right_items' => array_values(array_filter(array_map(static fn (string $id): ?array => $rightById[$id] ?? null, $workingState['right_order'] ?? []))),
-            'matched' => $workingState['matched'] ?? [],
+            'completed_left_item_ids' => $this->completedItemIds($matches, 'left_id'),
+            'completed_right_item_ids' => $this->completedItemIds($matches, 'right_id'),
         ];
     }
 
@@ -132,7 +134,7 @@ class MatchingActivityHandler implements InteractiveActivityHandler
 
     private function validate(array $configuration, ?array $existingConfiguration): void
     {
-        if (isset($existingConfiguration['schema_version']) && $existingConfiguration['schema_version'] !== 1) {
+        if ($existingConfiguration !== null && array_key_exists('schema_version', $existingConfiguration) && $existingConfiguration['schema_version'] !== 1) {
             throw ValidationException::withMessages(['configuration.schema_version' => 'Unsupported schema version.']);
         }
 
@@ -156,6 +158,14 @@ class MatchingActivityHandler implements InteractiveActivityHandler
     private function containsId(array $pairs, string $key, string $id): bool
     {
         return in_array($id, array_column($pairs, $key), true);
+    }
+
+    private function completedItemIds(array $matches, string $key): array
+    {
+        $ids = array_values(array_unique(array_filter(array_column($matches, $key), 'is_string')));
+        sort($ids, SORT_STRING);
+
+        return $ids;
     }
 
     private function result(bool $accepted, bool $correct, bool $complete, array $workingState): array
