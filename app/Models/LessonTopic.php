@@ -127,7 +127,12 @@ class LessonTopic extends Model
 
     public function scopeInstructional($query)
     {
-        return $query->where('type', '!=', 'interactive_checkpoint');
+        return $query->whereNotIn('type', ['interactive', 'interactive_checkpoint']);
+    }
+
+    public function isOptionalInteraction(): bool
+    {
+        return in_array($this->type, ['interactive', 'interactive_checkpoint'], true);
     }
 
     /**
@@ -135,7 +140,7 @@ class LessonTopic extends Model
      */
     public function getVideoEmbedUrlAttribute(): ?string
     {
-        if ($this->type !== 'video' || !$this->video_provider || !$this->video_id) {
+        if ($this->type !== 'video' || ! $this->video_provider || ! $this->video_id) {
             return null;
         }
 
@@ -147,7 +152,7 @@ class LessonTopic extends Model
      */
     public function getVideoThumbnailAttribute(): ?string
     {
-        if ($this->type !== 'video' || !$this->video_provider || !$this->video_id) {
+        if ($this->type !== 'video' || ! $this->video_provider || ! $this->video_id) {
             return null;
         }
 
@@ -171,7 +176,7 @@ class LessonTopic extends Model
 
     private function resolvePublicMediaUrl(?string $path, string $defaultDirectory = ''): ?string
     {
-        if (!$path) {
+        if (! $path) {
             return null;
         }
 
@@ -185,8 +190,8 @@ class LessonTopic extends Model
             $normalized = substr($normalized, 8);
         }
 
-        if (!str_contains($normalized, '/') && $defaultDirectory !== '') {
-            $normalized = trim($defaultDirectory, '/') . '/' . $normalized;
+        if (! str_contains($normalized, '/') && $defaultDirectory !== '') {
+            $normalized = trim($defaultDirectory, '/').'/'.$normalized;
         }
 
         return Storage::url($normalized);

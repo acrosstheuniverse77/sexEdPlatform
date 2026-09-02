@@ -101,7 +101,9 @@ class LessonController extends Controller
         $allLessonsCompleted = $allLessons->count() > 0 && count($completedLessonIds) === $allLessons->count();
 
         $topicIds = $allLessons
-            ->flatMap(fn ($moduleLesson) => $moduleLesson->topics->where('type', '!=', 'interactive_checkpoint')->pluck('id'))
+            ->flatMap(fn ($moduleLesson) => $moduleLesson->topics
+                ->filter(fn (LessonTopic $topic) => ! $topic->isOptionalInteraction())
+                ->pluck('id'))
             ->unique();
         $completedModuleTopicIds = LessonTopicProgress::where('user_id', $user->id)
             ->whereIn('lesson_topic_id', $topicIds)
@@ -230,7 +232,7 @@ class LessonController extends Controller
         // Calculate locked topics based on prerequisite dependencies
         $lockedTopicIds = [];
         foreach ($lessonTopics as $index => $topic) {
-            if ($topic->type === 'interactive_checkpoint') {
+            if ($topic->isOptionalInteraction()) {
                 continue;
             }
 
@@ -239,7 +241,7 @@ class LessonController extends Controller
                 // Lock if any previous prerequisite topics are not completed
                 for ($i = 0; $i < $index; $i++) {
                     $previousTopic = $lessonTopics[$i];
-                    if ($previousTopic->type === 'interactive_checkpoint') {
+                    if ($previousTopic->isOptionalInteraction()) {
                         continue;
                     }
 
@@ -417,7 +419,7 @@ class LessonController extends Controller
             return back()->with('error', 'You are not enrolled in this module.');
         }
 
-        if ($topic->type === 'interactive_checkpoint') {
+        if ($topic->isOptionalInteraction()) {
             abort(404);
         }
 
@@ -491,6 +493,10 @@ class LessonController extends Controller
 
         if (! $isEnrolled) {
             return back()->with('error', 'You are not enrolled in this module.');
+        }
+
+        if ($topic->isOptionalInteraction()) {
+            abort(404);
         }
 
         // Mark this topic incomplete

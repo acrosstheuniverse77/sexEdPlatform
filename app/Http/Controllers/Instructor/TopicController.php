@@ -274,7 +274,7 @@ class TopicController extends Controller
         }
 
         // Update lesson duration (sum of all topics)
-        $lesson->duration = $lesson->topics()->sum('duration');
+        $lesson->duration = $lesson->topics()->instructional()->sum('duration');
         $lesson->save();
 
         // Update module duration (sum of all lessons)
@@ -529,7 +529,7 @@ class TopicController extends Controller
 
         // Update lesson duration
         $lesson = $topic->lesson;
-        $lesson->duration = $lesson->topics()->sum('duration');
+        $lesson->duration = $lesson->topics()->instructional()->sum('duration');
         $lesson->save();
 
         // Update module duration
@@ -667,7 +667,7 @@ class TopicController extends Controller
         return DB::transaction(function () use ($placement, $questionData, $lesson) {
             if ($placement['checkpoint_placement'] === 'inside_topic') {
                 $parentTopic = $lesson->topics()
-                    ->where('type', '!=', 'interactive_checkpoint')
+                    ->instructional()
                     ->findOrFail($placement['parent_topic_id']);
                 $this->authorize('update', $parentTopic);
                 $blockUuid = (string) Str::uuid();
