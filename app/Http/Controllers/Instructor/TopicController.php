@@ -9,6 +9,7 @@ use App\Models\LessonTopic;
 use App\Models\Quiz;
 use App\Models\QuizQuestion;
 use App\Services\Content\ContentOwnershipGuard;
+use App\Services\Learning\InteractiveActivities\InteractiveActivityAuthoringService;
 use App\Services\Learning\QuestionAuthoringService;
 use App\Support\ContentPanelContext;
 use Illuminate\Http\Request;
@@ -18,7 +19,10 @@ use Illuminate\Support\Str;
 
 class TopicController extends Controller
 {
-    public function __construct(private QuestionAuthoringService $questionAuthoring) {}
+    public function __construct(
+        private QuestionAuthoringService $questionAuthoring,
+        private InteractiveActivityAuthoringService $activityAuthoring,
+    ) {}
 
     public function create(Request $request)
     {
@@ -40,6 +44,15 @@ class TopicController extends Controller
 
         if ($request->input('type') === 'interactive_checkpoint') {
             return $this->storeCheckpoint($request, $lessonForAuthorization);
+        }
+
+        if ($request->input('type') === 'interactive') {
+            $data = $this->activityAuthoring->validate($request, $lessonForAuthorization);
+            $this->activityAuthoring->create($lessonForAuthorization, $data);
+
+            return redirect()
+                ->route($this->routeName('lessons.show'), $lessonForAuthorization)
+                ->with('success', 'Interactive activity created successfully.');
         }
 
         // Log the request for debugging
