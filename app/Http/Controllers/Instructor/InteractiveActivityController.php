@@ -25,7 +25,7 @@ class InteractiveActivityController extends Controller
         $this->authorize('update', $interactiveActivity->lessonTopic);
         $this->ensureAdminCanMutateLesson($lesson);
 
-        return view('instructor.interactive-activities.edit', [
+        return view('instructor.topics.edit-interactive-activity', [
             'activity' => $interactiveActivity->load('lessonTopic'),
             'lesson' => $lesson,
             'formAction' => route($this->routeName('interactive-activities.update'), $interactiveActivity),

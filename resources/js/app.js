@@ -5,6 +5,7 @@ import persist from '@alpinejs/persist';
 import { createQuestionAuthoring, questionTextForEditor } from './question-authoring';
 import { createCheckpointCoordinator, createInteractiveCheckpoint } from './interactive-checkpoint';
 import { createWordBank } from './word-bank';
+import { createInteractiveActivityAuthoring } from './interactive-activity-authoring';
 import './toast'; // Toast notification system
 import './chat/store';
 import './chat/global-popup';
@@ -77,6 +78,7 @@ window.questionTextForEditor = questionTextForEditor;
 window.interactiveCheckpoint = createInteractiveCheckpoint;
 window.checkpointCoordinator = createCheckpointCoordinator;
 window.wordBankQuestion = createWordBank;
+window.interactiveActivityAuthoring = createInteractiveActivityAuthoring;
 
 // Heavy libraries are loaded on-demand to keep the main bundle small.
 let cachedPdfJsLib = null;

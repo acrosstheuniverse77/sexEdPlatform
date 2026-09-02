@@ -28,7 +28,7 @@ class InteractiveCheckpointAuthoringTest extends TestCase
             ->assertSee('Question Type')
             ->assertSee('Explanation')
             ->assertSee('data-topic-metadata', false)
-            ->assertSee("const showTopicMetadata = type !== 'interactive_checkpoint';", false);
+            ->assertSee("const showTopicMetadata = !['interactive_checkpoint', 'interactive'].includes(type);", false);
     }
 
     public function test_lesson_details_uses_accessible_topic_removal_modal(): void

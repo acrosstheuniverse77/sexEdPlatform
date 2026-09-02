@@ -245,6 +245,40 @@ class InteractiveActivityAuthoringTest extends TestCase
             ->assertSee('The activity will be removed; its parent topic will remain.');
     }
 
+    public function test_create_page_exposes_matching_and_sequencing_activity_cards(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture();
+        LessonTopic::factory()->create(['lesson_id' => $lesson->id, 'title' => 'Eligible parent']);
+
+        $this->actingAs($instructor)
+            ->get(route('instructor.topics.create', ['lesson' => $lesson]))
+            ->assertOk()
+            ->assertSee('Matching')
+            ->assertSee('Sequencing')
+            ->assertSee('Interactive Activity')
+            ->assertSee('data-activity-type="matching"', false)
+            ->assertSee('data-activity-type="sequencing"', false)
+            ->assertSee('name="activity_type"', false)
+            ->assertSee('Eligible parent')
+            ->assertSee("!['interactive_checkpoint', 'interactive'].includes(type)", false)
+            ->assertDontSee('Simulation')
+            ->assertDontSee('Exercise');
+    }
+
+    public function test_activity_edit_page_has_no_duration_or_prerequisite_controls(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture();
+        [, $activity] = $this->insideActivity($lesson);
+
+        $this->actingAs($instructor)
+            ->get(route('instructor.interactive-activities.edit', $activity))
+            ->assertOk()
+            ->assertSee('interactiveActivityAuthoring')
+            ->assertSee('Existing activity')
+            ->assertDontSee('name="duration"', false)
+            ->assertDontSee('is_prerequisite');
+    }
+
     public function test_activity_type_is_immutable(): void
     {
         [$instructor, $lesson] = $this->authoringFixture();
@@ -259,6 +293,45 @@ class InteractiveActivityAuthoringTest extends TestCase
             ->assertSessionHasErrors('activity_type');
 
         $this->assertSame('matching', $activity->refresh()->activity_type->value);
+    }
+
+    public function test_sequencing_answer_changes_increment_revision_once(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture();
+        $parent = LessonTopic::factory()->create(['lesson_id' => $lesson->id]);
+        $activity = InteractiveActivity::create([
+            'lesson_topic_id' => $parent->id,
+            'placement' => 'inside_topic',
+            'block_uuid' => (string) Str::uuid(),
+            'activity_type' => 'sequencing',
+            'title' => 'Order me',
+            'configuration' => [
+                'schema_version' => 1,
+                'items' => [
+                    ['id' => 'item-1', 'kind' => 'text', 'value' => 'First', 'correct_position' => 1],
+                    ['id' => 'item-2', 'kind' => 'text', 'value' => 'Second', 'correct_position' => 2],
+                    ['id' => 'item-3', 'kind' => 'text', 'value' => 'Third', 'correct_position' => 3],
+                ],
+            ],
+            'revision' => 1,
+        ]);
+
+        $changed = $activity->configuration;
+        $changed['items'][0]['value'] = 'Begin';
+
+        $this->actingAs($instructor)
+            ->put(route('instructor.interactive-activities.update', $activity), $this->activityPayload($activity, [
+                'configuration' => $changed,
+            ]))
+            ->assertRedirect(route('instructor.lessons.show', $lesson));
+
+        $this->assertSame(2, $activity->refresh()->revision);
+
+        $this->actingAs($instructor)
+            ->put(route('instructor.interactive-activities.update', $activity), $this->activityPayload($activity))
+            ->assertRedirect(route('instructor.lessons.show', $lesson));
+
+        $this->assertSame(2, $activity->refresh()->revision);
     }
 
     public function test_inside_activity_can_move_to_another_parent_and_removes_old_reference(): void
@@ -391,6 +464,41 @@ class InteractiveActivityAuthoringTest extends TestCase
             ->assertForbidden();
 
         $this->assertDatabaseHas('interactive_activities', ['id' => $activity->id]);
+    }
+
+    public function test_admin_cannot_edit_or_update_instructor_owned_activity(): void
+    {
+        [, $lesson] = $this->authoringFixture();
+        [, $activity] = $this->insideActivity($lesson);
+        $admin = User::factory()->create(['role' => 'admin']);
+        $admin->assignRole('admin');
+
+        $this->actingAs($admin)
+            ->get(route('admin.interactive-activities.edit', $activity))
+            ->assertForbidden();
+
+        $this->actingAs($admin)
+            ->put(route('admin.interactive-activities.update', $activity), $this->activityPayload($activity))
+            ->assertForbidden();
+    }
+
+    public function test_deleting_parent_topic_cascades_its_activity_and_progress(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture();
+        [$parent, $activity] = $this->insideActivity($lesson);
+        $learner = User::factory()->create(['role' => 'learner']);
+        InteractiveActivityProgress::factory()->create([
+            'user_id' => $learner->id,
+            'interactive_activity_id' => $activity->id,
+            'activity_revision' => 1,
+        ]);
+
+        $this->actingAs($instructor)
+            ->delete(route('instructor.topics.destroy', $parent))
+            ->assertRedirect();
+
+        $this->assertDatabaseMissing('interactive_activities', ['id' => $activity->id]);
+        $this->assertDatabaseMissing('interactive_activity_progress', ['interactive_activity_id' => $activity->id]);
     }
 
     /** @return array<string, mixed> */

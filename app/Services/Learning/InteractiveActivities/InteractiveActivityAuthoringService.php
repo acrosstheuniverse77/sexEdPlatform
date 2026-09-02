@@ -37,7 +37,9 @@ class InteractiveActivityAuthoringService
             'configuration' => ['required', 'array'],
         ]);
 
-        $handler = $this->registry->for($validated['activity_type']);
+        $handler = $activity
+            ? $this->registry->for($activity->activity_type)
+            : $this->registry->for($validated['activity_type']);
         if ($activity && $validated['activity_type'] !== $activity->activity_type->value) {
             throw ValidationException::withMessages([
                 'activity_type' => 'Activity type cannot be changed after creation.',
