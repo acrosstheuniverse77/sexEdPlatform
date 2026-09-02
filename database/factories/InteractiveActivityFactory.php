@@ -22,7 +22,7 @@ class InteractiveActivityFactory extends Factory
             'title' => fake()->sentence(4),
             'instructions' => fake()->sentence(),
             'explanation' => fake()->sentence(),
-            'configuration' => [],
+            'configuration' => ['schema_version' => 1, 'pairs' => []],
             'revision' => 1,
         ];
     }
@@ -31,6 +31,7 @@ class InteractiveActivityFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'activity_type' => InteractiveActivityType::MATCHING,
+            'configuration' => ['schema_version' => 1, 'pairs' => []],
         ]);
     }
 
@@ -38,6 +39,7 @@ class InteractiveActivityFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'activity_type' => InteractiveActivityType::SEQUENCING,
+            'configuration' => ['schema_version' => 1, 'items' => []],
         ]);
     }
 
@@ -52,6 +54,7 @@ class InteractiveActivityFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'placement' => 'between_topics',
+            'block_uuid' => null,
         ]);
     }
 }

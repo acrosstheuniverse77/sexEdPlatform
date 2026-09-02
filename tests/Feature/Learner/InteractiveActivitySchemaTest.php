@@ -9,6 +9,7 @@ use App\Models\LessonTopic;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class InteractiveActivitySchemaTest extends TestCase
@@ -40,11 +41,39 @@ class InteractiveActivitySchemaTest extends TestCase
         $this->assertIsArray($activity->configuration);
         $this->assertSame($activity->id, $topic->interactiveActivities()->firstOrFail()->id);
 
+        $direct = InteractiveActivity::create([
+            'lesson_topic_id' => $topic->id,
+            'placement' => 'inside_topic',
+            'activity_type' => InteractiveActivityType::MATCHING,
+            'title' => 'Direct activity',
+            'configuration' => ['schema_version' => 1, 'pairs' => []],
+        ]);
+
+        $explicitUuid = (string) Str::uuid();
+        $explicit = InteractiveActivity::create([
+            'lesson_topic_id' => $topic->id,
+            'placement' => 'inside_topic',
+            'block_uuid' => $explicitUuid,
+            'activity_type' => InteractiveActivityType::MATCHING,
+            'title' => 'Explicit UUID activity',
+            'configuration' => ['schema_version' => 1, 'pairs' => []],
+        ]);
+
+        $this->assertTrue(Str::isUuid($direct->block_uuid));
+        $this->assertSame($explicitUuid, $explicit->block_uuid);
+
+        $matching = InteractiveActivity::factory()->matching()->create();
+        $sequencing = InteractiveActivity::factory()->sequencing()->create();
+
+        $this->assertSame(['schema_version' => 1, 'pairs' => []], $matching->configuration);
+        $this->assertSame(['schema_version' => 1, 'items' => []], $sequencing->configuration);
+
         $standalone = InteractiveActivity::factory()->betweenTopics()->create([
             'lesson_topic_id' => $topic->id,
         ]);
 
         $this->assertSame($standalone->id, $topic->standaloneInteractiveActivity->id);
+        $this->assertNull($standalone->block_uuid);
 
         $progress = InteractiveActivityProgress::factory()->create([
             'interactive_activity_id' => $activity->id,

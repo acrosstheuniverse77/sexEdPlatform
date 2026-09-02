@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class InteractiveActivity extends Model
 {
@@ -33,6 +34,15 @@ class InteractiveActivity extends Model
             'configuration' => 'array',
             'revision' => 'integer',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $activity): void {
+            if ($activity->placement === 'inside_topic' && $activity->block_uuid === null) {
+                $activity->block_uuid = (string) Str::uuid();
+            }
+        });
     }
 
     public function lessonTopic(): BelongsTo
