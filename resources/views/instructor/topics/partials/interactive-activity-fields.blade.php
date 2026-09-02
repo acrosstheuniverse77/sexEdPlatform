@@ -1,13 +1,32 @@
 @php($fieldActivity = $activity ?? null)
+@php($eligibleActivityTopics = $lesson->topics->filter(fn ($topic) => ! $topic->isOptionalInteraction()))
+@php($activityInsertAfterBlock = 0)
+@if($fieldActivity?->placement === 'inside_topic')
+    @foreach(($fieldActivity->lessonTopic?->content_blocks ?? []) as $blockIndex => $block)
+        @if(is_array($block) && ($block['type'] ?? null) === 'interactive_activity' && (int) ($block['activity_id'] ?? 0) === (int) $fieldActivity->id)
+            @php($activityInsertAfterBlock = max(0, $blockIndex - 1))
+        @endif
+    @endforeach
+@endif
+@php($activityBlockOptions = $eligibleActivityTopics->flatMap(function ($topic) {
+    return collect($topic->content_blocks ?? [])->keys()->map(fn ($blockIndex) => [
+        'topic_id' => (string) $topic->id,
+        'block_index' => (int) $blockIndex,
+        'label' => $topic->title.' - block '.((int) $blockIndex + 1),
+    ]);
+})->values())
 <div id="interactiveActivityFields"
      x-data="interactiveActivityAuthoring({
          activityType: @js(old('activity_type', $fieldActivity?->activity_type?->value ?? 'matching')),
          placement: @js(old('placement', $fieldActivity?->placement ?? 'between_topics')),
          parentTopicId: @js(old('parent_topic_id', $fieldActivity?->placement === 'inside_topic' ? $fieldActivity->lesson_topic_id : '')),
-         insertAfterBlock: @js((int) old('insert_after_block', 0)),
+         insertAfterBlock: @js((int) old('insert_after_block', $activityInsertAfterBlock)),
+         blockOptions: @js($activityBlockOptions),
          pairs: @js(old('configuration.pairs', $fieldActivity?->activity_type?->value === 'matching' ? ($fieldActivity->configuration['pairs'] ?? []) : [])),
          items: @js(old('configuration.items', $fieldActivity?->activity_type?->value === 'sequencing' ? ($fieldActivity->configuration['items'] ?? []) : [])),
      })"
+     @pointerup.window="dropItem(dragOverIndex)"
+     @pointercancel.window="cancelItemDrag()"
      x-cloak>
     <input type="hidden" name="activity_type" x-model="activityType">
 
@@ -45,20 +64,18 @@
 
     <div x-show="placement === 'inside_topic'" class="mb-6 space-y-4">
         <label for="activity_parent_topic_id" class="block text-sm font-semibold text-gray-900">Containing Topic</label>
-        <select id="activity_parent_topic_id" name="parent_topic_id" x-model="parentTopicId" :disabled="placement !== 'inside_topic'" class="w-full rounded-xl border-gray-200 focus:border-purple-400 focus:ring-purple-300">
+        <select id="activity_parent_topic_id" name="parent_topic_id" x-model="parentTopicId" @change="insertAfterBlock = 0" :disabled="placement !== 'inside_topic'" class="w-full rounded-xl border-gray-200 focus:border-purple-400 focus:ring-purple-300">
             <option value="">Select an instructional Topic</option>
-            @foreach($lesson->topics->filter(fn ($topic) => ! $topic->isOptionalInteraction()) as $lessonTopic)
+            @foreach($eligibleActivityTopics as $lessonTopic)
                 <option value="{{ $lessonTopic->id }}">{{ $lessonTopic->title }}</option>
             @endforeach
         </select>
         <label for="activity_insert_after_block" class="block text-sm font-semibold text-gray-900">Insert after block</label>
         <select id="activity_insert_after_block" name="insert_after_block" x-model.number="insertAfterBlock" :disabled="placement !== 'inside_topic'" class="w-full rounded-xl border-gray-200 focus:border-purple-400 focus:ring-purple-300">
             <option value="0">Topic body</option>
-            @foreach($lesson->topics->filter(fn ($topic) => ! $topic->isOptionalInteraction()) as $lessonTopic)
-                @foreach(($lessonTopic->content_blocks ?? []) as $blockIndex => $block)
-                    <option value="{{ $blockIndex }}">{{ $lessonTopic->title }} — block {{ $blockIndex + 1 }}</option>
-                @endforeach
-            @endforeach
+            <template x-for="option in blockOptions.filter(option => String(option.topic_id) === String(parentTopicId))" :key="`${option.topic_id}-${option.block_index}`">
+                <option :value="option.block_index" x-text="option.label"></option>
+            </template>
         </select>
         @error('parent_topic_id') <p class="text-xs text-red-600" role="alert">{{ $message }}</p> @enderror
     </div>

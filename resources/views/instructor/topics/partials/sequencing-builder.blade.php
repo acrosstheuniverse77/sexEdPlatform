@@ -1,11 +1,15 @@
 <fieldset class="space-y-4">
     <legend class="text-sm font-semibold text-gray-900">Sequence items</legend>
-    <p class="text-xs text-gray-500">Add 3–12 unique items. The displayed order becomes the correct sequence.</p>
+    <p class="text-xs text-gray-500">Add 3-12 unique items. The displayed order becomes the correct sequence.</p>
+    <div role="list" aria-label="Sequence items">
     <template x-for="(item, index) in items" :key="item.id || `item-${index}`">
-        <div class="grid gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 md:grid-cols-[auto_1fr_auto]">
-            <div class="flex items-center gap-2 text-xs font-semibold text-gray-500" aria-hidden="true">
-                <span class="cursor-grab text-lg" role="button" tabindex="0" aria-label="Drag item to reorder"
-                      @pointerdown.prevent="startItemDrag(index)" @pointerup.prevent="dropItem(index)">⠿</span><span x-text="index + 1"></span>
+        <div class="grid gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 md:grid-cols-[auto_1fr_auto]" role="listitem"
+             @pointerenter="if (dragIndex !== null) dragOverIndex = index">
+            <div class="flex items-center gap-2 text-xs font-semibold text-gray-500">
+                <span class="cursor-grab text-lg" aria-hidden="true"
+                      @pointerdown.prevent="startItemDrag(index)">⠿</span>
+                <span aria-live="polite" x-text="`${index + 1} of ${items.length}`"></span>
+                <span class="sr-only" aria-live="polite" x-text="dragIndex === index ? `Dragging item ${index + 1} of ${items.length}` : ''"></span>
             </div>
             <label class="text-xs font-semibold text-gray-700">Item text
                 <input type="hidden" :name="`configuration[items][${index}][id]`" :value="item.id || ''" :disabled="activityType !== 'sequencing'">
@@ -19,5 +23,6 @@
             </div>
         </div>
     </template>
+    </div>
     <button type="button" @click="addItem()" :disabled="items.length >= 12" class="rounded-lg border border-purple-200 px-3 py-2 text-xs font-semibold text-purple-700 disabled:cursor-not-allowed disabled:opacity-40">Add item</button>
 </fieldset>

@@ -143,7 +143,10 @@ class InteractiveActivityAuthoringService
                 $sameParent = $oldPlacement === 'inside_topic' && $oldTopic->is($targetTopic);
                 $targetBlockUuid = $sameParent ? $stored->block_uuid : (string) Str::uuid();
 
-                if (! $sameParent) {
+                if ($sameParent) {
+                    $targetTopic->update(['content_blocks' => $this->removeActivityBlock($targetTopic, $stored)]);
+                    $this->addActivityBlock($targetTopic, $targetBlockUuid, $stored->id, (int) ($data['insert_after_block'] ?? 0));
+                } else {
                     if ($oldPlacement === 'inside_topic') {
                         $oldTopic->update(['content_blocks' => $this->removeActivityBlock($oldTopic, $stored)]);
                     } else {

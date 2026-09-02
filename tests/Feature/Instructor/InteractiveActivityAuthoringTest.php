@@ -357,6 +357,29 @@ class InteractiveActivityAuthoringTest extends TestCase
         ], $newParent->fresh()->content_blocks);
     }
 
+    public function test_inside_activity_can_move_within_the_same_parent_without_changing_its_block_uuid(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture();
+        [$parent, $activity] = $this->insideActivity($lesson);
+        $activityBlock = $parent->content_blocks[0];
+        $parent->update(['content_blocks' => [
+            ['type' => 'rich_text', 'html' => '<p>First</p>'],
+            $activityBlock,
+            ['type' => 'rich_text', 'html' => '<p>Last</p>'],
+        ]]);
+
+        $this->actingAs($instructor)
+            ->put(route('instructor.interactive-activities.update', $activity), $this->activityPayload($activity, [
+                'insert_after_block' => 1,
+            ]))
+            ->assertRedirect(route('instructor.lessons.show', $lesson));
+
+        $blocks = $parent->fresh()->content_blocks;
+        $this->assertSame(['rich_text', 'rich_text', 'interactive_activity'], array_column($blocks, 'type'));
+        $this->assertSame($activity->block_uuid, $blocks[2]['uuid']);
+        $this->assertSame($activity->id, (int) $blocks[2]['activity_id']);
+    }
+
     public function test_activity_can_move_between_and_inside_without_orphaning_hosts(): void
     {
         [$instructor, $lesson] = $this->authoringFixture();

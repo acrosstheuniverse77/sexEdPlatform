@@ -10,6 +10,7 @@ export function createInteractiveActivityAuthoring(options = {}) {
         placement: options.placement === 'inside_topic' ? 'inside_topic' : 'between_topics',
         parentTopicId: options.parentTopicId ?? '',
         insertAfterBlock: Number.isInteger(options.insertAfterBlock) ? options.insertAfterBlock : 0,
+        blockOptions: Array.isArray(options.blockOptions) ? copy(options.blockOptions) : [],
         pairs: Array.isArray(options.pairs) && options.pairs.length > 0
             ? copy(options.pairs)
             : [defaultPair(), defaultPair()],
@@ -17,6 +18,7 @@ export function createInteractiveActivityAuthoring(options = {}) {
             ? copy(options.items)
             : [defaultItem(), defaultItem(), defaultItem()],
         dragIndex: null,
+        dragOverIndex: null,
 
         setActivityType(type) {
             this.activityType = type === 'sequencing' ? 'sequencing' : 'matching';
@@ -59,15 +61,23 @@ export function createInteractiveActivityAuthoring(options = {}) {
 
         startItemDrag(index) {
             this.dragIndex = index;
+            this.dragOverIndex = index;
             return this;
         },
 
         dropItem(index) {
-            if (this.dragIndex !== null && this.dragIndex !== index) {
+            if (this.dragIndex !== null && Number.isInteger(index) && this.dragIndex !== index) {
                 const [item] = this.items.splice(this.dragIndex, 1);
                 this.items.splice(index, 0, item);
             }
             this.dragIndex = null;
+            this.dragOverIndex = null;
+            return this;
+        },
+
+        cancelItemDrag() {
+            this.dragIndex = null;
+            this.dragOverIndex = null;
             return this;
         },
 

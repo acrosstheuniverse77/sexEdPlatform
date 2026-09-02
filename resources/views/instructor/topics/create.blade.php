@@ -144,7 +144,7 @@
 
                     <!-- Matching Activity Type -->
                     <label data-activity-type="matching"
-                        class="relative flex flex-col items-center p-6 border-2 border-orange-200 bg-orange-50/40 rounded-xl cursor-pointer hover:border-orange-400 hover:shadow-md transition-all topic-type-card">
+                        class="relative flex flex-col items-center p-6 border-2 border-orange-200 bg-orange-50/40 rounded-xl cursor-pointer hover:border-orange-400 focus-within:ring-2 focus-within:ring-orange-400 focus-within:ring-offset-2 hover:shadow-md transition-all topic-type-card">
                         <input type="radio" name="type" value="interactive" class="sr-only topic-type-radio"
                             {{ old('type') === 'interactive' && old('activity_type', 'matching') === 'matching' ? 'checked' : '' }} required>
                         <svg class="w-12 h-12 text-orange-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -156,7 +156,7 @@
 
                     <!-- Sequencing Activity Type -->
                     <label data-activity-type="sequencing"
-                        class="relative flex flex-col items-center p-6 border-2 border-orange-200 bg-orange-50/40 rounded-xl cursor-pointer hover:border-orange-400 hover:shadow-md transition-all topic-type-card">
+                        class="relative flex flex-col items-center p-6 border-2 border-orange-200 bg-orange-50/40 rounded-xl cursor-pointer hover:border-orange-400 focus-within:ring-2 focus-within:ring-orange-400 focus-within:ring-offset-2 hover:shadow-md transition-all topic-type-card">
                         <input type="radio" name="type" value="interactive" class="sr-only topic-type-radio"
                             {{ old('type') === 'interactive' && old('activity_type') === 'sequencing' ? 'checked' : '' }} required>
                         <svg class="w-12 h-12 text-orange-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

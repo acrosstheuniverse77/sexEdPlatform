@@ -10,6 +10,16 @@
     <form action="{{ $formAction }}" method="POST" class="space-y-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
         @csrf
         @method('PUT')
+        @if($errors->any())
+            <div id="activity-form-errors" role="alert" aria-labelledby="activity-form-errors-title" class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                <h2 id="activity-form-errors-title" class="font-semibold">Please fix the activity configuration.</h2>
+                <ul class="mt-1 list-inside list-disc">
+                    @foreach($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
         <input type="hidden" name="lesson_id" value="{{ $lesson->id }}">
         <input type="hidden" name="type" value="interactive">
 
