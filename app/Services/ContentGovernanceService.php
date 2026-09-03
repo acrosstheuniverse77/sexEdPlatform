@@ -6,19 +6,21 @@ use App\Models\Module;
 use App\Models\ModuleReviewRequest;
 use App\Models\ModuleRevision;
 use App\Models\User;
-use App\Services\Content\ContentAuthoringService;
-use App\Services\Instructor\InstructorPlanCapabilityService;
-use App\Services\Moderation\SourceAdapters\ModuleReviewModerationAdapter;
 use App\Notifications\Admin\NewModuleSubmissionNotification;
 use App\Notifications\InstructorModuleReviewDecisionNotification;
 use App\Notifications\InstructorModuleReviewStatusNotification;
+use App\Services\Content\ContentAuthoringService;
+use App\Services\Instructor\InstructorPlanCapabilityService;
+use App\Services\Moderation\SourceAdapters\ModuleReviewModerationAdapter;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class ContentGovernanceService
 {
     public const STATUS_SUBMITTED = 'submitted';
+
     public const STATUS_IN_REVIEW = 'in_review';
+
     public const STATUS_WITHDRAWN = 'withdrawn';
 
     public function __construct(
@@ -27,8 +29,7 @@ class ContentGovernanceService
         private readonly ContentAuthoringService $contentAuthoringService,
         private readonly InstructorPlanCapabilityService $instructorPlanCapabilityService,
         private readonly ModuleReviewModerationAdapter $moduleReviewModerationAdapter,
-    ) {
-    }
+    ) {}
 
     /**
      * @param  array<string, mixed>  $validated
@@ -81,7 +82,7 @@ class ContentGovernanceService
     public function startReview(ModuleReviewRequest $reviewRequest, User $admin): ModuleReviewRequest
     {
         return DB::transaction(function () use ($reviewRequest, $admin) {
-            if (!in_array($reviewRequest->status, [self::STATUS_SUBMITTED, self::STATUS_IN_REVIEW], true)) {
+            if (! in_array($reviewRequest->status, [self::STATUS_SUBMITTED, self::STATUS_IN_REVIEW], true)) {
                 throw new InvalidArgumentException('Only submitted module requests can be moved to under review.');
             }
 
@@ -141,7 +142,7 @@ class ContentGovernanceService
                 ->latest('id')
                 ->first();
 
-            if (!$reviewRequest) {
+            if (! $reviewRequest) {
                 throw new InvalidArgumentException('No submission found to withdraw.');
             }
 
@@ -301,7 +302,7 @@ class ContentGovernanceService
         }
 
         $instructor = User::query()->find($module->created_by);
-        if (!$instructor) {
+        if (! $instructor) {
             return;
         }
 
@@ -332,8 +333,7 @@ class ContentGovernanceService
         ?string $guidanceNote = null,
         bool $issueWarning = false,
         ?string $moderationNotes = null,
-    ): ModuleRevision
-    {
+    ): ModuleRevision {
         if (trim($feedback) === '') {
             throw new InvalidArgumentException('Review feedback is required when rejecting a module submission.');
         }
@@ -425,7 +425,7 @@ class ContentGovernanceService
     public function archiveReview(ModuleReviewRequest $reviewRequest, User $admin, ?string $notes = null): ModuleReviewRequest
     {
         return DB::transaction(function () use ($reviewRequest, $admin, $notes) {
-            if (!in_array($reviewRequest->status, [self::STATUS_SUBMITTED, self::STATUS_IN_REVIEW], true)) {
+            if (! in_array($reviewRequest->status, [self::STATUS_SUBMITTED, self::STATUS_IN_REVIEW], true)) {
                 throw new InvalidArgumentException('Only pending review submissions can be archived.');
             }
 
@@ -470,7 +470,7 @@ class ContentGovernanceService
     public function createRevisionSnapshot(Module $module, User $actor): ModuleRevision
     {
         $module->loadMissing([
-            'lessons.topics',
+            'lessons.topics.interactiveActivities',
             'quizzes.questions.options',
             'finalQuiz.questions.options',
         ]);
@@ -529,24 +529,39 @@ class ContentGovernanceService
                     'is_published',
                     'text_content',
                 ]),
-                'topics' => $lesson->topics->map(fn ($topic) => $topic->only([
-                    'id',
-                    'lesson_id',
-                    'title',
-                    'type',
-                    'video_provider',
-                    'video_id',
-                    'video_file_path',
-                    'text_content',
-                    'file_path',
-                    'quiz_id',
-                    'interactive_config',
-                    'image_attachments',
-                    'slideshow_data',
-                    'duration',
-                    'is_prerequisite',
-                    'order',
-                ]))->values()->all(),
+                'topics' => $lesson->topics->map(fn ($topic) => [
+                    ...$topic->only([
+                        'id',
+                        'lesson_id',
+                        'title',
+                        'type',
+                        'video_provider',
+                        'video_id',
+                        'video_file_path',
+                        'text_content',
+                        'content_blocks',
+                        'file_path',
+                        'quiz_id',
+                        'interactive_config',
+                        'image_attachments',
+                        'slideshow_data',
+                        'duration',
+                        'is_prerequisite',
+                        'order',
+                    ]),
+                    'interactive_activities' => $topic->interactiveActivities->map(fn ($activity) => $activity->only([
+                        'id',
+                        'lesson_topic_id',
+                        'placement',
+                        'block_uuid',
+                        'activity_type',
+                        'title',
+                        'instructions',
+                        'explanation',
+                        'configuration',
+                        'revision',
+                    ]))->values()->all(),
+                ])->values()->all(),
             ])->values()->all(),
             'quizzes' => $module->quizzes->map(fn ($quiz) => [
                 'attributes' => $quiz->only([

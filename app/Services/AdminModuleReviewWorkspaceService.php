@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\ModuleReviewRejectionReason;
+use App\Models\InteractiveActivity;
 use App\Models\Lesson;
 use App\Models\Module;
 use App\Models\ModuleEnrollment;
@@ -22,7 +23,7 @@ class AdminModuleReviewWorkspaceService
             'reviewer',
             'revision.submitter',
             'module.publisher',
-            'module.lessons.topics',
+            'module.lessons.topics.interactiveActivities',
             'module.quizzes.questions.options',
             'module.finalQuiz.questions.options',
         ]);
@@ -50,7 +51,7 @@ class AdminModuleReviewWorkspaceService
         $quizzes = $this->extractQuizzes($snapshot, $module);
 
         $thumbnailUrl = data_get($moduleData, 'thumbnail_url');
-        if (!is_string($thumbnailUrl) || trim($thumbnailUrl) === '') {
+        if (! is_string($thumbnailUrl) || trim($thumbnailUrl) === '') {
             $thumbnailUrl = $module?->thumbnail_url
                 ?? $this->resolveMediaUrl((string) data_get($moduleData, 'thumbnail', ''), 'modules');
         }
@@ -75,7 +76,7 @@ class AdminModuleReviewWorkspaceService
         }
 
         $moduleOwnerType = strtolower((string) data_get($moduleData, 'content_owner_type', $module?->content_owner_type ?? ''));
-        if (!in_array($moduleOwnerType, ['admin', 'platform', 'instructor'], true)) {
+        if (! in_array($moduleOwnerType, ['admin', 'platform', 'instructor'], true)) {
             $moduleOwnerType = strtolower((string) ($instructor?->role ?? '')) === 'admin'
                 ? 'admin'
                 : 'instructor';
@@ -221,7 +222,7 @@ class AdminModuleReviewWorkspaceService
                 ?->flatMap(fn (Lesson $lesson) => $lesson->topics)
                 ?->firstWhere('id', $nodeId);
 
-            if (!$topic) {
+            if (! $topic) {
                 return null;
             }
 
@@ -263,7 +264,7 @@ class AdminModuleReviewWorkspaceService
             }
 
             $quiz = $reviewRequest->module?->quizzes?->firstWhere('id', $nodeId);
-            if (!$quiz) {
+            if (! $quiz) {
                 return null;
             }
 
@@ -299,7 +300,62 @@ class AdminModuleReviewWorkspaceService
             ];
         }
 
+        if ($nodeType === 'activity') {
+            $hasFrozenLessons = is_array($snapshot) && array_key_exists('lessons', $snapshot);
+
+            foreach ((array) ($snapshot['lessons'] ?? []) as $lesson) {
+                foreach ((array) data_get($lesson, 'topics', []) as $topic) {
+                    foreach ((array) data_get($topic, 'interactive_activities', []) as $activity) {
+                        if ((int) data_get($activity, 'id') !== $nodeId) {
+                            continue;
+                        }
+
+                        return $this->mapActivityPreview($activity);
+                    }
+                }
+            }
+
+            if ($hasFrozenLessons) {
+                return null;
+            }
+
+            $activity = $reviewRequest->module?->lessons
+                ?->flatMap(fn (Lesson $lesson) => $lesson->topics)
+                ?->flatMap(fn ($topic) => $topic->interactiveActivities)
+                ?->firstWhere('id', $nodeId);
+
+            return $activity ? $this->mapActivityPreview($activity) : null;
+        }
+
         return null;
+    }
+
+    /**
+     * @param  array<string, mixed>|InteractiveActivity  $activity
+     * @return array<string, mixed>
+     */
+    private function mapActivityPreview(array|InteractiveActivity $activity): array
+    {
+        $value = fn (string $key, mixed $default = null): mixed => is_array($activity)
+            ? data_get($activity, $key, $default)
+            : $activity->getAttribute($key) ?? $default;
+        $activityType = $value('activity_type');
+        $activityType = $activityType instanceof \BackedEnum ? $activityType->value : (string) $activityType;
+
+        return [
+            'type' => 'activity',
+            'id' => (int) $value('id'),
+            'lesson_topic_id' => $value('lesson_topic_id'),
+            'placement' => $value('placement'),
+            'block_uuid' => $value('block_uuid'),
+            'activity_type' => $activityType,
+            'activity_type_label' => $this->humanizeLabel($activityType, true),
+            'title' => $value('title'),
+            'instructions' => $this->sanitizeRichContent((string) $value('instructions', '')),
+            'explanation' => $this->sanitizeRichContent((string) $value('explanation', '')),
+            'configuration' => (array) $value('configuration', []),
+            'revision' => (int) $value('revision', 1),
+        ];
     }
 
     private function sanitizeRichContent(string $content): string
@@ -333,7 +389,7 @@ class AdminModuleReviewWorkspaceService
             return 'Not specified';
         }
 
-        return (string) $minAge . ' - ' . (string) $maxAge;
+        return (string) $minAge.' - '.(string) $maxAge;
     }
 
     private function resolveMediaUrl(string $path, string $defaultDirectory = ''): ?string
@@ -352,8 +408,8 @@ class AdminModuleReviewWorkspaceService
             $normalized = substr($normalized, 8);
         }
 
-        if (!str_contains($normalized, '/') && $defaultDirectory !== '') {
-            $normalized = trim($defaultDirectory, '/') . '/' . $normalized;
+        if (! str_contains($normalized, '/') && $defaultDirectory !== '') {
+            $normalized = trim($defaultDirectory, '/').'/'.$normalized;
         }
 
         return Storage::url($normalized);
@@ -369,14 +425,14 @@ class AdminModuleReviewWorkspaceService
         }
 
         return match ($provider) {
-            'youtube' => 'https://www.youtube.com/embed/' . $videoId,
-            'vimeo' => 'https://player.vimeo.com/video/' . $videoId,
+            'youtube' => 'https://www.youtube.com/embed/'.$videoId,
+            'vimeo' => 'https://player.vimeo.com/video/'.$videoId,
             default => null,
         };
     }
 
     /**
-     * @param array<int, mixed> $attachments
+     * @param  array<int, mixed>  $attachments
      * @return array<int, string>
      */
     private function extractAttachmentUrls(array $attachments): array
@@ -414,7 +470,7 @@ class AdminModuleReviewWorkspaceService
             return $snapshotLessons->all();
         }
 
-        if (!$module) {
+        if (! $module) {
             return [];
         }
 
@@ -431,24 +487,39 @@ class AdminModuleReviewWorkspaceService
                     'is_published',
                     'text_content',
                 ]),
-                'topics' => $lesson->topics->map(fn ($topic) => $topic->only([
-                    'id',
-                    'lesson_id',
-                    'title',
-                    'type',
-                    'video_provider',
-                    'video_id',
-                    'video_file_path',
-                    'text_content',
-                    'file_path',
-                    'quiz_id',
-                    'interactive_config',
-                    'image_attachments',
-                    'slideshow_data',
-                    'duration',
-                    'is_prerequisite',
-                    'order',
-                ]))->values()->all(),
+                'topics' => $lesson->topics->map(fn ($topic) => [
+                    ...$topic->only([
+                        'id',
+                        'lesson_id',
+                        'title',
+                        'type',
+                        'video_provider',
+                        'video_id',
+                        'video_file_path',
+                        'text_content',
+                        'content_blocks',
+                        'file_path',
+                        'quiz_id',
+                        'interactive_config',
+                        'image_attachments',
+                        'slideshow_data',
+                        'duration',
+                        'is_prerequisite',
+                        'order',
+                    ]),
+                    'interactive_activities' => $topic->interactiveActivities->map(fn ($activity) => $activity->only([
+                        'id',
+                        'lesson_topic_id',
+                        'placement',
+                        'block_uuid',
+                        'activity_type',
+                        'title',
+                        'instructions',
+                        'explanation',
+                        'configuration',
+                        'revision',
+                    ]))->values()->all(),
+                ])->values()->all(),
             ])
             ->values()
             ->all();
@@ -468,7 +539,7 @@ class AdminModuleReviewWorkspaceService
             return $snapshotQuizzes->all();
         }
 
-        if (!$module) {
+        if (! $module) {
             return [];
         }
 
@@ -530,7 +601,7 @@ class AdminModuleReviewWorkspaceService
 
     private function buildInstructorPreview(?User $instructor, $recentViolations, $moderationProfile): array
     {
-        if (!$instructor) {
+        if (! $instructor) {
             return [
                 'profile' => [
                     'user_id' => null,

@@ -15,7 +15,7 @@ class ContentReviewPreviewRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'node_type' => ['required', Rule::in(['topic', 'quiz'])],
+            'node_type' => ['required', Rule::in(['topic', 'quiz', 'activity'])],
             'node_id' => ['required', 'integer', 'min:1'],
         ];
     }
