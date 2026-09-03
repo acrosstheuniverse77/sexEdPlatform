@@ -82,14 +82,14 @@ export function createSequencingActivity(config = {}, request = globalThis.fetch
         },
 
         scheduleSave() {
-            if (!config.stateUrl || typeof request !== 'function' || this.status === 'completed') return this;
+            if (config.preview || !config.stateUrl || typeof request !== 'function' || this.status === 'completed') return this;
             clearTimeout(this.saveTimer);
             this.saveTimer = setTimeout(() => this.persistState(), config.saveDebounceMs ?? 300);
             return this;
         },
 
         async persistState(force = false) {
-            if ((!force && this.submitting) || typeof request !== 'function' || !config.stateUrl) return null;
+            if (config.preview || (!force && this.submitting) || typeof request !== 'function' || !config.stateUrl) return null;
             const body = { revision: this.revision, state: { item_order: [...this.order] } };
             this.pendingSave = request(config.stateUrl, {
                 method: 'PUT',
@@ -105,12 +105,21 @@ export function createSequencingActivity(config = {}, request = globalThis.fetch
         },
 
         async checkAnswer() {
-            if (this.isLocked() || typeof request !== 'function' || !config.checkUrl) return null;
+            if (this.isLocked()) return null;
             clearTimeout(this.saveTimer);
             this.submitting = true;
             this.feedback = '';
             this.error = '';
             try {
+                if (config.preview) {
+                    const correct = JSON.stringify(this.order) === JSON.stringify(config.answerKey ?? []);
+                    const data = { is_correct: correct, status: correct ? 'completed' : this.status };
+                    this.status = data.status;
+                    if (!correct) this.feedback = 'Not quite—try again';
+                    this.$dispatch?.('interactive-activity-state', { status: this.status, data });
+                    return data;
+                }
+                if (typeof request !== 'function' || !config.checkUrl) return null;
                 if (this.pendingSave) await this.pendingSave;
                 else if (config.stateUrl) await this.persistState(true);
                 const response = await request(config.checkUrl, {

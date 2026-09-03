@@ -1,9 +1,11 @@
-@props(['activity'])
+@props(['activity', 'preview' => false])
 
 <div class="relative mt-6" x-data="matchingActivity(@js([
     'activityId' => $activity['id'] ?? null,
     'revision' => $activity['revision'] ?? 1,
     'matchUrl' => $activity['match_url'] ?? null,
+    'preview' => $preview,
+    'answerKey' => $preview ? ($activity['preview_answer_key'] ?? []) : null,
     'csrf' => csrf_token(),
     'initialStatus' => $activity['status'] ?? 'in_progress',
     'initialMatchedPairs' => $activity['matched_pairs'] ?? [],

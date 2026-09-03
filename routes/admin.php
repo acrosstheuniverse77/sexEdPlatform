@@ -90,6 +90,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::delete('topics/{topic}', [Instructor\TopicController::class, 'destroy'])
         ->name('topics.destroy');
 
+    Route::post('interactive-activities/preview', [Instructor\InteractiveActivityController::class, 'preview'])
+        ->name('interactive-activities.preview');
     Route::get('interactive-activities/{interactiveActivity}/edit', [Instructor\InteractiveActivityController::class, 'edit'])
         ->name('interactive-activities.edit');
     Route::put('interactive-activities/{interactiveActivity}', [Instructor\InteractiveActivityController::class, 'update'])

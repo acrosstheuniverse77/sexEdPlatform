@@ -3,9 +3,79 @@ const copy = (value) => JSON.parse(JSON.stringify(value));
 const defaultPair = () => ({ left: { value: '' }, right: { value: '' } });
 const defaultItem = () => ({ value: '' });
 
+export function createInteractiveActivityPreview(options = {}, request = globalThis.fetch?.bind(globalThis)) {
+    return {
+        isOpen: false,
+        isLoading: false,
+        previewHtml: '',
+        errors: {},
+        previewError: '',
+        previewViewport: 'desktop',
+        previewTrigger: null,
+
+        previewWidth() {
+            return { mobile: 375, tablet: 768, desktop: 1440 }[this.previewViewport] ?? 1440;
+        },
+
+        selectViewport(viewport) {
+            if (['mobile', 'tablet', 'desktop'].includes(viewport)) this.previewViewport = viewport;
+            return this;
+        },
+
+        errorMessages() {
+            return Object.values(this.errors).flatMap((messages) => Array.isArray(messages) ? messages : [messages]).filter(Boolean);
+        },
+
+        async open(form, trigger = null) {
+            this.isLoading = true;
+            this.isOpen = false;
+            this.previewError = '';
+            this.errors = {};
+            this.previewTrigger = trigger;
+
+            try {
+                const formData = new FormData(form);
+                formData.delete?.('_method');
+                const response = await request(options.url, {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': options.csrf, Accept: 'application/json' },
+                    body: formData,
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    this.errors = data.errors ?? {};
+                    this.previewError = data.message || 'Review the highlighted fields.';
+                    return null;
+                }
+
+                this.previewHtml = data.html || '';
+                this.isOpen = true;
+                this.$nextTick?.(() => {
+                    const mount = this.$refs?.previewMount;
+                    if (mount && globalThis.Alpine?.initTree) globalThis.Alpine.initTree(mount);
+                });
+                return data;
+            } catch (error) {
+                this.previewError = error.message || 'Unable to load the activity preview.';
+                return null;
+            } finally {
+                this.isLoading = false;
+            }
+        },
+
+        close() {
+            this.isOpen = false;
+            this.previewTrigger?.focus?.();
+            this.previewTrigger = null;
+            return this;
+        },
+    };
+}
+
 export function createInteractiveActivityAuthoring(options = {}) {
     const initialType = options.activityType === 'sequencing' ? 'sequencing' : 'matching';
     const api = {
+        ...createInteractiveActivityPreview({ url: options.previewUrl, csrf: options.csrf }, options.request),
         activityType: initialType,
         placement: options.placement === 'inside_topic' ? 'inside_topic' : 'between_topics',
         parentTopicId: options.parentTopicId ?? '',
@@ -125,6 +195,17 @@ export function createInteractiveActivityAuthoring(options = {}) {
 
         serializedConfiguration() {
             return JSON.stringify(this.configuration());
+        },
+
+        async openPreview(trigger = null) {
+            const form = trigger?.closest?.('form') ?? this.$root?.closest?.('form');
+            const result = await this.open(form, trigger);
+            if (result === null) this.validationErrors = copy(this.errors);
+            return result;
+        },
+
+        closePreview() {
+            return this.close();
         },
     };
 

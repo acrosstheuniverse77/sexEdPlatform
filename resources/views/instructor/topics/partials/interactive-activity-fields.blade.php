@@ -36,6 +36,8 @@
          parentTopicId: @js(old('parent_topic_id', $fieldActivity?->placement === 'inside_topic' ? $fieldActivity->lesson_topic_id : '')),
          insertAfterBlock: @js((int) old('insert_after_block', $activityInsertAfterBlock)),
          blockOptions: @js($activityBlockOptions),
+         previewUrl: @js(route($contentRoutePrefix . '.interactive-activities.preview')),
+         csrf: @js(csrf_token()),
          validationErrors: @js($errors->getMessages()),
          pairs: @js(old('configuration.pairs', $fieldActivity?->activity_type?->value === 'matching' ? ($fieldActivity->configuration['pairs'] ?? []) : [])),
          items: @js(old('configuration.items', $fieldActivity?->activity_type?->value === 'sequencing' ? ($fieldActivity->configuration['items'] ?? []) : [])),
@@ -108,4 +110,13 @@
     <div x-show="activityType === 'sequencing'">
         @include('instructor.topics.partials.sequencing-builder')
     </div>
+
+    <div class="mt-6 flex justify-end">
+        <button type="button" data-preview-trigger @click="openPreview($event.currentTarget)" :disabled="isLoading" class="rounded-xl border border-purple-300 px-4 py-2 text-sm font-semibold text-purple-700 hover:bg-purple-50 disabled:cursor-not-allowed disabled:opacity-50">
+            <span x-show="!isLoading">Interactive Preview</span>
+            <span x-show="isLoading">Loading preview…</span>
+        </button>
+    </div>
+
+    @include('instructor.topics.partials.interactive-activity-preview-modal')
 </div>

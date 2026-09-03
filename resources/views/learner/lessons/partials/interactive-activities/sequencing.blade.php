@@ -1,10 +1,12 @@
-@props(['activity'])
+@props(['activity', 'preview' => false])
 
 <div class="mt-6" x-data="sequencingActivity(@js([
     'activityId' => $activity['id'] ?? null,
     'revision' => $activity['revision'] ?? 1,
     'checkUrl' => $activity['check_sequence_url'] ?? null,
     'stateUrl' => $activity['state_url'] ?? null,
+    'preview' => $preview,
+    'answerKey' => $preview ? ($activity['preview_answer_key'] ?? []) : null,
     'csrf' => csrf_token(),
     'initialStatus' => $activity['status'] ?? 'in_progress',
     'items' => $activity['payload']['items'] ?? [],

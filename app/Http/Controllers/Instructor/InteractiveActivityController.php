@@ -32,6 +32,24 @@ class InteractiveActivityController extends Controller
         ]);
     }
 
+    public function preview(Request $request)
+    {
+        $lesson = Lesson::query()->findOrFail((int) $request->input('lesson_id'));
+        $this->authorize('update', $lesson);
+        $this->ensureAdminCanMutateLesson($lesson);
+        $data = $this->authoring->validate($request, $lesson);
+        $activity = $this->authoring->preview($lesson, $data);
+
+        return response()->json([
+            'html' => view('learner.lessons.partials.interactive-activities.shell', [
+                'activity' => $activity,
+                'continueUrl' => null,
+                'inside' => false,
+                'preview' => true,
+            ])->render(),
+        ]);
+    }
+
     public function update(Request $request, InteractiveActivity $interactiveActivity)
     {
         $lesson = $this->lessonFor($interactiveActivity);

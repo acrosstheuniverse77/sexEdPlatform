@@ -234,15 +234,42 @@ class InteractiveActivityAuthoringService
         });
     }
 
-    public function preview(array $data): array
+    public function preview(Lesson $lesson, array $data): array
     {
+        if ($data['placement'] === 'inside_topic') {
+            $parent = $lesson->topics()
+                ->instructional()
+                ->find($data['parent_topic_id'] ?? null);
+
+            if (! $parent) {
+                throw ValidationException::withMessages([
+                    'parent_topic_id' => 'Choose an eligible topic in this lesson.',
+                ]);
+            }
+
+            Gate::authorize('update', $parent);
+        }
+
         $handler = $this->registry->for($data['activity_type']);
         $configuration = $handler->normalize(
             $this->addDefaultTextKinds($data['configuration'], $data['activity_type']),
         );
         $workingState = $handler->initialWorkingState($configuration, new Randomizer(new Mt19937(1234)));
 
-        return $handler->previewPayload($configuration, $workingState);
+        return [
+            'id' => 'preview-'.Str::uuid(),
+            'revision' => 1,
+            'type' => $data['activity_type'],
+            'activity_type' => $data['activity_type'],
+            'title' => $data['title'],
+            'instructions' => $data['instructions'],
+            'explanation' => $data['explanation'],
+            'status' => 'in_progress',
+            'available' => true,
+            'preview' => true,
+            'payload' => $handler->previewPayload($configuration, $workingState),
+            'preview_answer_key' => $this->previewAnswerKey($data['activity_type'], $configuration),
+        ];
     }
 
     private function createActivity(LessonTopic $topic, array $data, string $placement, ?string $blockUuid): InteractiveActivity
@@ -361,6 +388,37 @@ class InteractiveActivityAuthoringService
 
     private function sanitize(?string $html): ?string
     {
-        return $html === null ? null : strip_tags($html, self::ALLOWED_HTML);
+        if ($html === null) {
+            return null;
+        }
+
+        $allowed = strip_tags($html, self::ALLOWED_HTML);
+
+        return preg_replace_callback('/<([a-z][a-z0-9]*)(?:\s[^>]*)?>/i', static function (array $match): string {
+            $tag = strtolower($match[1]);
+            if ($tag !== 'a') {
+                return '<'.$tag.'>';
+            }
+
+            preg_match('/\bhref\s*=\s*(["\'])(.*?)\1/is', $match[0], $hrefMatch);
+            $href = $hrefMatch[2] ?? '';
+            if ($href === '' || ! preg_match('/^(?:https?:|mailto:|\/|#)/i', $href)) {
+                return '<a>';
+            }
+
+            return '<a href="'.htmlspecialchars($href, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').'">';
+        }, $allowed) ?? '';
+    }
+
+    /** @return array<string, string>|list<string> */
+    private function previewAnswerKey(string $activityType, array $configuration): array
+    {
+        if ($activityType === InteractiveActivityType::MATCHING->value) {
+            return collect($configuration['pairs'] ?? [])
+                ->mapWithKeys(fn (array $pair): array => [$pair['left']['id'] => $pair['right']['id']])
+                ->all();
+        }
+
+        return array_column($configuration['items'] ?? [], 'id');
     }
 }

@@ -85,13 +85,27 @@ export function createMatchingActivity(config = {}, request = globalThis.fetch?.
         },
 
         async submitMatch() {
-            if (this.submitting || this.status === 'completed' || this.leftId === null || this.rightId === null || typeof request !== 'function') return null;
+            if (this.submitting || this.status === 'completed' || this.leftId === null || this.rightId === null) return null;
 
             const proposal = { left_id: this.leftId, right_id: this.rightId };
             this.submitting = true;
             this.feedback = '';
             this.error = '';
             try {
+                if (config.preview) {
+                    const correct = config.answerKey?.[proposal.left_id] === proposal.right_id;
+                    if (correct && !this.matchedPairs.some((pair) => pair.left_id === proposal.left_id)) this.matchedPairs.push(proposal);
+                    const complete = correct && this.matchedPairs.length === Object.keys(config.answerKey ?? {}).length;
+                    const data = { is_correct: correct, status: complete ? 'completed' : this.status };
+                    this.status = data.status;
+                    if (!correct) this.feedback = 'Not quite—try another match';
+                    this.leftId = null;
+                    this.rightId = null;
+                    this.$dispatch?.('interactive-activity-state', { status: this.status, data });
+                    queueMicrotask(() => this.refreshConnectors());
+                    return data;
+                }
+                if (typeof request !== 'function') return null;
                 const response = await request(config.matchUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': config.csrf, Accept: 'application/json' },

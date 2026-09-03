@@ -187,6 +187,112 @@ class InteractiveActivityAuthoringTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_instructor_can_preview_matching_without_persisting_activity_rows(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture();
+        $parent = LessonTopic::factory()->create([
+            'lesson_id' => $lesson->id,
+            'content_blocks' => [['type' => 'rich_text', 'html' => '<p>Topic body</p>']],
+        ]);
+        $topicCount = LessonTopic::query()->count();
+
+        $response = $this->actingAs($instructor)
+            ->postJson(route('instructor.interactive-activities.preview'), $this->previewPayload($lesson, $parent, [
+                'title' => 'Preview matching',
+                'instructions' => '<p>Safe instructions</p><script>alert(1)</script><a href="javascript:alert(2)" onclick="alert(3)">link</a>',
+            ]));
+
+        $response->assertOk()->assertJsonStructure(['html']);
+        $html = $response->json('html');
+        $this->assertStringContainsString('Preview matching', $html);
+        $this->assertStringContainsString('data-preview="true"', $html);
+        $this->assertStringContainsString('<p>Safe instructions</p>', $html);
+        $this->assertStringNotContainsString('<script', $html);
+        $this->assertStringNotContainsString('javascript:', $html);
+        $this->assertStringNotContainsString('onclick', $html);
+        $this->assertDatabaseCount('interactive_activities', 0);
+        $this->assertDatabaseCount('interactive_activity_progress', 0);
+        $this->assertSame($topicCount, LessonTopic::query()->count());
+    }
+
+    public function test_preview_rejects_cross_lesson_parent_and_invalid_matching_or_sequencing_configuration(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture();
+        $otherLesson = Lesson::factory()->create(['module_id' => $lesson->module_id]);
+        $otherParent = LessonTopic::factory()->create(['lesson_id' => $otherLesson->id]);
+
+        $this->actingAs($instructor)
+            ->postJson(route('instructor.interactive-activities.preview'), $this->previewPayload($lesson, $otherParent))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('parent_topic_id');
+
+        $duplicate = $this->previewPayload($lesson, null, [
+            'configuration' => [
+                'pairs' => [
+                    ['left' => ['value' => 'Same'], 'right' => ['value' => 'One']],
+                    ['left' => ['value' => 'same'], 'right' => ['value' => 'Two']],
+                ],
+            ],
+        ]);
+        $this->actingAs($instructor)
+            ->postJson(route('instructor.interactive-activities.preview'), $duplicate)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('pairs.left');
+
+        $invalidSequence = $this->previewPayload($lesson, null, [
+            'activity_type' => 'sequencing',
+            'configuration' => ['items' => [
+                ['value' => 'Only one'],
+                ['value' => 'Only two'],
+            ]],
+        ]);
+        $this->actingAs($instructor)
+            ->postJson(route('instructor.interactive-activities.preview'), $invalidSequence)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('configuration.items');
+
+        $this->assertDatabaseCount('interactive_activities', 0);
+    }
+
+    public function test_admin_can_preview_platform_owned_activity(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $admin->assignRole('admin');
+        $module = Module::factory()->create([
+            'created_by' => $admin->id,
+            'content_owner_type' => 'admin',
+        ]);
+        $lesson = Lesson::factory()->create(['module_id' => $module->id]);
+        $parent = LessonTopic::factory()->create(['lesson_id' => $lesson->id]);
+
+        $this->actingAs($admin)
+            ->postJson(route('admin.interactive-activities.preview'), $this->previewPayload($lesson, $parent, [
+                'title' => 'Admin preview',
+            ]))
+            ->assertOk()
+            ->assertJsonPath('html', fn (string $html): bool => str_contains($html, 'Admin preview'));
+
+        $this->assertDatabaseCount('interactive_activities', 0);
+    }
+
+    public function test_create_and_edit_activity_pages_expose_preview_control(): void
+    {
+        [$instructor, $lesson] = $this->authoringFixture();
+        [, $activity] = $this->insideActivity($lesson);
+
+        $this->actingAs($instructor)
+            ->get(route('instructor.topics.create', ['lesson' => $lesson]))
+            ->assertOk()
+            ->assertSee('Interactive Preview')
+            ->assertSee('previewUrl:', false);
+
+        $this->actingAs($instructor)
+            ->get(route('instructor.interactive-activities.edit', $activity))
+            ->assertOk()
+            ->assertSee('Interactive Preview')
+            ->assertSee('previewUrl:', false);
+    }
+
     public function test_wording_only_edit_preserves_revision_and_answer_edit_increments_once(): void
     {
         [$instructor, $lesson] = $this->authoringFixture();
@@ -545,6 +651,22 @@ class InteractiveActivityAuthoringTest extends TestCase
                 ['value' => 'Negotiate'],
             ],
         ];
+    }
+
+    /** @param array<string, mixed> $overrides */
+    private function previewPayload(Lesson $lesson, ?LessonTopic $parent, array $overrides = []): array
+    {
+        return array_merge([
+            'lesson_id' => $lesson->id,
+            'type' => 'interactive',
+            'activity_type' => 'matching',
+            'placement' => $parent ? 'inside_topic' : 'between_topics',
+            'parent_topic_id' => $parent?->id,
+            'title' => 'Preview activity',
+            'instructions' => '<p>Preview instructions</p>',
+            'explanation' => '<p>Preview explanation</p>',
+            'configuration' => $this->matchingConfiguration(),
+        ], $overrides);
     }
 
     /** @return array<string, mixed> */

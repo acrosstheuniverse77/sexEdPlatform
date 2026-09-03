@@ -60,14 +60,30 @@ export function createInteractiveActivity(config = {}, request = globalThis.fetc
         },
 
         async skip() {
+            if (config.preview) {
+                this.status = 'skipped';
+                this.$dispatch?.('interactive-activity-state', { status: this.status, data: { status: this.status } });
+                return { status: this.status };
+            }
             return this.send(config.skipUrl, 'POST', { revision: this.revision });
         },
 
         async resume() {
+            if (config.preview) {
+                this.status = 'in_progress';
+                this.$dispatch?.('interactive-activity-state', { status: this.status, data: { status: this.status } });
+                return { status: this.status };
+            }
             return this.send(config.resumeUrl, 'POST', { revision: this.revision });
         },
 
         async practice() {
+            if (config.preview) {
+                this.status = 'practice';
+                this.$dispatch?.('interactive-activity-state', { status: this.status, data: { status: this.status } });
+                this.$dispatch?.('interactive-activity-practice');
+                return { status: this.status };
+            }
             const data = await this.send(config.practiceUrl, 'POST', { revision: this.revision });
             if (data) {
                 this.practiceMode = true;
@@ -77,11 +93,11 @@ export function createInteractiveActivity(config = {}, request = globalThis.fetc
         },
 
         continueLearning() {
-            if (config.continueUrl) {
+            if (!config.preview && config.continueUrl) {
                 window.location.assign(config.continueUrl);
                 return;
             }
-            this.$dispatch?.('interactive-activity-continued', { activityId: config.activityId });
+            this.$dispatch?.('interactive-activity-continued', { activityId: config.activityId, preview: config.preview === true });
         },
     };
 
