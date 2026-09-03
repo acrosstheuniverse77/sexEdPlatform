@@ -327,9 +327,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::delete('/subscribers/{subscription}', [Admin\SubscriberAdminController::class, 'destroy'])
         ->name('subscribers.destroy');
 
-
     // Calendar
-    Route::get('/calendar', fn() => view('admin.calendar.index'))->name('calendar.index');
+    Route::get('/calendar', fn () => view('admin.calendar.index'))->name('calendar.index');
 
     // Seminars
     Route::prefix('seminars')->name('seminars.')->group(function () {
@@ -344,6 +343,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     });
 
     // Messages
-    Route::get('/messages', fn() => view('admin.messages.index'))->name('messages.index');
+    Route::get('/messages', fn () => view('admin.messages.index'))->name('messages.index');
 
 });

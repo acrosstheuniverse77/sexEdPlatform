@@ -47,6 +47,14 @@ class TopicController extends Controller
         }
 
         if ($request->input('type') === 'interactive') {
+            if (! $request->filled('activity_type')
+                || ! $request->filled('placement')
+                || ! $request->has('configuration')) {
+                $request->validate([
+                    'type' => ['in:video,text,worksheet'],
+                ]);
+            }
+
             $data = $this->activityAuthoring->validate($request, $lessonForAuthorization);
             $this->activityAuthoring->create($lessonForAuthorization, $data);
 

@@ -1,9 +1,9 @@
 <?php
 
-use App\Http\Controllers\Instructor;
 use App\Http\Controllers\Connector\HomeController as ConnectorHomeController;
-use App\Http\Controllers\SeminarBrowseController;
+use App\Http\Controllers\Instructor;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\SeminarBrowseController;
 use Illuminate\Support\Facades\Route;
 
 /*
