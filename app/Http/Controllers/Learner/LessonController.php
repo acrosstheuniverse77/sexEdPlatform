@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Learner;
 
 use App\Enums\EnrollmentStatus;
 use App\Http\Controllers\Controller;
+use App\Models\InteractiveActivityProgress;
 use App\Models\InteractiveCheckpointProgress;
 use App\Models\Lesson;
 use App\Models\LessonTopic;
@@ -11,12 +12,17 @@ use App\Models\LessonTopicProgress;
 use App\Models\QuizAttempt;
 use App\Models\UserProgress;
 use App\Services\GamificationService;
+use App\Services\Learning\InteractiveActivities\InteractiveActivityPresenter;
+use App\Services\Learning\InteractiveActivities\InteractiveActivityProgressService;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class LessonController extends Controller
 {
     public function __construct(
         private GamificationService $gamificationService,
+        private InteractiveActivityProgressService $interactiveActivityProgress,
+        private InteractiveActivityPresenter $interactiveActivityPresenter,
     ) {}
 
     /**
@@ -53,7 +59,7 @@ class LessonController extends Controller
             ->where('is_published', true)
             ->orderBy('order')
             ->with([
-                'topics',
+                'topics.interactiveActivities',
                 'quiz' => fn ($q) => $q->where('is_active', true)->with('questions'),
             ])
             ->get();
@@ -204,7 +210,10 @@ class LessonController extends Controller
         }
 
         // Get lesson topics with progress
-        $lessonTopics = $lesson->topics()->ordered()->with('checkpointQuestions.options')->get();
+        $lessonTopics = $lesson->topics()->ordered()->with([
+            'checkpointQuestions.options',
+            'interactiveActivities',
+        ])->get();
         $checkpointQuestionIds = $lessonTopics->flatMap->checkpointQuestions->pluck('id');
         $checkpointProgress = InteractiveCheckpointProgress::where('user_id', $user->id)
             ->whereIn('quiz_question_id', $checkpointQuestionIds)
@@ -224,9 +233,26 @@ class LessonController extends Controller
             ->pluck('lesson_topic_id')
             ->map(fn ($id) => (int) $id)
             ->all();
+        $lessonActivityIds = $lessonTopics->flatMap->interactiveActivities->pluck('id')->unique();
+        $activityProgress = $lessonActivityIds->isEmpty()
+            ? collect()
+            : InteractiveActivityProgress::query()
+                ->where('user_id', $user->id)
+                ->whereIn('interactive_activity_id', $lessonActivityIds)
+                ->with('interactiveActivity.lessonTopic')
+                ->get();
+        $resolvedActivityTopicIds = $activityProgress
+            ->filter(fn (InteractiveActivityProgress $progress) => in_array($progress->status, ['completed', 'skipped'], true))
+            ->filter(fn (InteractiveActivityProgress $progress) => $progress->interactiveActivity
+                && (int) $progress->activity_revision === (int) $progress->interactiveActivity->revision
+                && $progress->interactiveActivity->placement === 'between_topics')
+            ->pluck('interactiveActivity.lesson_topic_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
         $resolvedLearningItemIds = array_values(array_unique([
             ...array_map('intval', $completedTopicIds),
             ...$resolvedCheckpointTopicIds,
+            ...$resolvedActivityTopicIds,
         ]));
 
         // Calculate locked topics based on prerequisite dependencies
@@ -321,6 +347,52 @@ class LessonController extends Controller
             }
         }
 
+        $interactiveActivityPresentations = [];
+        if ($currentTopic) {
+            foreach ($currentTopic->interactiveActivities as $activity) {
+                $isValidHost = $activity->placement === 'between_topics'
+                    ? $currentTopic->type === 'interactive'
+                    : $currentTopic->type !== 'interactive' && ! $currentTopic->isOptionalInteraction();
+
+                if (! $isValidHost) {
+                    continue;
+                }
+
+                $progress = null;
+                try {
+                    $progress = $this->interactiveActivityProgress->stateFor($user, $activity);
+                    $presentation = $this->interactiveActivityPresenter->present($activity, $progress);
+                } catch (\Throwable $exception) {
+                    if ($activity->placement === 'inside_topic') {
+                        Log::warning('Inline interactive activity reference unavailable.', [
+                            'activity_id' => $activity->id,
+                            'lesson_topic_id' => $activity->lesson_topic_id,
+                            'validation_message' => $exception->getMessage(),
+                        ]);
+
+                        continue;
+                    }
+
+                    $presentation = $this->interactiveActivityPresenter->present($activity, null);
+                }
+
+                $presentation['match_url'] = route('learner.interactive-activities.match', $activity);
+                $presentation['check_sequence_url'] = route('learner.interactive-activities.check-sequence', $activity);
+                $presentation['state_url'] = route('learner.interactive-activities.state', $activity);
+                $presentation['skip_url'] = route('learner.interactive-activities.skip', $activity);
+                $presentation['resume_url'] = route('learner.interactive-activities.resume', $activity);
+                $presentation['practice_url'] = route('learner.interactive-activities.practice', $activity);
+                $presentation['continue_url'] = $activity->placement === 'between_topics'
+                    ? ($currentTopicIndex < $lessonTopics->count() - 1
+                        ? route('learner.lessons.show', ['lesson' => $lesson->id, 'topic' => $currentTopicIndex + 1])
+                        : ($lessonQuiz
+                            ? route('learner.lessons.show', ['lesson' => $lesson->id, 'quiz' => 1])
+                            : ($nextLesson ? route('learner.lessons.show', $nextLesson) : route('learner.modules.show', $module))))
+                    : null;
+                $interactiveActivityPresentations[$activity->id] = $presentation;
+            }
+        }
+
         return view('learner.lessons.show', compact(
             'lesson',
             'module',
@@ -341,6 +413,8 @@ class LessonController extends Controller
             'checkpointProgress',
             'completedTopicIds',
             'resolvedCheckpointTopicIds',
+            'resolvedActivityTopicIds',
+            'interactiveActivityPresentations',
             'lockedTopicIds',
             'currentTopic',
             'currentTopicIndex'

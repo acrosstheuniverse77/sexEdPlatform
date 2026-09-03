@@ -1,13 +1,18 @@
-@props(['activity', 'continueUrl' => null])
+@props(['activity', 'continueUrl' => null, 'inside' => false])
 
-<section class="rounded-2xl border border-purple-100 bg-white p-5 shadow-sm" x-data="interactiveActivity(@js([
+@php($activityToken = 'activity:'.($activity['id'] ?? 'unknown'))
+
+<section data-optional-interaction="{{ $activityToken }}" class="rounded-2xl border border-purple-100 bg-white p-5 shadow-sm" x-data="interactiveActivity(@js([
     'activityId' => $activity['id'] ?? null,
     'revision' => $activity['revision'] ?? 1,
     'initialStatus' => $activity['status'] ?? 'in_progress',
     'initialExplanation' => $activity['explanation'] ?? null,
     'continueUrl' => $continueUrl,
+    'skipUrl' => $activity['skip_url'] ?? null,
+    'resumeUrl' => $activity['resume_url'] ?? null,
+    'practiceUrl' => $activity['practice_url'] ?? null,
     'csrf' => csrf_token(),
-]))">
+]))" x-init="$dispatch('optional-interaction-active', { token: @js($activityToken), initial: true })" @focusin="$dispatch('optional-interaction-active', { token: @js($activityToken) })">
     <p class="text-xs font-semibold uppercase tracking-[0.16em] text-purple-600">INTERACTIVE ACTIVITY · Optional</p>
     <h3 class="mt-2 text-lg font-semibold text-gray-900">{{ $activity['title'] ?? 'Interactive Activity' }}</h3>
     @if(!empty($activity['instructions']))
@@ -16,8 +21,10 @@
 
     @if(($activity['available'] ?? false) && ($activity['type'] ?? null) === 'matching')
         @include('learner.lessons.partials.interactive-activities.matching', ['activity' => $activity])
+    @elseif(($activity['available'] ?? false) && ($activity['type'] ?? null) === 'sequencing')
+        @include('learner.lessons.partials.interactive-activities.sequencing', ['activity' => $activity])
     @else
-        <p class="mt-5 rounded-xl bg-amber-50 p-4 text-sm text-amber-800">This activity is temporarily unavailable.</p>
+        @include('learner.lessons.partials.interactive-activities.unavailable', ['activity' => $activity, 'continueUrl' => $continueUrl])
     @endif
 
     <div class="mt-5 flex flex-wrap gap-3">

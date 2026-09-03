@@ -74,10 +74,10 @@ export function createInteractiveCheckpoint(config = {}, request = globalThis.fe
                 window.location.assign(config.continueUrl);
                 return;
             }
-            this.$dispatch?.('checkpoint-continued', { questionId: config.questionId });
+            this.$dispatch?.('checkpoint-continued', { questionId: config.questionId, token: `checkpoint:${config.questionId}` });
         },
         claimForward() {
-            this.$dispatch?.('checkpoint-active', { questionId: config.questionId });
+            this.$dispatch?.('checkpoint-active', { questionId: config.questionId, token: `checkpoint:${config.questionId}` });
         },
     };
 
@@ -90,14 +90,20 @@ export function createInteractiveCheckpoint(config = {}, request = globalThis.fe
     return checkpoint;
 }
 
-export function createCheckpointCoordinator() {
+export function createOptionalInteractionCoordinator() {
     return {
-        activeQuestionId: null,
-        activate(questionId) { this.activeQuestionId = Number(questionId); },
-        release(questionId) {
-            if (this.activeQuestionId === Number(questionId)) this.activeQuestionId = null;
+        activeToken: null,
+        activate(token) {
+            this.activeToken = String(token);
         },
-        footerForwardVisible() { return this.activeQuestionId === null; },
+        release(token) {
+            if (this.activeToken === String(token)) this.activeToken = null;
+        },
+        footerForwardVisible() { return this.activeToken === null; },
     };
+}
+
+export function createCheckpointCoordinator() {
+    return createOptionalInteractionCoordinator();
 }
 import { createWordBank } from './word-bank.js';

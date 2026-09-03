@@ -82,7 +82,16 @@ test('resolved inside checkpoint claims then releases footer ownership', async (
     checkpoint.continueLearning();
 
     assert.deepEqual(events, [
-        ['checkpoint-active', { questionId: 17 }],
-        ['checkpoint-continued', { questionId: 17 }],
+        ['checkpoint-active', { questionId: 17, token: 'checkpoint:17' }],
+        ['checkpoint-continued', { questionId: 17, token: 'checkpoint:17' }],
     ]);
+});
+
+test('optional interaction coordinator accepts string tokens and checkpoint alias remains compatible', () => {
+    const coordinator = createCheckpointCoordinator();
+
+    coordinator.activate('activity:17');
+    assert.equal(coordinator.footerForwardVisible(), false);
+    coordinator.release('activity:17');
+    assert.equal(coordinator.footerForwardVisible(), true);
 });

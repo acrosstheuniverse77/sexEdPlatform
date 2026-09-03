@@ -25,9 +25,13 @@
             <div class="flex-1 min-w-0">
                 <h3 class="text-sm font-semibold text-white leading-snug">{{ $currentTopic->title }}</h3>
                 <p class="text-white/70 text-xs">
-                    Topic {{ $currentTopicIndex + 1 }} of {{ $lessonTopics->count() }}
-                    <span class="mx-1">·</span>{{ $currentTopic->duration }}m
-                    <span class="mx-1">·</span>{{ ucfirst($currentTopic->type) }}
+                    @if($currentTopic->isOptionalInteraction())
+                        INTERACTIVE ACTIVITY · Optional
+                    @else
+                        Topic {{ $currentTopicIndex + 1 }} of {{ $lessonTopics->count() }}
+                        <span class="mx-1">·</span>{{ $currentTopic->duration }}m
+                        <span class="mx-1">·</span>{{ ucfirst($currentTopic->type) }}
+                    @endif
                 </p>
                 @if(($module->created_by ?? null) && ($module->created_by ?? null) !== auth()->id())
                     <button
@@ -708,21 +712,15 @@
             </div>
 
         @elseif($currentTopic->type === 'interactive')
-            <!-- Interactive Content -->
-            <div class="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-12 text-center">
-                <svg class="mx-auto h-20 w-20 text-purple-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-                <h3 class="text-xl font-bold text-purple-900 mb-2">Interactive Activity</h3>
-                <p class="text-purple-700 mb-6">This interactive content is coming soon!</p>
-                @if($currentTopic->text_content)
-                    <div class="bg-white bg-opacity-60 rounded-lg p-4 max-w-2xl mx-auto">
-                        <div class="prose prose-sm max-w-none">
-                            {!! $currentTopic->text_content !!}
-                        </div>
-                    </div>
-                @endif
-            </div>
+            @php
+                $standaloneActivity = $currentTopic->interactiveActivities->firstWhere('placement', 'between_topics');
+                $standalonePresentation = $standaloneActivity ? ($interactiveActivityPresentations[$standaloneActivity->id] ?? null) : null;
+            @endphp
+            @if($standalonePresentation)
+                @include('learner.lessons.partials.interactive-activities.shell', ['activity' => $standalonePresentation, 'continueUrl' => $standalonePresentation['continue_url'] ?? null, 'inside' => false])
+            @else
+                @include('learner.lessons.partials.interactive-activities.unavailable', ['activity' => ['title' => $currentTopic->title, 'message' => 'This activity is temporarily unavailable.'], 'continueUrl' => $currentTopicIndex < $lessonTopics->count() - 1 ? route('learner.lessons.show', ['lesson' => $lesson->id, 'topic' => $currentTopicIndex + 1]) : null])
+            @endif
         @endif
 
         @if($currentTopic->type !== 'interactive_checkpoint' && is_array($currentTopic->content_blocks))
@@ -734,6 +732,20 @@
                     @endphp
                     @if($validBlock)
                         @include('learner.lessons.partials.interactive-checkpoint', ['question' => $question])
+                    @endif
+                @elseif(($block['type'] ?? null) === 'interactive_activity')
+                    @php
+                        $activity = $currentTopic->interactiveActivities->firstWhere('id', (int) ($block['activity_id'] ?? 0));
+                        $presentation = $activity ? ($interactiveActivityPresentations[$activity->id] ?? null) : null;
+                        $validActivityBlock = $activity
+                            && $activity->placement === 'inside_topic'
+                            && $activity->lesson_topic_id === $currentTopic->id
+                            && $activity->block_uuid === ($block['uuid'] ?? null)
+                            && $presentation
+                            && ($presentation['available'] ?? false);
+                    @endphp
+                    @if($validActivityBlock)
+                        @include('learner.lessons.partials.interactive-activities.shell', ['activity' => $presentation, 'inside' => true])
                     @endif
                 @endif
             @endforeach

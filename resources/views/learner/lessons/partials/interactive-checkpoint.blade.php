@@ -19,7 +19,7 @@
     }
 @endphp
 
-<section
+<section data-optional-interaction="checkpoint:{{ $question->id }}"
     x-data="interactiveCheckpoint(@js([
         'type' => $question->question_type,
         'questionId' => $question->id,
@@ -32,8 +32,8 @@
         'initialExplanation' => $progress?->status === 'correct' ? $question->explanation : null,
         'continueUrl' => $checkpointContinueUrl,
     ]))"
-    x-init="if (@js($ownsFooterOnLoad)) $dispatch('checkpoint-active', { questionId: {{ $question->id }} })"
-    @focusin="$dispatch('checkpoint-active', { questionId: {{ $question->id }} })"
+    x-init="if (@js($ownsFooterOnLoad)) $dispatch('checkpoint-active', { questionId: {{ $question->id }}, token: 'checkpoint:{{ $question->id }}', initial: true })"
+    @focusin="$dispatch('checkpoint-active', { questionId: {{ $question->id }}, token: 'checkpoint:{{ $question->id }}' })"
     class="my-6 rounded-2xl border border-purple-200 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-900/10 p-5">
     <p class="text-xs font-bold uppercase tracking-widest text-purple-700 dark:text-purple-300">Quick Check</p>
     <h3 class="mt-2 text-base font-semibold text-gray-900 dark:text-white">

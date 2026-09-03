@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Tests\Feature\Learner;
 
 use App\Enums\EnrollmentStatus;
+use App\Enums\InteractiveActivityType;
 use App\Http\Middleware\EnsureProfileCompleted;
+use App\Models\InteractiveActivity;
 use App\Models\Lesson;
 use App\Models\LessonTopic;
 use App\Models\LessonTopicProgress;
@@ -107,6 +109,35 @@ class InteractiveActivityProgressIsolationTest extends TestCase
             ->get(route('learner.lessons.show', $lesson))
             ->assertOk()
             ->assertViewHas('currentTopic', fn (LessonTopic $topic) => $topic->is($following));
+    }
+
+    public function test_required_topic_completion_endpoint_rejects_standalone_activity_host(): void
+    {
+        [$learner, , , $activity] = $this->fixture();
+
+        InteractiveActivity::create([
+            'lesson_topic_id' => $activity->id,
+            'placement' => 'between_topics',
+            'activity_type' => InteractiveActivityType::MATCHING,
+            'title' => 'Standalone',
+            'configuration' => [
+                'schema_version' => 1,
+                'pairs' => [
+                    ['id' => 'pair-1', 'left' => ['id' => 'left-1', 'kind' => 'text', 'value' => 'A'], 'right' => ['id' => 'right-1', 'kind' => 'text', 'value' => 'B']],
+                    ['id' => 'pair-2', 'left' => ['id' => 'left-2', 'kind' => 'text', 'value' => 'C'], 'right' => ['id' => 'right-2', 'kind' => 'text', 'value' => 'D']],
+                ],
+            ],
+            'revision' => 1,
+        ]);
+
+        $this->actingAs($learner)
+            ->post(route('learner.topics.complete', $activity))
+            ->assertNotFound();
+
+        $this->assertDatabaseMissing('lesson_topic_progress', [
+            'user_id' => $learner->id,
+            'lesson_topic_id' => $activity->id,
+        ]);
     }
 
     /** @return array{User, Lesson, LessonTopic, LessonTopic, LessonTopic} */

@@ -25,9 +25,11 @@
 
 @section('content')
 <div class="flex h-full min-h-0 overflow-hidden"
-     x-data="{ ...checkpointCoordinator(), sidebarOpen: JSON.parse(localStorage.getItem('lessonSidebarOpen') ?? 'true') }"
-     @checkpoint-active.window="activate($event.detail.questionId)"
-     @checkpoint-continued.window="release($event.detail.questionId)"
+     x-data="{ ...checkpointCoordinator(), sidebarOpen: JSON.parse(localStorage.getItem('lessonSidebarOpen') ?? 'true'), focusNextOptional(token) { const items = [...$el.querySelectorAll('[data-optional-interaction]')]; const current = items.findIndex((item) => item.dataset.optionalInteraction === token); this.release(token); const next = items[current + 1]?.querySelector('button, input, select, textarea, a'); next?.focus(); } }"
+     @checkpoint-active.window="activate($event.detail.token || ('checkpoint:' + $event.detail.questionId))"
+     @checkpoint-continued.window="focusNextOptional($event.detail.token || ('checkpoint:' + $event.detail.questionId))"
+     @optional-interaction-active.window="activate($event.detail.token)"
+     @interactive-activity-continued.window="focusNextOptional('activity:' + $event.detail.activityId)"
      x-effect="localStorage.setItem('lessonSidebarOpen', JSON.stringify(sidebarOpen))">
 
     {{-- ═══════════════════════════════════════════
@@ -179,7 +181,8 @@
                         @foreach($__lTopics as $__tIdx => $__t)
                             @php
                                 $__tIsLast  = $loop->last && !$__lQuiz;
-                                $__tDone    = in_array($__t->id, $allCompletedTopicIds);
+                        $__tDone    = in_array($__t->id, $allCompletedTopicIds)
+                            || ($__lIsCurrent && in_array($__t->id, $resolvedActivityTopicIds ?? []));
                                 $__tCurrent = $__lIsCurrent && $currentTopicIndex === $__tIdx && !request()->has('quiz');
                                 $__tLocked  = $__lIsCurrent && in_array($__t->id, $lockedTopicIds);
                                 $__tLabel   = match($__t->type) {
@@ -222,6 +225,8 @@
                                             <p class="text-sm font-medium text-gray-500 dark:text-gray-400 leading-snug">{{ $__t->title }}</p>
                                             @if($__t->type === 'interactive_checkpoint')
                                                 <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">QUICK CHECK · Optional</p>
+                                            @elseif($__t->type === 'interactive')
+                                                <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">INTERACTIVE ACTIVITY · Optional</p>
                                             @else
                                             <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{{ $__t->duration }}m · {{ $__tLabel }}{{ $__t->is_prerequisite ? ' · Required' : '' }}</p>
                                             @endif
@@ -236,6 +241,8 @@
                                             </p>
                                             @if($__t->type === 'interactive_checkpoint')
                                                 <p class="text-xs mt-0.5 {{ $__tCurrent ? 'text-violet-500' : 'text-gray-400 dark:text-gray-500' }}">QUICK CHECK · Optional</p>
+                                            @elseif($__t->type === 'interactive')
+                                                <p class="text-xs mt-0.5 {{ $__tCurrent ? 'text-violet-500' : 'text-gray-400 dark:text-gray-500' }}">INTERACTIVE ACTIVITY · Optional</p>
                                             @else
                                             <p class="text-xs mt-0.5 {{ $__tCurrent ? 'text-violet-500' : 'text-gray-400 dark:text-gray-500' }}">
                                                 {{ $__t->duration }}m · {{ $__tLabel }}{{ $__t->is_prerequisite ? ' · Required' : '' }}
@@ -379,7 +386,8 @@
                 @foreach($lessonTopics as $__dot)
                     @php
                         $__dotDone = in_array($__dot->id, $completedTopicIds)
-                            || in_array($__dot->id, $resolvedCheckpointTopicIds);
+                            || in_array($__dot->id, $resolvedCheckpointTopicIds)
+                            || in_array($__dot->id, $resolvedActivityTopicIds ?? []);
                         $__dotCurrent = $__dot->id === $currentTopic->id;
                     @endphp
                     <div class="rounded-full transition-all duration-300 {{ $__dotCurrent ? 'h-3 w-3 ring-2 ring-offset-1' : 'h-2 w-2' }}"
