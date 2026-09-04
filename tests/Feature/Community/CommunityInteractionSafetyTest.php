@@ -152,6 +152,7 @@ class CommunityInteractionSafetyTest extends DatabaseTestCase
         $this->actingAs($minor)
             ->post(route('connector.community.store', $connector), [
                 'post_type' => 'announcement',
+                'topic_choice' => 'Consent education',
                 'title' => 'Minor post',
                 'body' => 'This should not publish.',
             ])
@@ -189,6 +190,21 @@ class CommunityInteractionSafetyTest extends DatabaseTestCase
             ])
             ->assertRedirect(route('connector.community.show', [$connector, $post]))
             ->assertSessionHasErrors('reason_code');
+    }
+
+    public function test_report_route_does_not_reveal_whether_an_unscoped_comment_id_exists(): void
+    {
+        [$connector, $author, $post] = $this->publishedPostFixture();
+
+        $this->actingAs($author)
+            ->post(route('connector.community.reports.store', [$connector, $post]), [
+                'community_comment_id' => PHP_INT_MAX,
+                'reason_code' => 'other',
+                'details' => 'Invalid comment reference.',
+            ])
+            ->assertNotFound();
+
+        $this->assertDatabaseCount('community_reports', 0);
     }
 
     public function test_other_report_reason_requires_custom_details(): void

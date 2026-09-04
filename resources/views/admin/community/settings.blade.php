@@ -4,8 +4,10 @@
 @section('page-title', 'Community Hub Settings')
 
 @section('content')
-<div class="max-w-4xl space-y-6">
-    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+<div class="max-w-5xl space-y-8">
+    @include('admin.community.partials.navigation')
+
+    <section class="rounded-[30px] border border-gray-200 bg-white p-6 shadow-theme-xs">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <p class="text-xs font-bold uppercase tracking-[0.18em] text-rose-700">Emergency control</p>
@@ -23,7 +25,7 @@
         </div>
 
         <div class="mt-6 grid gap-4 sm:grid-cols-2">
-            <form method="POST" action="{{ route('admin.community.freeze') }}" class="space-y-3 rounded-2xl border border-rose-100 bg-rose-50 p-4" data-confirm-submit data-confirm-title="Freeze Community Hub?" data-confirm-text="This pauses connector posting, comments, reactions, and reports globally while safety review is underway." data-confirm-icon="warning" data-confirm-button="Freeze Hub">
+            <form method="POST" action="{{ route('admin.community.freeze') }}" class="space-y-3 rounded-[26px] border border-rose-100 bg-rose-50 p-4" data-confirm-submit data-confirm-title="Freeze Community Hub?" data-confirm-text="This pauses connector posting, comments, reactions, and reports globally while safety review is underway." data-confirm-icon="warning" data-confirm-button="Freeze Hub">
                 @csrf
                 <label class="block text-sm font-bold text-rose-900" for="reason">Freeze reason</label>
                 <textarea id="reason" name="reason" rows="3" class="w-full rounded-xl border-rose-200 text-sm focus:border-rose-400 focus:ring-rose-400" required></textarea>
@@ -32,7 +34,7 @@
                 </button>
             </form>
 
-            <form method="POST" action="{{ route('admin.community.unfreeze') }}" class="space-y-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-4" data-confirm-submit data-confirm-title="Reopen Community Hub?" data-confirm-text="Reopen hub actions after platform safety review is complete." data-confirm-icon="question" data-confirm-button="Reopen Hub">
+            <form method="POST" action="{{ route('admin.community.unfreeze') }}" class="space-y-3 rounded-[26px] border border-emerald-100 bg-emerald-50 p-4" data-confirm-submit data-confirm-title="Reopen Community Hub?" data-confirm-text="Reopen hub actions after platform safety review is complete." data-confirm-icon="question" data-confirm-button="Reopen Hub">
                 @csrf
                 <p class="text-sm font-bold text-emerald-900">Reopen hub</p>
                 <p class="text-sm text-emerald-800">Use after platform safety review confirms connector spaces can resume activity.</p>
@@ -43,7 +45,7 @@
         </div>
     </section>
 
-    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+    <section class="rounded-[30px] border border-gray-200 bg-white p-6 shadow-theme-xs">
         <div>
             <p class="text-xs font-bold uppercase tracking-[0.18em] text-purple-700">Connector suspension handling</p>
             <h2 class="mt-1 text-xl font-bold text-gray-950">Suspended connector visibility</h2>

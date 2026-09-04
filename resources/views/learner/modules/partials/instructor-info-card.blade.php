@@ -22,6 +22,7 @@
                         target_user_id: {{ $creator->id }},
                         name: '{{ addslashes($creator->name) }}',
                         avatar: '{{ $instructorPhoto ?: ('https://ui-avatars.com/api/?name=' . urlencode($creator->name) . '&color=1D4ED8&background=EFF6FF') }}',
+                        target_role: 'instructor',
                         conversation_type: 'module_chat',
                         module_id: {{ $module->id }}
                     })"

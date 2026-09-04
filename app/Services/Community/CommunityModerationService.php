@@ -12,14 +12,14 @@ use App\Models\User;
 use App\Notifications\Community\CommunityPostDecisionNotification;
 use App\Notifications\Community\CommunityPostEscalatedNotification;
 use App\Services\Connectors\ConnectorAccessService;
+use Illuminate\Support\Facades\DB;
 
 class CommunityModerationService
 {
     public function __construct(
         private readonly CommunityAccessService $access,
         private readonly ConnectorAccessService $connectorAccess,
-    ) {
-    }
+    ) {}
 
     public function approvePost(User $actor, CommunityPost $post, string $reason): CommunityPost
     {
@@ -65,6 +65,7 @@ class CommunityModerationService
     {
         $post->loadMissing(['connector', 'space']);
         $this->authorizePostModeration($actor, $post, CommunityModerationActionType::Feature);
+        abort_unless(in_array($post->status?->value ?? $post->status, [CommunityPostStatus::Published->value, CommunityPostStatus::Locked->value], true), 422, 'Only published or locked posts can be pinned.');
 
         $previousStatus = $post->status?->value ?? (string) $post->status;
 
@@ -102,6 +103,8 @@ class CommunityModerationService
 
         abort_unless($post->isQuestion(), 422);
         abort_unless((int) $comment->community_post_id === (int) $post->id, 404);
+        abort_unless($comment->parent_id === null, 422, 'Only top-level comments can be marked as the official answer.');
+        abort_unless($comment->status === CommunityCommentStatus::Visible, 422, 'Only visible comments can be marked as the official answer.');
 
         $previousStatus = $post->status?->value ?? (string) $post->status;
 
@@ -171,19 +174,26 @@ class CommunityModerationService
 
         $previousStatus = $comment->status?->value ?? (string) $comment->status;
 
-        $comment->forceFill([
-            'status' => $nextStatus,
-            'hidden_at' => $nextStatus === CommunityCommentStatus::Hidden ? now() : $comment->hidden_at,
-            'hidden_by' => $nextStatus === CommunityCommentStatus::Hidden ? $actor->id : $comment->hidden_by,
-            'hidden_reason' => $nextStatus === CommunityCommentStatus::Hidden ? $reason : $comment->hidden_reason,
-            'removed_at' => $nextStatus === CommunityCommentStatus::Removed ? now() : $comment->removed_at,
-            'removed_by' => $nextStatus === CommunityCommentStatus::Removed ? $actor->id : $comment->removed_by,
-            'removed_reason' => $nextStatus === CommunityCommentStatus::Removed ? $reason : $comment->removed_reason,
-        ])->save();
+        return DB::transaction(function () use ($actor, $comment, $action, $previousStatus, $nextStatus, $reason): CommunityComment {
+            $comment->forceFill([
+                'status' => $nextStatus,
+                'hidden_at' => $nextStatus === CommunityCommentStatus::Hidden ? now() : $comment->hidden_at,
+                'hidden_by' => $nextStatus === CommunityCommentStatus::Hidden ? $actor->id : $comment->hidden_by,
+                'hidden_reason' => $nextStatus === CommunityCommentStatus::Hidden ? $reason : $comment->hidden_reason,
+                'removed_at' => $nextStatus === CommunityCommentStatus::Removed ? now() : $comment->removed_at,
+                'removed_by' => $nextStatus === CommunityCommentStatus::Removed ? $actor->id : $comment->removed_by,
+                'removed_reason' => $nextStatus === CommunityCommentStatus::Removed ? $reason : $comment->removed_reason,
+            ])->save();
 
-        $this->logAction($actor, $comment, $action, $previousStatus, $nextStatus->value, $reason);
+            CommunityPost::query()
+                ->whereKey($comment->community_post_id)
+                ->where('official_answer_comment_id', $comment->id)
+                ->update(['official_answer_comment_id' => null]);
 
-        return $comment->fresh();
+            $this->logAction($actor, $comment, $action, $previousStatus, $nextStatus->value, $reason);
+
+            return $comment->fresh();
+        });
     }
 
     private function authorizePostModeration(User $actor, CommunityPost $post, CommunityModerationActionType $action): void

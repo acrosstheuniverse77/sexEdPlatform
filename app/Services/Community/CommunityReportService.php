@@ -15,13 +15,12 @@ class CommunityReportService
     public function __construct(
         private readonly CommunityAccessService $access,
         private readonly CommunityFeedModerationAdapter $adapter,
-    ) {
-    }
+    ) {}
 
     public function reportPost(User $reporter, CommunityPost $post, string $reasonCode, ?string $details = null): CommunityReport
     {
         $post->loadMissing('connector');
-        $this->access->abortUnlessCanViewSpace($reporter, $post->connector);
+        $this->access->abortUnlessCanViewPost($reporter, $post);
 
         return DB::transaction(function () use ($reporter, $post, $reasonCode, $details): CommunityReport {
             $report = CommunityReport::query()->firstOrNew([
@@ -47,7 +46,7 @@ class CommunityReportService
     public function reportComment(User $reporter, CommunityComment $comment, string $reasonCode, ?string $details = null): CommunityReport
     {
         $comment->loadMissing('post.connector');
-        $this->access->abortUnlessCanViewSpace($reporter, $comment->post->connector);
+        $this->access->abortUnlessCanViewComment($reporter, $comment->post, $comment);
 
         return DB::transaction(function () use ($reporter, $comment, $reasonCode, $details): CommunityReport {
             $report = CommunityReport::query()->firstOrNew([

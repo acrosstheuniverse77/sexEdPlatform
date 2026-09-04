@@ -3,6 +3,7 @@
 namespace Tests\Feature\Community;
 
 use App\Enums\CommunityPostType;
+use App\Enums\CommunityReactionType;
 use App\Models\CommunityPost;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -25,6 +26,14 @@ class CommunityHubTaxonomyTest extends DatabaseTestCase
             'seminar_id',
             'official_answer_comment_id',
         ]));
+    }
+
+    public function test_configured_reaction_labels_match_existing_reaction_types(): void
+    {
+        $this->assertSame(
+            CommunityReactionType::values(),
+            array_keys(config('community_feed.reactions', []))
+        );
     }
 
     public function test_post_helpers_identify_featured_event_and_question_posts(): void

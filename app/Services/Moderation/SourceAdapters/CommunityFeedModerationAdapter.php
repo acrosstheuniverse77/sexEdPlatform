@@ -10,15 +10,13 @@ use App\Services\Moderation\ModerationCaseIntakeService;
 
 class CommunityFeedModerationAdapter
 {
-    public function __construct(private readonly ModerationCaseIntakeService $moderationCaseIntakeService)
-    {
-    }
+    public function __construct(private readonly ModerationCaseIntakeService $moderationCaseIntakeService) {}
 
     public function syncReport(CommunityReport $report): void
     {
         $report->loadMissing([
             'post:id,connector_id,community_space_id,author_id,title,status,post_type',
-            'comment:id,community_post_id,author_id,status',
+            'comment:id,community_post_id,parent_id,author_id,status',
             'reporter:id,name,email,role',
             'reportedUser:id,name,email,role',
         ]);
@@ -37,6 +35,7 @@ class CommunityFeedModerationAdapter
                     'target_type' => $report->community_comment_id ? 'community_comment' : 'community_post',
                     'post_id' => (int) $report->community_post_id,
                     'comment_id' => $report->community_comment_id ? (int) $report->community_comment_id : null,
+                    'parent_comment_id' => $report->comment?->parent_id,
                     'connector_id' => $report->post?->connector_id,
                     'community_space_id' => $report->post?->community_space_id,
                     'post_type' => $report->post?->post_type?->value ?? $report->post?->post_type,

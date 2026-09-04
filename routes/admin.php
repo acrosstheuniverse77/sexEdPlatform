@@ -56,10 +56,31 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
 
     Route::prefix('community')->name('community.')->group(function () {
         Route::get('/', [Admin\CommunityFeedController::class, 'index'])->name('index');
+        Route::get('/communities', [Admin\CommunityFeedController::class, 'communities'])->name('communities');
+        Route::get('/communities/{communitySpace}', [Admin\CommunityFeedController::class, 'communityShow'])->name('communities.show');
+        Route::get('/communities/{communitySpace}/posts', [Admin\CommunityFeedController::class, 'communityPosts'])->name('communities.posts');
+        Route::get('/communities/{communitySpace}/members', [Admin\CommunityFeedController::class, 'communityMembers'])->name('communities.members');
+        Route::get('/communities/{communitySpace}/edit', [Admin\CommunityFeedController::class, 'editCommunity'])->name('communities.edit');
+        Route::put('/communities/{communitySpace}', [Admin\CommunityFeedController::class, 'updateCommunity'])->name('communities.update');
+        Route::post('/communities/{communitySpace}/deactivate', [Admin\CommunityFeedController::class, 'deactivateCommunity'])->name('communities.deactivate');
+        Route::prefix('moderation')->name('moderation.')->group(function () {
+            Route::get('/', [Admin\CommunityFeedController::class, 'moderation'])->name('index');
+            Route::get('/pending', [Admin\CommunityFeedController::class, 'moderationPending'])->name('pending');
+            Route::get('/reports', [Admin\CommunityFeedController::class, 'moderationReports'])->name('reports');
+        });
+        Route::prefix('content')->name('content.')->group(function () {
+            Route::get('/', [Admin\CommunityFeedController::class, 'content'])->name('index');
+            Route::get('/announcements', [Admin\CommunityFeedController::class, 'contentAnnouncements'])->name('announcements');
+            Route::get('/featured', [Admin\CommunityFeedController::class, 'contentFeatured'])->name('featured');
+            Route::get('/drafts', [Admin\CommunityFeedController::class, 'contentDrafts'])->name('drafts');
+            Route::get('/archived', [Admin\CommunityFeedController::class, 'contentArchived'])->name('archived');
+        });
         Route::get('/settings', [Admin\CommunityFeedSettingsController::class, 'show'])->name('settings');
         Route::post('/settings/freeze', [Admin\CommunityFeedSettingsController::class, 'freeze'])->name('freeze');
         Route::post('/settings/unfreeze', [Admin\CommunityFeedSettingsController::class, 'unfreeze'])->name('unfreeze');
         Route::get('/{communityPost}', [Admin\CommunityFeedController::class, 'show'])->name('show');
+        Route::post('/{communityPost}/moderation/approve', [Admin\CommunityModerationController::class, 'approve'])->name('moderation.approve');
+        Route::post('/{communityPost}/moderation/reject', [Admin\CommunityModerationController::class, 'reject'])->name('moderation.reject');
         Route::post('/{communityPost}/moderation/hide', [Admin\CommunityModerationController::class, 'hide'])->name('moderation.hide');
         Route::post('/{communityPost}/moderation/restore', [Admin\CommunityModerationController::class, 'restore'])->name('moderation.restore');
         Route::post('/{communityPost}/moderation/remove', [Admin\CommunityModerationController::class, 'remove'])->name('moderation.remove');

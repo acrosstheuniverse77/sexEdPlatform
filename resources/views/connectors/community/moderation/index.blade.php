@@ -6,6 +6,7 @@
 @section('content')
 @php
     $tabs = [
+        'all' => 'All posts',
         'pending' => 'Pending',
         'reported' => 'Reported',
         'hidden' => 'Hidden',
@@ -13,9 +14,6 @@
         'escalated' => 'Escalated',
     ];
 
-    $actionClasses = [
-        'review' => 'border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100',
-    ];
 @endphp
 
 <div class="mx-auto max-w-6xl space-y-6">
@@ -78,10 +76,41 @@
                         </div>
                     </div>
 
-                    <div class="flex shrink-0 flex-wrap gap-2 lg:w-48 lg:justify-end">
-                        <a href="{{ route('connector.community.show', [$connector, $post]) }}" class="inline-flex h-10 w-10 items-center justify-center rounded-xl border {{ $actionClasses['review'] }}" title="Review Post" aria-label="Review Post">
-                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S3.732 16.057 2.458 12Z"/></svg>
-                        </a>
+                    @php
+                        $actions = match ($postStatus) {
+                            'pending_review' => ['approve' => 'Approve', 'reject' => 'Reject', 'escalate' => 'Escalate'],
+                            'published' => ['hide' => 'Hide', 'lock' => 'Lock', 'remove' => 'Remove', 'escalate' => 'Escalate'],
+                            'locked' => ['unlock' => 'Unlock', 'hide' => 'Hide', 'remove' => 'Remove', 'escalate' => 'Escalate'],
+                            'hidden' => ['restore' => 'Restore', 'remove' => 'Remove', 'escalate' => 'Escalate'],
+                            'removed' => ['restore' => 'Restore', 'escalate' => 'Escalate'],
+                            'escalated' => ['restore' => 'Restore', 'remove' => 'Remove'],
+                            default => [],
+                        };
+                        $actions = array_filter(
+                            $actions,
+                            fn ($label, $action) => $moderationPermissions[$action] ?? false,
+                            ARRAY_FILTER_USE_BOTH,
+                        );
+                    @endphp
+                    <div class="w-full shrink-0 space-y-2 lg:w-56">
+                        <a href="{{ route('connector.community.show', [$connector, $post]) }}" class="inline-flex min-h-11 items-center rounded-xl border border-brand-200 bg-brand-50 px-4 text-sm font-bold text-brand-700 hover:bg-brand-100 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2">View post</a>
+                        <details class="rounded-xl border border-amber-200 bg-amber-50/70">
+                                <summary class="flex min-h-11 cursor-pointer items-center px-4 text-sm font-bold text-amber-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-inset">Manage post</summary>
+                                <div class="space-y-2 border-t border-amber-200 p-3">
+                                    @if($actions === [])
+                                        <p class="text-xs leading-5 text-gray-600">No actions are available for your role.</p>
+                                    @else
+                                        <p class="text-xs leading-5 text-gray-600">Each action is recorded in the connector moderation history.</p>
+                                        @foreach($actions as $action => $label)
+                                            <form method="POST" action="{{ route('connector.community.moderation.'.$action, [$connector, $post]) }}" data-confirm-submit data-confirm-title="{{ $label }} post?" data-confirm-text="Record this connector moderation action for this post." data-confirm-icon="warning" data-confirm-button="{{ $label }}">
+                                                @csrf
+                                                <input type="hidden" name="reason" value="Connector moderation action.">
+                                                <button class="inline-flex min-h-11 w-full items-center justify-center rounded-lg border {{ $action === 'escalate' ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100' : ($action === 'remove' || $action === 'reject' ? 'border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-200' : 'border-gray-200 bg-white text-gray-800 hover:bg-gray-50') }} px-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2">{{ $label }}</button>
+                                            </form>
+                                        @endforeach
+                                    @endif
+                                </div>
+                            </details>
                     </div>
                 </div>
             </article>

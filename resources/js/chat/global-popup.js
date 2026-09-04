@@ -39,6 +39,7 @@ document.addEventListener('alpine:init', () => {
                 currentUserName: payload.currentUserName,
                 currentUserRole: payload.currentUserRole,
                 messageMutationWindowMinutes: payload.messageMutationWindowMinutes,
+                suggestions: payload.suggestions,
                 notificationsEnabled: false,
             });
         },
@@ -46,11 +47,18 @@ document.addEventListener('alpine:init', () => {
         async openChat(detail = {}) {
             await this.bootstrapStore();
 
-            const conversationId = await this.resolveConversationId(detail);
+            const resolved = await this.resolveConversation(detail);
 
-            if (!conversationId) {
+            if (!resolved) {
                 return;
             }
+
+            if (resolved.draft) {
+                this.openDraftWindow(resolved.draft, detail);
+                return;
+            }
+
+            const conversationId = resolved.conversationId;
 
             await this.openWindowByConversationId(conversationId, detail, {
                 markRead: true,
@@ -124,6 +132,7 @@ document.addEventListener('alpine:init', () => {
                 fallbackName: detail.name || 'Conversation',
                 fallbackAvatar: detail.avatar || null,
                 fallbackConversationType: detail.conversation_type || 'direct',
+                showMoreSuggestions: false,
                 sending: false,
             });
 
@@ -136,6 +145,50 @@ document.addEventListener('alpine:init', () => {
             if (config.persist) {
                 this.persistWindowsState();
             }
+
+            return true;
+        },
+
+        openDraftWindow(draft, detail = {}) {
+            if (!draft?.target_user_id || !draft?.conversation_type) {
+                return false;
+            }
+
+            const draftKey = [
+                'draft',
+                draft.target_user_id,
+                draft.conversation_type,
+                draft.module_id || 0,
+                draft.lesson_id || 0,
+                draft.lesson_topic_id || 0,
+                draft.quiz_id || 0,
+            ].join('-');
+
+            const existing = this.openWindows.find((windowItem) => windowItem.draftKey === draftKey);
+            if (existing) {
+                existing.isMinimized = false;
+                return true;
+            }
+
+            if (this.openWindows.length >= 3) {
+                this.openWindows.shift();
+            }
+
+            this.openWindows.push({
+                id: draftKey,
+                draftKey,
+                draft,
+                composer: draft.composer || '',
+                queuedAttachments: [],
+                isMinimized: false,
+                contextLabel: detail.context_label || draft.context_label || '',
+                fallbackName: detail.name || draft.fallback_name || 'Instructor',
+                fallbackAvatar: detail.avatar || draft.fallback_avatar || null,
+                fallbackConversationType: draft.conversation_type,
+                targetRole: draft.target_role || detail.target_role || null,
+                showMoreSuggestions: false,
+                sending: false,
+            });
 
             return true;
         },
@@ -213,7 +266,10 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
-            const windows = this.openWindows.slice(0, 3).map((windowItem, index) => ({
+            const windows = this.openWindows
+                .filter((windowItem) => !this.isDraft(windowItem))
+                .slice(0, 3)
+                .map((windowItem, index) => ({
                 conversation_id: Number(windowItem.id),
                 is_minimized: Boolean(windowItem.isMinimized),
                 context_label: windowItem.contextLabel || '',
@@ -221,7 +277,7 @@ document.addEventListener('alpine:init', () => {
                 avatar: windowItem.fallbackAvatar || null,
                 conversation_type: windowItem.fallbackConversationType || 'direct',
                 position: index,
-            }));
+                }));
 
             try {
                 if (windows.length < 1) {
@@ -235,11 +291,11 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        async resolveConversationId(detail = {}) {
+        async resolveConversation(detail = {}) {
             const explicitConversationId = Number(detail.conversation_id || 0);
 
             if (explicitConversationId > 0) {
-                return explicitConversationId;
+                return { conversationId: explicitConversationId };
             }
 
             const startPayload = {
@@ -250,6 +306,10 @@ document.addEventListener('alpine:init', () => {
                 lesson_topic_id: detail.lesson_topic_id,
                 quiz_id: detail.quiz_id,
                 initial_message: detail.initial_message,
+                target_role: detail.target_role || detail.targetRole,
+                context_label: detail.context_label || detail.contextLabel,
+                name: detail.name,
+                avatar: detail.avatar,
             };
 
             if (!startPayload.target_user_id) {
@@ -270,7 +330,17 @@ document.addEventListener('alpine:init', () => {
                 return null;
             }
 
-            return Number(startResult?.conversation?.id || 0) || null;
+            if (startResult?.requires_initial_message) {
+                return { draft: startResult.draft || this.$store.chat.pendingConversationDraft };
+            }
+
+            const conversationId = Number(startResult?.conversation?.id || 0) || null;
+
+            return conversationId ? { conversationId } : null;
+        },
+
+        isDraft(windowItem) {
+            return Boolean(windowItem?.draftKey);
         },
 
         conversationFor(windowItem) {
@@ -334,7 +404,58 @@ document.addEventListener('alpine:init', () => {
         },
 
         canSend(windowItem) {
+            if (this.isDraft(windowItem)) {
+                return this.$store.chat.isSuggestionEligible(
+                    windowItem.targetRole || windowItem.draft?.target_role,
+                    windowItem.draft?.conversation_type,
+                );
+            }
+
             return this.$store.chat.canSendToConversation(windowItem.id);
+        },
+
+        suggestionsFor(windowItem, limit = 4, excludedKeys = []) {
+            if (this.isDraft(windowItem)) {
+                if (!this.$store.chat.isSuggestionEligible(
+                    windowItem.targetRole || windowItem.draft?.target_role,
+                    windowItem.draft?.conversation_type,
+                )) {
+                    return [];
+                }
+
+                return this.$store.chat.suggestionsForContext(windowItem.draft, limit, excludedKeys);
+            }
+
+            const conversation = this.conversationFor(windowItem);
+            if (!conversation || !this.$store.chat.isSuggestionEligible(
+                conversation.other_participant?.role,
+                conversation.conversation_type,
+            )) {
+                return [];
+            }
+
+            return this.$store.chat.suggestionsForContext({
+                conversation_type: conversation.conversation_type,
+                target_role: conversation.other_participant?.role,
+            }, limit, excludedKeys);
+        },
+
+        applySuggestion(windowItem, suggestion) {
+            if (!suggestion?.text) {
+                return;
+            }
+
+            if (windowItem.composer?.trim()
+                && !window.confirm('Replace your current draft with this suggestion?')) {
+                return;
+            }
+
+            windowItem.composer = suggestion.text;
+
+            this.$nextTick(() => {
+                const input = this.$el.querySelector(`[data-popup-composer='${windowItem.id}']`);
+                input?.focus();
+            });
         },
 
         isPending(windowItem) {
@@ -442,6 +563,31 @@ document.addEventListener('alpine:init', () => {
             windowItem.sending = true;
 
             try {
+                if (this.isDraft(windowItem)) {
+                    if (files.length > 0) {
+                        this.$store.chat.composerError = 'Attachments can be added after the conversation starts.';
+                        return;
+                    }
+
+                    const result = await this.$store.chat.sendConversationDraft(windowItem.draft, body);
+                    const conversationId = Number(result?.conversation?.id || 0);
+
+                    if (conversationId > 0) {
+                        this.openWindows = this.openWindows.filter((entry) => entry.draftKey !== windowItem.draftKey);
+                        await this.openWindowByConversationId(conversationId, {
+                            context_label: windowItem.contextLabel,
+                            name: windowItem.fallbackName,
+                            avatar: windowItem.fallbackAvatar,
+                            conversation_type: windowItem.draft.conversation_type,
+                        }, {
+                            markRead: true,
+                            persist: true,
+                        });
+                    }
+
+                    return;
+                }
+
                 await this.$store.chat.sendMessageToConversation(windowItem.id, body, files);
                 windowItem.composer = '';
                 windowItem.queuedAttachments = [];
@@ -460,7 +606,7 @@ document.addEventListener('alpine:init', () => {
         async toggleMinimize(windowItem) {
             windowItem.isMinimized = !windowItem.isMinimized;
 
-            if (!windowItem.isMinimized) {
+            if (!windowItem.isMinimized && !this.isDraft(windowItem)) {
                 await this.markConversationRead(windowItem.id);
                 this.scrollToBottom(windowItem.id);
             }
@@ -469,6 +615,10 @@ document.addEventListener('alpine:init', () => {
         },
 
         async openFullChat(windowItem) {
+            if (this.isDraft(windowItem)) {
+                return;
+            }
+
             window.location.href = `/chat/conversation/${windowItem.id}`;
         },
 
@@ -518,7 +668,7 @@ document.addEventListener('alpine:init', () => {
 
         syncOpenWindowReadState() {
             this.openWindows.forEach((windowItem) => {
-                if (!windowItem.isMinimized && this.unreadCount(windowItem) > 0) {
+                if (!this.isDraft(windowItem) && !windowItem.isMinimized && this.unreadCount(windowItem) > 0) {
                     this.markConversationRead(windowItem.id);
                 }
             });

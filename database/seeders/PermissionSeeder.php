@@ -19,7 +19,7 @@ class PermissionSeeder extends Seeder
             Permission::firstOrCreate([
                 'name' => $permissionName,
                 'guard_name' => 'web',
-            ]);
+            ]);                                                                                                                                                                                                                                                                                                                                                 
         }
     }
 
@@ -105,6 +105,10 @@ class PermissionSeeder extends Seeder
             'view activity logs',
             'manage system settings',
             'manage notifications',
+            'community.view_any',
+            'community.moderate_any',
+            'community.manage_settings',
+            'community.freeze',
         ];
 
         $legacy = [

@@ -1,0 +1,4 @@
+﻿interface:
+  display_name: "Conscious Connections UI"
+  short_description: "Match the platform UI design system"
+  default_prompt: "Use $conscious-connections-ui to update this Conscious Connections Blade/Tailwind UI consistently."

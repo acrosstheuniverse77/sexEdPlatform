@@ -30,6 +30,7 @@ return [
         'helpful' => 'Helpful',
         'question' => 'Question',
         'support' => 'Support',
+        'bookmark' => 'Bookmark',
     ],
     'report_reasons' => [
         'inappropriate_content' => 'Inappropriate Content',

@@ -10,6 +10,7 @@ use App\Services\Community\CommunityInteractionService;
 use App\Services\Community\CommunityPostService;
 use App\Services\Community\CommunityReportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\DatabaseTestCase;
 use Tests\Feature\Connectors\ConnectorTestHelpers;
 
@@ -57,18 +58,40 @@ class CommunityReportModerationAdapterTest extends DatabaseTestCase
         $this->assertSame('Updated detail.', $second->moderationCase->metadata['source_trace']['details']);
     }
 
+    public function test_member_cannot_report_posts_hidden_from_the_member_feed(): void
+    {
+        [$connector, $author, $post] = $this->publishedPostFixture();
+        $reporter = $this->createAdultConnectorMember($connector, ['community.view_space']);
+
+        foreach (['draft', 'pending_review', 'hidden', 'removed', 'escalated', 'archived'] as $status) {
+            $post->forceFill(['status' => $status])->save();
+
+            try {
+                app(CommunityReportService::class)->reportPost($reporter, $post, 'other', 'Guessed non-public post.');
+                $this->fail("A member was allowed to report a {$status} post.");
+            } catch (HttpException $exception) {
+                $this->assertSame(403, $exception->getStatusCode());
+            }
+        }
+
+        $this->assertDatabaseCount('community_reports', 0);
+        $this->assertDatabaseCount('moderation_cases', 0);
+    }
+
     public function test_comment_report_tracks_comment_target_and_reported_author(): void
     {
         [$connector, $author, $post] = $this->publishedPostFixture();
         $commenter = $this->createAdultConnectorMember($connector, ['community.view_space']);
         $reporter = $this->createAdultConnectorMember($connector, ['community.view_space']);
-        $comment = app(CommunityInteractionService::class)->comment($commenter, $post, 'Helpful public response.');
+        $parent = app(CommunityInteractionService::class)->comment($author, $post, 'Helpful public response.');
+        $comment = app(CommunityInteractionService::class)->comment($commenter, $post, 'Helpful public reply.', $parent);
 
         $report = app(CommunityReportService::class)->reportComment($reporter, $comment, 'harassment', 'This reply is not appropriate.');
 
         $this->assertSame($commenter->id, $report->moderationCase->reported_user_id);
         $this->assertSame('community_comment', $report->moderationCase->metadata['source_trace']['target_type']);
         $this->assertSame($comment->id, $report->moderationCase->metadata['source_trace']['comment_id']);
+        $this->assertSame($parent->id, $report->moderationCase->metadata['source_trace']['parent_comment_id']);
     }
 
     private function publishedPostFixture(): array

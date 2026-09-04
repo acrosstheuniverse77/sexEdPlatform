@@ -1,8 +1,11 @@
-@props(['status'])
+@props(['status', 'context' => 'community'])
 
 @php
     $value = $status?->value ?? (string) $status;
     $label = $status?->label() ?? str($value)->headline()->toString();
+    if ($context === 'admin' && $value === 'escalated') {
+        $label = 'Under review';
+    }
     $classes = [
         'draft' => 'border-slate-200 bg-slate-50 text-slate-700',
         'pending_review' => 'border-amber-200 bg-amber-50 text-amber-800',
@@ -10,7 +13,7 @@
         'hidden' => 'border-slate-300 bg-slate-100 text-slate-700',
         'locked' => 'border-blue-200 bg-blue-50 text-blue-700',
         'removed' => 'border-rose-200 bg-rose-50 text-rose-700',
-        'escalated' => 'border-rose-300 bg-rose-100 text-rose-800',
+        'escalated' => $context === 'admin' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-rose-300 bg-rose-100 text-rose-800',
         'archived' => 'border-gray-200 bg-gray-100 text-gray-600',
     ][$value] ?? 'border-gray-200 bg-gray-50 text-gray-700';
 @endphp

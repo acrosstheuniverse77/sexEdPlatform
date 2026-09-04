@@ -15,6 +15,7 @@ class StoreCommunityCommentRequest extends FormRequest
     {
         return [
             'body' => ['required', 'string', 'max:2000'],
+            'parent_id' => ['nullable', 'integer'],
         ];
     }
 }

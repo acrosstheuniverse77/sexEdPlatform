@@ -110,7 +110,6 @@
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="M4 7h16M4 12h16M4 17h16"/></svg>
                         </button>
                         <div class="min-w-0">
-                            <p class="truncate text-xs font-semibold uppercase tracking-[0.18em] text-purple-700">{{ str_replace('_', ' ', $connector->category ?? 'Connector') }}</p>
                             <h1 class="truncate text-xl font-bold">@yield('page-title', $connector->name ?? 'Connector')</h1>
                         </div>
                     </div>

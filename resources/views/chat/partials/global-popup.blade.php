@@ -7,7 +7,8 @@
         currentUserId: {{ (int) $user->id }},
         currentUserName: @js($user->name),
         currentUserRole: @js($user->role),
-        messageMutationWindowMinutes: {{ (int) config('chat.message_mutation_window_minutes', 15) }}
+        messageMutationWindowMinutes: {{ (int) config('chat.message_mutation_window_minutes', 15) }},
+        suggestions: @js(app(\App\Services\Chat\ChatSuggestionCatalog::class)->forUser($user))
     })"
     x-init="init()"
     x-cloak
@@ -114,8 +115,35 @@
                     :data-popup-messages="windowItem.id"
                     @scroll.passive="handleMessageScroll(windowItem, $event)"
                 >
+                    <template x-if="messagesFor(windowItem).length < 1 && suggestionsFor(windowItem, 7).length > 0">
+                        <div data-chat-suggestion-empty-state class="rounded-xl border border-indigo-100 bg-indigo-50/70 px-3 py-3">
+                            <p class="text-sm font-semibold text-gray-900" x-text="isDraft(windowItem) ? 'Start a conversation' : 'Suggested questions'"></p>
+                            <p class="mt-1 text-xs leading-5 text-gray-600" x-text="isDraft(windowItem) ? 'Choose a prompt or type your own message. You can edit it before sending.' : 'Choose a prompt to help guide your question.'"></p>
+                            <div class="mt-2 flex max-h-28 flex-wrap gap-1.5 overflow-y-auto">
+                                <template x-for="suggestion in suggestionsFor(windowItem, windowItem.showMoreSuggestions ? 7 : 4)" :key="`popup-suggestion-empty-${windowItem.id}-${suggestion.key}`">
+                                    <button
+                                        type="button"
+                                        data-chat-suggestion-key
+                                        :data-chat-suggestion-key="suggestion.key"
+                                        class="rounded-full border border-indigo-200 bg-white px-2.5 py-1.5 text-left text-[11px] font-medium text-indigo-700 transition hover:border-indigo-400 hover:bg-indigo-100"
+                                        @click="applySuggestion(windowItem, suggestion)"
+                                        :aria-label="`Use suggestion: ${suggestion.text}`"
+                                        x-text="suggestion.text"
+                                    ></button>
+                                </template>
+                                <button
+                                    type="button"
+                                    class="rounded-full border border-gray-200 bg-white px-2.5 py-1.5 text-left text-[11px] font-semibold text-gray-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
+                                    x-show="suggestionsFor(windowItem, 7).length > 4"
+                                    @click="windowItem.showMoreSuggestions = !windowItem.showMoreSuggestions"
+                                    x-text="windowItem.showMoreSuggestions ? 'Show fewer' : 'More suggestions'"
+                                ></button>
+                            </div>
+                        </div>
+                    </template>
+
                     <template x-if="messagesFor(windowItem).length < 1">
-                        <div class="rounded-lg border border-dashed border-gray-300 bg-white px-3 py-2 text-xs text-gray-500">
+                        <div x-show="suggestionsFor(windowItem, 7).length < 1" class="rounded-lg border border-dashed border-gray-300 bg-white px-3 py-2 text-xs text-gray-500">
                             No messages yet.
                         </div>
                     </template>
@@ -156,6 +184,25 @@
                 </div>
 
                 <div class="border-t border-gray-100 bg-white px-3 py-2">
+                    <div
+                        data-chat-suggestion-compact
+                        class="mb-2 flex items-center gap-1.5 overflow-x-auto pb-0.5"
+                        x-show="messagesFor(windowItem).length > 0 && suggestionsFor(windowItem, 3).length > 0"
+                    >
+                        <span class="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-gray-400">Suggested</span>
+                        <template x-for="suggestion in suggestionsFor(windowItem, 3)" :key="`popup-suggestion-compact-${windowItem.id}-${suggestion.key}`">
+                            <button
+                                type="button"
+                                data-chat-suggestion-key
+                                :data-chat-suggestion-key="suggestion.key"
+                                class="shrink-0 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] font-medium text-gray-700 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
+                                @click="applySuggestion(windowItem, suggestion)"
+                                :aria-label="`Use suggestion: ${suggestion.text}`"
+                                x-text="suggestion.text"
+                            ></button>
+                        </template>
+                    </div>
+
                     <div class="grid gap-1.5" x-show="(windowItem.queuedAttachments || []).length > 0">
                         <template x-for="item in (windowItem.queuedAttachments || [])" :key="item.id">
                             <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-[11px] text-gray-600">
@@ -189,6 +236,7 @@
                         <input
                             type="text"
                             x-model="windowItem.composer"
+                            :data-popup-composer="windowItem.id"
                             :disabled="!canSend(windowItem) || windowItem.sending"
                             @input="$store.chat.notifyTyping(windowItem.id, windowItem.composer.trim().length > 0)"
                             @blur="$store.chat.notifyTyping(windowItem.id, false)"

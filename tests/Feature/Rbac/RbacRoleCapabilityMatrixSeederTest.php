@@ -26,6 +26,10 @@ class RbacRoleCapabilityMatrixSeederTest extends TestCase
 
         $this->assertTrue($admin->hasPermissionTo('manage users'));
         $this->assertTrue($admin->hasPermissionTo('publish modules'));
+        $this->assertTrue($admin->hasPermissionTo('community.view_any'));
+        $this->assertTrue($admin->hasPermissionTo('community.moderate_any'));
+        $this->assertTrue($admin->hasPermissionTo('community.manage_settings'));
+        $this->assertTrue($admin->hasPermissionTo('community.freeze'));
 
         $this->assertTrue($instructor->hasPermissionTo('create modules'));
         $this->assertTrue($instructor->hasPermissionTo('view learners'));

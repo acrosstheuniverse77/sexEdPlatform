@@ -15,10 +15,15 @@ class CommunityPost extends Model
         'connector_id',
         'author_id',
         'post_type',
+        'topic',
         'seminar_id',
         'status',
         'title',
         'body',
+        'media_path',
+        'media_type',
+        'media_mime_type',
+        'media_original_name',
         'resource_url',
         'prescreen_decision',
         'prescreen_flags',
@@ -88,9 +93,32 @@ class CommunityPost extends Model
         return $this->hasMany(CommunityComment::class);
     }
 
+    public function topLevelComments(): HasMany
+    {
+        return $this->hasMany(CommunityComment::class)->whereNull('parent_id');
+    }
+
+    public function media(): HasMany
+    {
+        return $this->hasMany(CommunityPostMedia::class);
+    }
+
+    public function activeMedia(): HasMany
+    {
+        return $this->hasMany(CommunityPostMedia::class)
+            ->whereNull('removed_at')
+            ->orderBy('display_order')
+            ->orderBy('id');
+    }
+
     public function reactions(): HasMany
     {
         return $this->hasMany(CommunityReaction::class);
+    }
+
+    public function upvotes(): HasMany
+    {
+        return $this->hasMany(CommunityPostUpvote::class);
     }
 
     public function reports(): HasMany

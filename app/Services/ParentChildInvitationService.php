@@ -231,12 +231,18 @@ class ParentChildInvitationService
                             $movedDocuments,
                         );
                     } else {
-                        $invitation->update([
-                            'status' => ParentChildInvitationStatus::Accepted->value,
-                            'decision_note' => $decisionNote,
-                            'responded_at' => now(),
-                            'relationship_verification_documents' => null,
-                        ]);
+                        $this->relationshipVerificationService->submitDeclaration(
+                            $relationship,
+                            $invitation->inviterParent()->firstOrFail(),
+                            function () use ($invitation, $decisionNote): void {
+                                $invitation->update([
+                                    'status' => ParentChildInvitationStatus::Accepted->value,
+                                    'decision_note' => $decisionNote,
+                                    'responded_at' => now(),
+                                    'relationship_verification_documents' => null,
+                                ]);
+                            },
+                        );
                     }
 
                 } else {

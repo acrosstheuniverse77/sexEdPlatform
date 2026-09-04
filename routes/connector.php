@@ -1,11 +1,13 @@
 <?php
 
-use App\Http\Controllers\Connector\DashboardController;
 use App\Http\Controllers\Connector\CommunityCommentController;
 use App\Http\Controllers\Connector\CommunityFeedController;
 use App\Http\Controllers\Connector\CommunityModerationController;
+use App\Http\Controllers\Connector\CommunityPinController;
 use App\Http\Controllers\Connector\CommunityReactionController;
 use App\Http\Controllers\Connector\CommunityReportController;
+use App\Http\Controllers\Connector\CommunityUpvoteController;
+use App\Http\Controllers\Connector\DashboardController;
 use App\Http\Controllers\Connector\HomeController;
 use App\Http\Controllers\Connector\InvitationController;
 use App\Http\Controllers\Connector\InvitationInboxController;
@@ -14,10 +16,10 @@ use App\Http\Controllers\Connector\MembershipRequestController;
 use App\Http\Controllers\Connector\NotificationController;
 use App\Http\Controllers\Connector\RegistrationController;
 use App\Http\Controllers\Connector\RoleController;
-use App\Http\Controllers\Connector\SeminarController;
 use App\Http\Controllers\Connector\SeminarAttendanceController;
-use App\Http\Controllers\Connector\SeminarLivestreamController;
+use App\Http\Controllers\Connector\SeminarController;
 use App\Http\Controllers\Connector\SeminarInteractionController;
+use App\Http\Controllers\Connector\SeminarLivestreamController;
 use App\Http\Controllers\Connector\SeminarRegistrantController;
 use App\Http\Controllers\Connector\SeminarSpeakerController;
 use App\Http\Controllers\Connector\SubscriptionController;
@@ -45,10 +47,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/connector/{connector}/community/create', [CommunityFeedController::class, 'create'])->name('connector.community.create');
     Route::post('/connector/{connector}/community', [CommunityFeedController::class, 'store'])->name('connector.community.store');
     Route::get('/connector/{connector}/community/moderation', [CommunityFeedController::class, 'moderation'])->name('connector.community.moderation.index');
+    Route::get('/connector/{connector}/community/{communityPost}/media/{communityPostMedia}', [CommunityFeedController::class, 'media'])->name('connector.community.media.show');
     Route::get('/connector/{connector}/community/{communityPost}', [CommunityFeedController::class, 'show'])->name('connector.community.show');
     Route::get('/connector/{connector}/community/{communityPost}/edit', [CommunityFeedController::class, 'edit'])->name('connector.community.edit');
     Route::put('/connector/{connector}/community/{communityPost}', [CommunityFeedController::class, 'update'])->name('connector.community.update');
     Route::post('/connector/{connector}/community/{communityPost}/comments', [CommunityCommentController::class, 'store'])->name('connector.community.comments.store');
+    Route::post('/connector/{connector}/community/{communityPost}/upvote', [CommunityUpvoteController::class, 'togglePost'])->name('connector.community.posts.upvote');
+    Route::post('/connector/{connector}/community/{communityPost}/pin', [CommunityPinController::class, 'store'])->name('connector.community.posts.pin');
+    Route::delete('/connector/{connector}/community/{communityPost}/pin', [CommunityPinController::class, 'destroy'])->name('connector.community.posts.pin');
+    Route::post('/connector/{connector}/community/{communityPost}/comments/{communityComment}/upvote', [CommunityUpvoteController::class, 'toggleComment'])->name('connector.community.comments.upvote');
     Route::post('/connector/{connector}/community/{communityPost}/reactions', [CommunityReactionController::class, 'store'])->name('connector.community.reactions.store');
     Route::delete('/connector/{connector}/community/{communityPost}/reactions', [CommunityReactionController::class, 'destroy'])->name('connector.community.reactions.destroy');
     Route::post('/connector/{connector}/community/{communityPost}/reports', [CommunityReportController::class, 'store'])->name('connector.community.reports.store');

@@ -30,7 +30,7 @@ class StoreCommunityReportRequest extends FormRequest
         return [
             'reason_code' => ['required', 'string', 'max:80', Rule::in(array_keys(config('community_feed.report_reasons', [])))],
             'details' => ['nullable', 'required_if:reason_code,other', 'string', 'max:2000'],
-            'community_comment_id' => ['nullable', 'integer', 'exists:community_comments,id'],
+            'community_comment_id' => ['nullable', 'integer', 'min:1'],
         ];
     }
 }

@@ -9,6 +9,8 @@ use App\Models\Lesson;
 use App\Models\Module;
 use App\Models\ModuleEnrollment;
 use App\Models\ModuleFeedback;
+use App\Models\Quiz;
+use App\Models\QuizAttempt;
 use App\Models\User;
 use App\Models\UserProgress;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -72,6 +74,104 @@ class ModuleFeedbackFlowTest extends DatabaseTestCase
             'module_id' => $module->id,
             'learner_id' => $learner->id,
             'rating' => 5,
+        ]);
+    }
+
+    public function test_completed_enrollment_can_submit_feedback_even_when_old_lesson_quiz_state_is_stale(): void
+    {
+        $this->withoutMiddleware(EnsureProfileCompleted::class);
+
+        [$learner, $module, $lesson] = $this->createLearnerAndModule();
+
+        $lessonQuiz = Quiz::factory()->create([
+            'module_id' => $module->id,
+            'lesson_id' => $lesson->id,
+            'is_active' => true,
+            'attempt_limit' => 3,
+        ]);
+
+        QuizAttempt::query()->create([
+            'user_id' => $learner->id,
+            'quiz_id' => $lessonQuiz->id,
+            'score' => 50,
+            'passed' => false,
+            'started_at' => now()->subMinutes(5),
+            'completed_at' => now(),
+        ]);
+
+        ModuleEnrollment::query()
+            ->where('user_id', $learner->id)
+            ->where('module_id', $module->id)
+            ->update([
+                'completed_at' => now(),
+                'completion_percentage' => 100,
+            ]);
+
+        UserProgress::query()->create([
+            'user_id' => $learner->id,
+            'module_id' => $module->id,
+            'lesson_id' => $lesson->id,
+            'completed' => true,
+            'progress_percentage' => 100,
+            'completed_at' => now(),
+        ]);
+
+        $this->actingAs($learner)
+            ->post(route('learner.modules.feedback.store', $module), [
+                'rating' => 5,
+                'review_content' => 'Completed module should be reviewable.',
+            ])
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('module_feedback', [
+            'module_id' => $module->id,
+            'learner_id' => $learner->id,
+            'rating' => 5,
+        ]);
+    }
+
+    public function test_learner_can_submit_feedback_after_completing_lesson_quiz_attempt_without_passing(): void
+    {
+        $this->withoutMiddleware(EnsureProfileCompleted::class);
+
+        [$learner, $module, $lesson] = $this->createLearnerAndModule();
+
+        $lessonQuiz = Quiz::factory()->create([
+            'module_id' => $module->id,
+            'lesson_id' => $lesson->id,
+            'is_active' => true,
+            'attempt_limit' => 3,
+        ]);
+
+        UserProgress::query()->create([
+            'user_id' => $learner->id,
+            'module_id' => $module->id,
+            'lesson_id' => $lesson->id,
+            'completed' => true,
+            'progress_percentage' => 100,
+            'completed_at' => now(),
+        ]);
+
+        QuizAttempt::query()->create([
+            'user_id' => $learner->id,
+            'quiz_id' => $lessonQuiz->id,
+            'score' => 67,
+            'passed' => false,
+            'started_at' => now()->subMinutes(5),
+            'completed_at' => now(),
+        ]);
+
+        $this->actingAs($learner)
+            ->post(route('learner.modules.feedback.store', $module), [
+                'feedback_type' => 'instructor',
+                'rating' => 4,
+                'review_content' => 'I finished the module and can leave instructor feedback.',
+            ])
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('instructor_feedback', [
+            'learner_id' => $learner->id,
+            'rating' => 4,
         ]);
     }
 

@@ -19,6 +19,7 @@
         discardRecording: false,
         recordingSeconds: 0,
         recordingTimer: null,
+        showMoreSuggestions: false,
         makeQueuedAttachment(file, source = 'file') {
             const mime = String(file?.type || '').toLowerCase();
             const isImage = mime.startsWith('image/');
@@ -71,6 +72,35 @@
             if (this.$refs.attachmentInput) {
                 this.$refs.attachmentInput.value = null;
             }
+        },
+        composerCanSend() {
+            return Boolean($store.chat.activeConversation()?.can_send)
+                || Boolean($store.chat.pendingConversationDraft);
+        },
+        applySuggestion(suggestion) {
+            if (!suggestion?.text) {
+                return;
+            }
+
+            if (this.composer.trim() && !window.confirm('Replace your current draft with this suggestion?')) {
+                return;
+            }
+
+            this.composer = suggestion.text;
+            this.$nextTick(() => this.$refs.composerInput?.focus());
+        },
+        async submitComposer() {
+            if (!this.composer.trim() && this.queuedAttachments.length < 1) {
+                return;
+            }
+
+            if ($store.chat.pendingConversationDraft && !$store.chat.activeConversationId) {
+                await $store.chat.sendConversationDraft($store.chat.pendingConversationDraft, this.composer);
+            } else {
+                await $store.chat.sendActiveMessage(this.composer, this.queuedAttachments.map((entry) => entry.file));
+            }
+
+            this.clearComposerState();
         },
         startEditing(message) {
             this.editingMessageId = message.id;
@@ -385,6 +415,23 @@
                     <p class="text-xs text-gray-500">Select a conversation to begin.</p>
                 </div>
             </template>
+
+            <template x-if="$store.chat.pendingConversationDraft && !$store.chat.activeConversationId">
+                <div class="flex min-w-0 flex-1 items-center gap-3">
+                    <div class="h-10 w-10 flex-shrink-0 overflow-hidden rounded-full border border-gray-200 bg-gray-100 text-sm font-semibold text-gray-700">
+                        <template x-if="$store.chat.pendingConversationDraft.fallback_avatar">
+                            <img :src="$store.chat.pendingConversationDraft.fallback_avatar" alt="Instructor avatar" class="h-full w-full object-cover">
+                        </template>
+                        <template x-if="!$store.chat.pendingConversationDraft.fallback_avatar">
+                            <span class="flex h-full w-full items-center justify-center" x-text="($store.chat.pendingConversationDraft.fallback_name || 'Instructor').slice(0, 1).toUpperCase()"></span>
+                        </template>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <h2 class="truncate text-sm font-semibold text-gray-900" x-text="$store.chat.pendingConversationDraft.fallback_name || 'Instructor'"></h2>
+                        <p class="mt-0.5 truncate text-[11px] text-gray-500" x-text="$store.chat.pendingConversationDraft.context_label || 'Direct Conversation'"></p>
+                    </div>
+                </div>
+            </template>
         </div>
     </header>
 
@@ -482,8 +529,41 @@
                 </div>
 
                 <template x-if="$store.chat.activeMessages().length < 1">
-                    <div class="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-3 text-xs text-gray-500">
-                        No messages yet. Start the conversation.
+                    <div>
+                        <div
+                            class="rounded-2xl border border-brand-100 bg-white px-4 py-4 shadow-sm"
+                            data-chat-suggestion-empty-state
+                            x-show="$store.chat.activeSuggestions(7).length > 0"
+                        >
+                            <p class="text-sm font-semibold text-gray-800">Start a conversation</p>
+                            <p class="mt-1 text-xs leading-relaxed text-gray-500">Have a question about your lessons or learning progress? Choose a suggestion below or type your own message.</p>
+                            <div class="mt-3 flex gap-2 overflow-x-auto pb-1" role="list" aria-label="Suggested questions">
+                                <template x-for="suggestion in $store.chat.activeSuggestions(showMoreSuggestions ? 7 : 4)" :key="`empty-suggestion-${suggestion.key}`">
+                                    <button
+                                        type="button"
+                                        class="min-h-11 flex-shrink-0 rounded-full border border-brand-200 bg-brand-50 px-3 py-2 text-left text-xs font-semibold text-brand-800 transition hover:border-brand-300 hover:bg-brand-100 focus:outline-none focus:ring-2 focus:ring-brand-300"
+                                        data-chat-suggestion-key
+                                        :data-chat-suggestion-key="suggestion.key"
+                                        :aria-label="`Use suggestion: ${suggestion.text}`"
+                                        @click="applySuggestion(suggestion)"
+                                        x-text="suggestion.text"
+                                    ></button>
+                                </template>
+                                <button
+                                    type="button"
+                                    class="min-h-11 flex-shrink-0 rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800 focus:outline-none focus:ring-2 focus:ring-brand-300"
+                                    x-show="$store.chat.activeSuggestions(7).length > 4"
+                                    @click="showMoreSuggestions = !showMoreSuggestions"
+                                    x-text="showMoreSuggestions ? 'Show fewer' : 'More suggestions'"
+                                ></button>
+                            </div>
+                        </div>
+                        <div
+                            class="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-3 text-xs text-gray-500"
+                            x-show="$store.chat.activeSuggestions(4).length < 1"
+                        >
+                            No messages yet. Start the conversation.
+                        </div>
                     </div>
                 </template>
 
@@ -729,11 +809,61 @@
     </div>
 
     <footer class="border-t border-gray-100 px-5 py-4 space-y-3">
-        <template x-if="$store.chat.activeConversationId">
+        <div
+            class="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2"
+            data-chat-suggestion-compact
+            x-show="$store.chat.activeConversationId && $store.chat.activeMessages().length > 0 && $store.chat.activeSuggestions(3).length > 0"
+        >
+            <p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Suggested questions</p>
+            <div class="flex gap-2 overflow-x-auto pb-1" role="list" aria-label="Suggested questions">
+                <template x-for="suggestion in $store.chat.activeSuggestions(3)" :key="`compact-suggestion-${suggestion.key}`">
+                    <button
+                        type="button"
+                        class="min-h-11 flex-shrink-0 rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800 focus:outline-none focus:ring-2 focus:ring-brand-300"
+                        data-chat-suggestion-key
+                        :data-chat-suggestion-key="suggestion.key"
+                        :aria-label="`Use suggestion: ${suggestion.text}`"
+                        @click="applySuggestion(suggestion)"
+                        x-text="suggestion.text"
+                    ></button>
+                </template>
+                <button
+                    type="button"
+                    class="min-h-11 flex-shrink-0 rounded-full border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800 focus:outline-none focus:ring-2 focus:ring-brand-300"
+                    x-show="$store.chat.draftSuggestions(7).length > 4"
+                    @click="showMoreSuggestions = !showMoreSuggestions"
+                    x-text="showMoreSuggestions ? 'Show fewer' : 'More suggestions'"
+                ></button>
+            </div>
+        </div>
+
+        <div
+            class="rounded-2xl border border-brand-100 bg-white px-4 py-4 shadow-sm"
+            data-chat-suggestion-empty-state
+                            x-show="$store.chat.pendingConversationDraft && !$store.chat.activeConversationId && $store.chat.draftSuggestions(7).length > 0"
+        >
+            <p class="text-sm font-semibold text-gray-800">Start a conversation</p>
+            <p class="mt-1 text-xs leading-relaxed text-gray-500">Have a question? Choose a suggestion below or type your own message.</p>
+            <div class="mt-3 flex gap-2 overflow-x-auto pb-1" role="list" aria-label="Suggested questions">
+                                <template x-for="suggestion in $store.chat.draftSuggestions(showMoreSuggestions ? 7 : 4)" :key="`draft-suggestion-${suggestion.key}`">
+                    <button
+                        type="button"
+                        class="min-h-11 flex-shrink-0 rounded-full border border-brand-200 bg-brand-50 px-3 py-2 text-left text-xs font-semibold text-brand-800 transition hover:border-brand-300 hover:bg-brand-100 focus:outline-none focus:ring-2 focus:ring-brand-300"
+                        data-chat-suggestion-key
+                        :data-chat-suggestion-key="suggestion.key"
+                        :aria-label="`Use suggestion: ${suggestion.text}`"
+                        @click="applySuggestion(suggestion)"
+                        x-text="suggestion.text"
+                    ></button>
+                </template>
+            </div>
+        </div>
+
+        <template x-if="$store.chat.activeConversationId || $store.chat.pendingConversationDraft">
             <form
                 class="space-y-3"
                 data-chat-composer
-                @submit.prevent="if (!composer.trim() && queuedAttachments.length < 1) { return; } await $store.chat.sendActiveMessage(composer, queuedAttachments.map((entry) => entry.file)); clearComposerState();"
+                @submit.prevent="submitComposer()"
             >
                 <div
                     class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"
@@ -785,7 +915,7 @@
                     <button
                         type="button"
                         class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
-                        :disabled="$store.chat.loading.send || !$store.chat.activeConversation()?.can_send || isRecording"
+                        :disabled="$store.chat.loading.send || !$store.chat.activeConversationId || !$store.chat.activeConversation()?.can_send || isRecording"
                         @click="$refs.attachmentInput.click()"
                         title="Attach files"
                     >
@@ -798,7 +928,7 @@
                         type="button"
                         class="inline-flex h-10 w-10 items-center justify-center rounded-xl border text-gray-600 transition disabled:cursor-not-allowed disabled:opacity-60"
                         :class="isRecording ? 'border-red-300 bg-red-50 text-red-600' : 'border-gray-200 bg-white hover:bg-gray-50'"
-                        :disabled="$store.chat.loading.send || !$store.chat.activeConversation()?.can_send"
+                        :disabled="$store.chat.loading.send || !$store.chat.activeConversationId || !$store.chat.activeConversation()?.can_send"
                         @click="isRecording ? stopVoiceRecording() : startVoiceRecording()"
                         :title="isRecording ? 'Stop recording' : 'Record voice note'"
                     >
@@ -809,11 +939,12 @@
 
                         <input
                             type="text"
+                            x-ref="composerInput"
                             x-model="composer"
                             @input="$store.chat.notifyTyping($store.chat.activeConversationId, composer.trim().length > 0)"
                             @blur="$store.chat.notifyTyping($store.chat.activeConversationId, false)"
-                            :disabled="$store.chat.loading.send || !$store.chat.activeConversation()?.can_send"
-                            :placeholder="$store.chat.activeConversation()?.can_send
+                            :disabled="$store.chat.loading.send || !composerCanSend()"
+                            :placeholder="composerCanSend()
                                 ? 'Type a message...'
                                 : ($store.chat.activeConversationIsPending()
                                     ? 'Waiting for instructor approval.'
@@ -825,7 +956,7 @@
 
                     <button
                         type="submit"
-                        :disabled="$store.chat.loading.send || !$store.chat.activeConversation()?.can_send || isRecording"
+                        :disabled="$store.chat.loading.send || !composerCanSend() || isRecording"
                         class="inline-flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-r from-purple-700 to-pink-500 text-white shadow-md transition-transform hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
                         title="Send message"
                     >

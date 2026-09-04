@@ -55,6 +55,7 @@ class ConnectorCommunityPostFlowTest extends DatabaseTestCase
 
         $response = $this->actingAs($member)->post(route('connector.community.store', $connector), [
             'post_type' => 'announcement',
+            'topic_choice' => 'Connector announcement',
             'title' => 'Route announcement',
             'body' => 'Adults are invited to a public health education session.',
             'resource_url' => null,
@@ -64,7 +65,8 @@ class ConnectorCommunityPostFlowTest extends DatabaseTestCase
         $this->assertDatabaseHas('community_posts', [
             'connector_id' => $connector->id,
             'author_id' => $member->id,
-            'title' => 'Route announcement',
+            'title' => 'Connector announcement',
+            'topic' => 'Connector announcement',
         ]);
     }
 
@@ -123,6 +125,82 @@ class ConnectorCommunityPostFlowTest extends DatabaseTestCase
 
         $this->assertSame(CommunityPostStatus::PendingReview, $updated->status);
         $this->assertSame(2, $updated->versions()->count());
+    }
+
+    public function test_moderated_post_states_cannot_be_edited_back_to_published(): void
+    {
+        $owner = User::factory()->create(['role' => 'learner', 'birthdate' => now()->subYears(30)->toDateString()]);
+        $owner->assignRole('learner');
+        $connector = $this->createVerifiedConnector($owner);
+        $post = app(CommunityPostService::class)->create($owner, $connector, [
+            'post_type' => 'announcement',
+            'title' => 'Moderated lifecycle post',
+            'body' => 'This post starts in a safe published state.',
+        ]);
+
+        foreach ([
+            CommunityPostStatus::Hidden,
+            CommunityPostStatus::Locked,
+            CommunityPostStatus::Removed,
+            CommunityPostStatus::Escalated,
+            CommunityPostStatus::Archived,
+        ] as $status) {
+            $post->forceFill(['status' => $status])->save();
+
+            $this->actingAs($owner)
+                ->put(route('connector.community.update', [$connector, $post]), [
+                    'post_type' => 'announcement',
+                    'topic_choice' => 'Connector announcement',
+                    'body' => 'An edit must not bypass the moderation lifecycle.',
+                ])
+                ->assertForbidden();
+
+            $this->assertSame($status, $post->fresh()->status);
+        }
+    }
+
+    public function test_connector_space_freeze_blocks_post_creation_and_editing(): void
+    {
+        $owner = User::factory()->create(['role' => 'learner', 'birthdate' => now()->subYears(30)->toDateString()]);
+        $owner->assignRole('learner');
+        $connector = $this->createVerifiedConnector($owner);
+        $post = app(CommunityPostService::class)->create($owner, $connector, [
+            'post_type' => 'announcement',
+            'title' => 'Post created before freeze',
+            'body' => 'This post exists before the emergency freeze.',
+        ]);
+        $post->space->forceFill([
+            'frozen_at' => now(),
+            'frozen_by' => $owner->id,
+            'freeze_reason' => 'Emergency connector review.',
+        ])->save();
+
+        $this->actingAs($owner)
+            ->get(route('connector.community.create', $connector))
+            ->assertForbidden();
+
+        $this->actingAs($owner)
+            ->post(route('connector.community.store', $connector), [
+                'post_type' => 'announcement',
+                'topic_choice' => 'Connector announcement',
+                'body' => 'This new post must be blocked while frozen.',
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($owner)
+            ->get(route('connector.community.edit', [$connector, $post]))
+            ->assertForbidden();
+
+        $this->actingAs($owner)
+            ->put(route('connector.community.update', [$connector, $post]), [
+                'post_type' => 'announcement',
+                'topic_choice' => 'Connector announcement',
+                'body' => 'This edit must be blocked while frozen.',
+            ])
+            ->assertForbidden();
+
+        $this->assertSame(1, $connector->communityPosts()->count());
+        $this->assertSame('This post exists before the emergency freeze.', $post->fresh()->body);
     }
 
     public function test_minor_cannot_create_post(): void

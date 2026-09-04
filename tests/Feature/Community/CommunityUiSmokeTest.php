@@ -55,15 +55,15 @@ class CommunityUiSmokeTest extends DatabaseTestCase
             ->assertOk()
             ->assertSee('Community Hub')
             ->assertSee('Adult community update')
-            ->assertSee('Create structured post')
-            ->assertSee('Community Feed')
-            ->assertSee('Safety center')
-            ->assertSee('Upcoming seminars')
-            ->assertSee('Moderation')
+            ->assertSee('Create post')
+            ->assertSee('Filters')
+            ->assertDontSee('Safety center')
+            ->assertDontSee('Moderation health')
+            ->assertSee('Open moderation')
+            ->assertDontSee('aria-label="Open moderation"', false)
             ->assertSee('href="'.route('connector.community.show', [$connector, $post]).'"', false)
             ->assertSee('href="'.route('connector.community.show', [$connector, $post]).'#comments"', false)
             ->assertSee('aria-label="Open comments"', false)
-            ->assertSee('src="https://example.com/community-update.jpg"', false)
             ->assertDontSee('aria-label="Open post"', false);
 
         $this->actingAs($member)->get(route('connector.community.show', [$connector, $post]))
@@ -71,7 +71,9 @@ class CommunityUiSmokeTest extends DatabaseTestCase
             ->assertSee('Community Post')
             ->assertSee('Adult community update')
             ->assertSee('id="comments"', false)
-            ->assertSee('Flat comments only')
+            ->assertDontSee('Manage post')
+            ->assertDontSee('action="'.route('connector.community.moderation.approve', [$connector, $post]).'"', false)
+            ->assertDontSee('Flat comments only')
             ->assertSee('Report comment')
             ->assertSee('name="reason_code"', false)
             ->assertSee('Community Guidelines Violation')
@@ -81,18 +83,12 @@ class CommunityUiSmokeTest extends DatabaseTestCase
         $this->actingAs($member)->get(route('connector.community.create', $connector))
             ->assertOk()
             ->assertSee('New Community Post')
-            ->assertSee('Safety reminder')
-            ->assertSee('for="community-post-type-announcement"', false)
-            ->assertSee('id="community-post-type-announcement"', false)
-            ->assertSee('for="community-post-type-event"', false)
-            ->assertSee('id="community-post-type-event"', false)
-            ->assertSee('for="community-post-type-resource"', false)
-            ->assertSee('id="community-post-type-resource"', false)
-            ->assertSee('for="community-post-type-moderated_question"', false)
-            ->assertSee('id="community-post-type-moderated_question"', false)
-            ->assertSee('for="community-post-type-discussion_prompt"', false)
-            ->assertSee('id="community-post-type-discussion_prompt"', false)
-            ->assertSee('Submit for Review')
+            ->assertDontSee('Safety reminder')
+            ->assertSee('id="post_type"', false)
+            ->assertSee('Choose a post type')
+            ->assertSee('id="topic_choice"', false)
+            ->assertDontSee('Submit for Review')
+            ->assertDontSee('Save Draft')
             ->assertSee('Publish');
 
         $this->actingAs($member)->get(route('connector.community.moderation.index', $connector))
@@ -101,14 +97,78 @@ class CommunityUiSmokeTest extends DatabaseTestCase
             ->assertSee('Pending')
             ->assertSee('Reported')
             ->assertSee('Escalated')
+            ->assertSee('All posts')
             ->assertSee('Needs moderator review')
             ->assertSee('href="'.route('connector.community.show', [$connector, $pendingPost]).'"', false)
-            ->assertSee('aria-label="Review Post"', false)
-            ->assertDontSee('aria-label="Approve"', false)
-            ->assertDontSee('aria-label="Hide"', false)
-            ->assertDontSee('aria-label="Lock comments"', false)
-            ->assertDontSee('aria-label="Escalate"', false)
-            ->assertDontSee('aria-label="Reject"', false);
+            ->assertSee('View post')
+            ->assertSee('Manage post')
+            ->assertSee('Approve')
+            ->assertSee('Reject')
+            ->assertSee('action="'.route('connector.community.moderation.approve', [$connector, $pendingPost]).'"', false)
+            ->assertSee('action="'.route('connector.community.moderation.reject', [$connector, $pendingPost]).'"', false)
+            ->assertDontSee('Hide')
+            ->assertDontSee('Lock');
+    }
+
+    public function test_review_center_all_posts_uses_status_appropriate_text_actions(): void
+    {
+        $owner = User::factory()->create(['role' => 'learner', 'birthdate' => now()->subYears(32)->toDateString()]);
+        $owner->assignRole('learner');
+        $connector = $this->createVerifiedConnector($owner);
+
+        $published = app(CommunityPostService::class)->create($owner, $connector, [
+            'post_type' => 'announcement', 'title' => 'Published review item', 'body' => 'Published post for the all-posts moderation queue.',
+        ]);
+        $published->forceFill(['status' => 'published', 'published_at' => now(), 'published_by' => $owner->id])->save();
+
+        $locked = app(CommunityPostService::class)->create($owner, $connector, [
+            'post_type' => 'announcement', 'title' => 'Locked review item', 'body' => 'Locked post for the all-posts moderation queue.',
+        ]);
+        $locked->forceFill(['status' => 'locked', 'locked_at' => now(), 'locked_by' => $owner->id])->save();
+
+        foreach (['draft' => 'Draft review item', 'archived' => 'Archived review item'] as $status => $title) {
+            $inactive = app(CommunityPostService::class)->create($owner, $connector, [
+                'post_type' => 'announcement', 'title' => $title, 'body' => 'This post is not actionable in connector moderation.',
+            ]);
+            $inactive->forceFill(['status' => $status])->save();
+        }
+
+        $response = $this->actingAs($owner)->get(route('connector.community.moderation.index', [$connector, 'tab' => 'all']));
+
+        $response->assertOk()
+            ->assertSee('All posts')
+            ->assertSee('Published review item')
+            ->assertSee('Locked review item')
+            ->assertDontSee('Draft review item')
+            ->assertDontSee('Archived review item')
+            ->assertSee('Manage post')
+            ->assertSee('View post')
+            ->assertSee('action="'.route('connector.community.moderation.hide', [$connector, $published]).'"', false)
+            ->assertSee('action="'.route('connector.community.moderation.lock', [$connector, $published]).'"', false)
+            ->assertDontSee('action="'.route('connector.community.moderation.unlock', [$connector, $published]).'"', false)
+            ->assertSee('action="'.route('connector.community.moderation.unlock', [$connector, $locked]).'"', false)
+            ->assertDontSee('action="'.route('connector.community.moderation.lock', [$connector, $locked]).'"', false);
+    }
+
+    public function test_review_center_only_shows_actions_allowed_by_the_moderator_role(): void
+    {
+        $owner = User::factory()->create(['role' => 'learner', 'birthdate' => now()->subYears(32)->toDateString()]);
+        $owner->assignRole('learner');
+        $connector = $this->createVerifiedConnector($owner);
+        $approver = $this->createAdultConnectorMember($connector, ['community.view_space', 'community.approve_posts']);
+
+        $pending = app(CommunityPostService::class)->create($owner, $connector, [
+            'post_type' => 'moderated_question', 'title' => 'Approver pending item', 'body' => 'This item needs approval.',
+        ]);
+        $pending->forceFill(['status' => 'pending_review'])->save();
+
+        $response = $this->actingAs($approver)->get(route('connector.community.moderation.index', $connector));
+
+        $response->assertOk()
+            ->assertSee('Manage post')
+            ->assertSee('action="'.route('connector.community.moderation.approve', [$connector, $pending]).'"', false)
+            ->assertDontSee('action="'.route('connector.community.moderation.reject', [$connector, $pending]).'"', false)
+            ->assertDontSee('action="'.route('connector.community.moderation.escalate', [$connector, $pending]).'"', false);
     }
 
     public function test_admin_community_pages_render_for_platform_admin(): void
@@ -131,10 +191,12 @@ class CommunityUiSmokeTest extends DatabaseTestCase
             ->assertOk()
             ->assertSee('Community Hub')
             ->assertSee('Admin visible community post')
-            ->assertSee('All connector spaces')
-            ->assertSee('Reported')
-            ->assertSee('Escalated')
-            ->assertSee('Global safety controls');
+            ->assertDontSee('Needs Attention')
+            ->assertSee('Communities')
+            ->assertSee('Recent Activity')
+            ->assertSee('Safety Controls')
+            ->assertDontSee('All connector spaces')
+            ->assertDontSee('Community moderation stream');
 
         $this->actingAs($admin)->get(route('admin.community.settings'))
             ->assertOk()
