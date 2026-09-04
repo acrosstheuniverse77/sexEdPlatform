@@ -65,6 +65,16 @@ class GuardianRelationshipVerificationService
         });
     }
 
+    public function submitDeclaration(ParentChildAccount $relationship, User $guardian, ?Closure $onSubmitted = null): ParentChildAccount
+    {
+        return DB::transaction(function () use ($relationship, $guardian, $onSubmitted): ParentChildAccount {
+            $submittedRelationship = $this->transitionToUnderReview($relationship, $guardian);
+            $onSubmitted?->__invoke($submittedRelationship);
+
+            return $submittedRelationship;
+        });
+    }
+
     public function approve(ParentChildAccount $relationship, User $admin): ParentChildAccount
     {
         return $this->transition($relationship, $admin, 'approved', 'verified');

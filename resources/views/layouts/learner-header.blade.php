@@ -9,16 +9,6 @@
     $unreadCount   = $headerUser->unreadNotifications()->count();
     $recentNotifs  = $headerUser->notifications()->latest()->limit(5)->get();
     $payloadNormalizer = app(\App\Support\NotificationPayloadNormalizer::class);
-    $headerSwitchableConnector = \App\Models\Connector::query()
-        ->where('status', 'verified')
-        ->where(function ($query) use ($headerUser) {
-            $query->where('created_by', $headerUser->id)
-                ->orWhereHas('memberships', fn ($membershipQuery) => $membershipQuery
-                    ->where('user_id', $headerUser->id)
-                    ->where('status', 'active'));
-        })
-        ->latest()
-        ->first();
 @endphp
 
 <header class="sticky top-0 z-[9998] w-full bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
@@ -290,16 +280,6 @@
                         >
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>
                             Instructor Dashboard
-                        </a>
-                        <div class="h-px bg-gray-100 dark:bg-gray-700 my-1"></div>
-                    @endif
-                    @if($headerSwitchableConnector)
-                        <a
-                            href="{{ route('connector.dashboard', $headerSwitchableConnector) }}"
-                            class="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-purple-700 bg-purple-50/50 hover:bg-purple-100/80 transition-colors border-l-4 border-purple-500"
-                        >
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4.75 5.5A2.75 2.75 0 0 1 7.5 2.75h9A2.75 2.75 0 0 1 19.25 5.5v13M8.75 7.5h6.5M8.75 11.5h6.5M7 19.25h10" /></svg>
-                            Connector Dashboard
                         </a>
                         <div class="h-px bg-gray-100 dark:bg-gray-700 my-1"></div>
                     @endif

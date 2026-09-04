@@ -24,7 +24,7 @@ class ConnectorRoleService
         $allowed = $this->allPermissionKeys();
 
         foreach ($keys as $key) {
-            if (! str_starts_with((string) $key, 'connector.') || ! in_array($key, $allowed, true)) {
+            if (! in_array($key, $allowed, true)) {
                 throw ValidationException::withMessages([
                     'permissions' => 'Invalid connector permission: '.$key,
                 ]);
@@ -57,14 +57,20 @@ class ConnectorRoleService
 
     public function defaultMemberRole(Connector $connector): ConnectorRole
     {
-        return $connector->roles()->firstOrCreate(
+        $role = $connector->roles()->firstOrCreate(
             ['name' => 'Member'],
             [
-                'description' => 'View-only connector member.',
+                'description' => 'View-only connector member with Community Hub access.',
                 'is_owner' => false,
                 'is_protected' => true,
             ]
         );
+
+        if (! in_array('community.view_space', $role->permissionKeys(), true)) {
+            $role->permissions()->create(['permission_key' => 'community.view_space']);
+        }
+
+        return $role->fresh('permissions');
     }
 
     public function createRole(Connector $connector, array $attributes): ConnectorRole

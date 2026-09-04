@@ -40,6 +40,7 @@
                             target_user_id: {{ $module->created_by }},
                             name: '{{ addslashes($module->creator?->name ?? 'Instructor') }}',
                             avatar: 'https://ui-avatars.com/api/?name={{ urlencode($module->creator?->name ?? 'Instructor') }}&color=1D4ED8&background=EFF6FF',
+                            target_role: 'instructor',
                             conversation_type: 'lesson_topic_chat',
                             lesson_topic_id: {{ $currentTopic->id }},
                             lesson_id: {{ $lesson->id }},

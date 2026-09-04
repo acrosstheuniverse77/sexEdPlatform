@@ -228,6 +228,14 @@ class ConversationController extends Controller
                 ], 409);
             }
 
+            if (trim((string) $request->validated('initial_message', '')) === '') {
+                return response()->json([
+                    'requires_initial_message' => true,
+                    'target_user_id' => (int) $request->validated('target_user_id'),
+                    'conversation_type' => $conversationType,
+                ], 428);
+            }
+
             $requestResult = $this->chatService->createOrGetPendingRequestConversation(
                 requester: $actor,
                 instructor: $target,

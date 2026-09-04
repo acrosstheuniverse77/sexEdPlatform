@@ -10,6 +10,7 @@ import { createInteractiveActivity } from './interactive-activity';
 import { createMatchingActivity } from './matching-activity';
 import { createSequencingActivity } from './sequencing-activity';
 import './toast'; // Toast notification system
+import './admin-community';
 import './chat/store';
 import './chat/global-popup';
 import './seminar-livestream';

@@ -12,17 +12,6 @@
         ->where('verification_status', 'approved')
         ->whereNotNull('relationship_verified_at')
         ->exists();
-    $switchableConnector = \App\Models\Connector::query()
-        ->where('status', 'verified')
-        ->where(function ($query) use ($authUser) {
-            $query->where('created_by', $authUser->id)
-                ->orWhereHas('memberships', fn ($membershipQuery) => $membershipQuery
-                    ->where('user_id', $authUser->id)
-                    ->where('status', 'active'));
-        })
-        ->latest()
-        ->first();
-
     $navItems = [
         [
             'label'  => 'Dashboard',
@@ -79,16 +68,6 @@
             'icon'   => '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="M7 2.75A4.25 4.25 0 0 0 2.75 7v10A4.25 4.25 0 0 0 7 21.25h10A4.25 4.25 0 0 0 21.25 17V7A4.25 4.25 0 0 0 17 2.75H7ZM4.25 7A2.75 2.75 0 0 1 7 4.25h10A2.75 2.75 0 0 1 19.25 7v10A2.75 2.75 0 0 1 17 19.25H7A2.75 2.75 0 0 1 4.25 17V7Zm4 2a.75.75 0 0 0 0 1.5h7.5a.75.75 0 0 0 0-1.5h-7.5Zm-.75 4.75a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5a.75.75 0 0 1-.75-.75Zm.75 3.25a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-4.5Z"/></svg>',
         ],
     ];
-
-    if ($switchableConnector) {
-        $navItems[] = [
-            'label'  => 'Connector Dashboard',
-            'route'  => 'connector.dashboard',
-            'params' => [$switchableConnector],
-            'active' => request()->routeIs('connector.dashboard'),
-            'icon'   => '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="M4.75 5.5A2.75 2.75 0 0 1 7.5 2.75h9A2.75 2.75 0 0 1 19.25 5.5v13a.75.75 0 0 1-1.5 0V5.5c0-.69-.56-1.25-1.25-1.25h-9c-.69 0-1.25.56-1.25 1.25v13a.75.75 0 0 1-1.5 0v-13Zm4 2A.75.75 0 0 1 9.5 6.75h5a.75.75 0 0 1 0 1.5h-5a.75.75 0 0 1-.75-.75Zm0 4A.75.75 0 0 1 9.5 10.75h5a.75.75 0 0 1 0 1.5h-5a.75.75 0 0 1-.75-.75ZM8 19.25a.75.75 0 0 1 .75-.75h6.5a.75.75 0 0 1 0 1.5h-6.5a.75.75 0 0 1-.75-.75Z"/></svg>',
-        ];
-    }
 
     if ($hasApprovedParentLinks) {
         $navItems[] = [

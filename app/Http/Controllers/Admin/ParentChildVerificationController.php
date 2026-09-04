@@ -172,7 +172,7 @@ class ParentChildVerificationController extends Controller
 
     public function showRelationship(ParentChildAccount $parentChildAccount): View
     {
-        abort_unless($parentChildAccount->requiresRelationshipVerification(), 404);
+        abort_unless($this->isRelationshipReviewRecord($parentChildAccount), 404);
 
         return view('admin.parent-verifications.show-relationship', [
             'relationship' => $parentChildAccount->load([
@@ -444,10 +444,20 @@ class ParentChildVerificationController extends Controller
                 'child.learnerProfile',
                 'verificationDocuments',
             ])
-            ->whereIn('relationship_type', array_filter(
-                GuardianRelationshipTypes::values(),
-                fn (string $type): bool => GuardianRelationshipTypes::requiresVerification($type),
-            ))
+            ->where(function ($query): void {
+                $query->whereIn('relationship_type', array_filter(
+                    GuardianRelationshipTypes::values(),
+                    fn (string $type): bool => GuardianRelationshipTypes::requiresVerification($type),
+                ))
+                    ->orWhereIn('relationship_verified_status', [
+                        'pending',
+                        'under_review',
+                        'resubmission_required',
+                        'verified',
+                        'rejected',
+                        'revoked',
+                    ]);
+            })
             ->when($status === VerificationStatus::Approved->value, fn ($query) => $query->where('relationship_verified_status', 'verified'))
             ->when($status === VerificationStatus::Rejected->value, fn ($query) => $query->whereIn('relationship_verified_status', ['rejected', 'revoked']))
             ->when($status === VerificationStatus::Pending->value, fn ($query) => $query->whereIn('relationship_verified_status', ['pending', 'under_review', 'resubmission_required']))
@@ -473,6 +483,19 @@ class ParentChildVerificationController extends Controller
     private function isChildRegistrationVerification(ParentChildAccount $verification): bool
     {
         return filled($verification->verification_document_path);
+    }
+
+    private function isRelationshipReviewRecord(ParentChildAccount $relationship): bool
+    {
+        return $relationship->requiresRelationshipVerification()
+            || in_array((string) $relationship->relationship_verified_status, [
+                'pending',
+                'under_review',
+                'resubmission_required',
+                'verified',
+                'rejected',
+                'revoked',
+            ], true);
     }
 
     private function respondSuccess(

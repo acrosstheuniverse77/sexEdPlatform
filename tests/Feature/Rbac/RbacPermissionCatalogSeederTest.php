@@ -19,6 +19,10 @@ class RbacPermissionCatalogSeederTest extends TestCase
             'review modules',
             'access chat',
             'view learner progress',
+            'community.view_any',
+            'community.moderate_any',
+            'community.manage_settings',
+            'community.freeze',
         ];
 
         $legacyStable = [

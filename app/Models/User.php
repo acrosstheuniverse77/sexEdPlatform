@@ -531,6 +531,17 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->calculateAge() < 13;
     }
 
+    public function isMinorForCommunityFeed(): bool
+    {
+        if (in_array($this->account_type, [self::ACCOUNT_TYPE_LEARNER_CHILD, self::ACCOUNT_TYPE_LEARNER_TEEN], true)) {
+            return true;
+        }
+
+        $age = $this->calculateAge() ?? $this->age;
+
+        return $age !== null && (int) $age < 18;
+    }
+
     /**
      * Check if user is 18+ (can be a parent)
      */

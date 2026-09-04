@@ -31,7 +31,30 @@
     @endif
 
     <form method="POST" action="{{ route('parent.create-child.credentials.store') }}"
-          x-data="{ showPass: false, showConfirm: false, password: '', passwordConfirmation: '' }">
+          x-data="{
+              showPass: false,
+              showConfirm: false,
+              password: '',
+              passwordConfirmation: '',
+              checks() {
+                  return {
+                      length: this.password.length >= 8,
+                      lower: /[a-z]/.test(this.password),
+                      upper: /[A-Z]/.test(this.password),
+                      number: /\d/.test(this.password),
+                      symbol: /[^A-Za-z0-9]/.test(this.password),
+                  };
+              },
+              score() {
+                  return Object.values(this.checks()).filter(Boolean).length;
+              },
+              strengthLabel() {
+                  const score = this.score();
+                  if (score <= 2) return 'Weak';
+                  if (score <= 4) return 'Medium';
+                  return 'Strong';
+              },
+          }">
         @csrf
 
         <div class="mb-4">
@@ -47,6 +70,21 @@
                 <input id="password" name="password" :type="showPass ? 'text' : 'password'" required x-model="password"
                        class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 pr-10">
                 <button type="button" @click="showPass = !showPass" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-purple-700">Show</button>
+            </div>
+            <div x-show="password" x-cloak class="mt-2">
+                <div class="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+                    <div class="h-full transition-all duration-300"
+                         :style="`width: ${password ? (score() / 5) * 100 : 0}%`"
+                         :class="score() <= 2 ? 'bg-red-500' : (score() <= 4 ? 'bg-amber-500' : 'bg-emerald-500')"></div>
+                </div>
+                <div class="mt-1.5 flex min-h-[18px] items-center justify-between gap-2 text-xs">
+                    <span class="font-medium"
+                          :class="password ? (score() <= 2 ? 'text-red-600' : (score() <= 4 ? 'text-amber-600' : 'text-emerald-600')) : 'text-gray-500'"
+                          x-text="password ? `Strength: ${strengthLabel()}` : 'Strength: -'"></span>
+                    <span class="text-right"
+                          :class="password ? (score() === 5 ? 'text-emerald-600' : 'text-gray-500') : 'text-gray-500'"
+                          x-text="password ? (score() === 5 ? 'All requirements met' : 'Use upper, lower, number, symbol') : 'Min 8 chars'"></span>
+                </div>
             </div>
             <p class="mt-1 text-xs text-gray-500">Use upper/lowercase letters, a number, and a symbol.</p>
         </div>

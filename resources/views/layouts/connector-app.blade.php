@@ -40,6 +40,7 @@
             ['Dashboard', 'connector.dashboard', null, 'M3.75 5.75A2 2 0 0 1 5.75 3.75h3.5a2 2 0 0 1 2 2v3.5a2 2 0 0 1-2 2h-3.5a2 2 0 0 1-2-2v-3.5Zm9 0a2 2 0 0 1 2-2h3.5a2 2 0 0 1 2 2v3.5a2 2 0 0 1-2 2h-3.5a2 2 0 0 1-2-2v-3.5Zm-9 9a2 2 0 0 1 2-2h3.5a2 2 0 0 1 2 2v3.5a2 2 0 0 1-2 2h-3.5a2 2 0 0 1-2-2v-3.5Zm9 0a2 2 0 0 1 2-2h3.5a2 2 0 0 1 2 2v3.5a2 2 0 0 1-2 2h-3.5a2 2 0 0 1-2-2v-3.5Z'],
             ['Members', 'connector.members.index', null, 'M16 11a4 4 0 1 0-8 0m8 0a4 4 0 1 1-8 0m8 0v1a4 4 0 0 0 4 4m-12-5v1a4 4 0 0 1-4 4m4-4h8m-8 0a4 4 0 0 0-4 4v1m12-5a4 4 0 0 1 4 4v1'],
             ['Seminars', 'connector.seminars.index', null, 'M7 3.75v2.5M17 3.75v2.5M4.75 8.75h14.5M6.25 5.25h11.5a2 2 0 0 1 2 2v10.5a2 2 0 0 1-2 2H6.25a2 2 0 0 1-2-2V7.25a2 2 0 0 1 2-2Z'],
+            ['Community Hub', 'connector.community.index', 'community.view_space', 'M7.5 8.25h9m-9 3.75h6m-8.25 7.5 2.25-2.25H18a2.25 2.25 0 0 0 2.25-2.25V6A2.25 2.25 0 0 0 18 3.75H6A2.25 2.25 0 0 0 3.75 6v9A2.25 2.25 0 0 0 6 17.25h.75v2.25Z'],
             ['Notifications', 'connector.notifications.index', null, 'M15 17h5l-1.405-1.405A2.032 2.032 0 0 1 18 14.158V11a6 6 0 1 0-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 1 1-6 0v-1m6 0H9'],
             ['Roles & Permissions', 'connector.roles.index', 'connector.manage_roles', 'M12 3.75 5.25 6.5v5.25c0 4.25 2.85 7.9 6.75 8.95 3.9-1.05 6.75-4.7 6.75-8.95V6.5L12 3.75Zm-2.25 8.5 1.75 1.75 3.25-4'],
             ['Modules', 'connector.modules', 'connector.manage_modules', 'M5 4.75h14v14H5zM8 8.75h8M8 12h8M8 15.25h5'],
@@ -109,7 +110,6 @@
                             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="M4 7h16M4 12h16M4 17h16"/></svg>
                         </button>
                         <div class="min-w-0">
-                            <p class="truncate text-xs font-semibold uppercase tracking-[0.18em] text-purple-700">{{ str_replace('_', ' ', $connector->category ?? 'Connector') }}</p>
                             <h1 class="truncate text-xl font-bold">@yield('page-title', $connector->name ?? 'Connector')</h1>
                         </div>
                     </div>

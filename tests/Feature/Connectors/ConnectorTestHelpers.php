@@ -69,6 +69,34 @@ trait ConnectorTestHelpers
         ]);
     }
 
+    private function createAdultConnectorMember(Connector $connector, array $permissions = []): User
+    {
+        $user = $this->createCompletedLearner([
+            'birthdate' => now()->subYears(24)->toDateString(),
+            'age' => 24,
+            'account_type' => User::ACCOUNT_TYPE_LEARNER_ADULT,
+        ]);
+        $role = $this->createCustomRole($connector, $permissions);
+
+        $connector->memberships()->create([
+            'user_id' => $user->id,
+            'connector_role_id' => $role->id,
+            'status' => 'active',
+            'accepted_at' => now(),
+        ]);
+
+        return $user->fresh();
+    }
+
+    private function createMinorLearner(int $age = 15): User
+    {
+        return $this->createCompletedLearner([
+            'birthdate' => now()->subYears($age)->toDateString(),
+            'age' => $age,
+            'account_type' => $age <= 12 ? User::ACCOUNT_TYPE_LEARNER_CHILD : User::ACCOUNT_TYPE_LEARNER_TEEN,
+        ]);
+    }
+
     private function createCompletedLearner(array $attributes = []): User
     {
         $this->seedCaviteAddress();

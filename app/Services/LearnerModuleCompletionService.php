@@ -16,7 +16,7 @@ class LearnerModuleCompletionService
      */
     public function reviewEligibility(User $user, Module $module): array
     {
-        $reason = $this->completionBlockerReason($user, $module);
+        $reason = $this->completionBlockerReason($user, $module, requirePassingLessonQuizzes: false);
 
         return [
             'eligible' => $reason === null,
@@ -26,18 +26,22 @@ class LearnerModuleCompletionService
 
     public function isFullyCompleted(User $user, Module $module): bool
     {
-        return $this->completionBlockerReason($user, $module) === null;
+        return $this->completionBlockerReason($user, $module, requirePassingLessonQuizzes: true) === null;
     }
 
-    public function completionBlockerReason(User $user, Module $module): ?string
+    public function completionBlockerReason(User $user, Module $module, bool $requirePassingLessonQuizzes = true): ?string
     {
-        $isEnrolled = $user->moduleEnrollments()
+        $enrollment = $user->moduleEnrollments()
             ->where('module_id', $module->id)
             ->where('status', EnrollmentStatus::Approved)
-            ->exists();
+            ->first();
 
-        if (!$isEnrolled) {
+        if (!$enrollment) {
             return 'You must be enrolled in this module.';
+        }
+
+        if ($enrollment->completed_at !== null || (int) $enrollment->completion_percentage >= 100) {
+            return null;
         }
 
         $lessons = $module->lessons()
@@ -89,14 +93,19 @@ class LearnerModuleCompletionService
                 ->filter()
                 ->keyBy('id');
 
-            $allLessonQuizzesCompleted = $lessonQuizIds->every(function ($quizId) use ($user, $lessonQuizById) {
+            $allLessonQuizzesCompleted = $lessonQuizIds->every(function ($quizId) use ($user, $lessonQuizById, $requirePassingLessonQuizzes) {
                 $attemptCount = QuizAttempt::query()
                     ->where('user_id', $user->id)
                     ->where('quiz_id', $quizId)
+                    ->whereNotNull('completed_at')
                     ->count();
 
                 if ($attemptCount === 0) {
                     return false;
+                }
+
+                if (! $requirePassingLessonQuizzes) {
+                    return true;
                 }
 
                 $hasPassed = QuizAttempt::query()

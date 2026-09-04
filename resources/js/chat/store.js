@@ -4,6 +4,8 @@ const defaultState = {
     currentUserRole: null,
     messageMutationWindowMinutes: 15,
     reportReasons: [],
+    suggestions: [],
+    pendingConversationDraft: null,
     conversations: [],
     messagesByConversation: {},
     messageWindowsByConversation: {},
@@ -199,6 +201,18 @@ function normalizeMessage(message = {}) {
     };
 }
 
+function normalizeSuggestion(suggestion = {}) {
+    return {
+        key: String(suggestion.key || ''),
+        text: String(suggestion.text || ''),
+        category: String(suggestion.category || 'general'),
+        audience: Array.isArray(suggestion.audience) ? suggestion.audience : [],
+        context: Array.isArray(suggestion.context) ? suggestion.context : ['general'],
+        active: Boolean(suggestion.active),
+        display_order: Number(suggestion.display_order || 0),
+    };
+}
+
 document.addEventListener('alpine:init', () => {
     const Alpine = window.Alpine;
 
@@ -265,6 +279,12 @@ document.addEventListener('alpine:init', () => {
 
             if (Array.isArray(payload.reportReasons)) {
                 this.reportReasons = payload.reportReasons;
+            }
+
+            if (Array.isArray(payload.suggestions)) {
+                this.suggestions = payload.suggestions
+                    .map((suggestion) => normalizeSuggestion(suggestion))
+                    .filter((suggestion) => suggestion.active && suggestion.key && suggestion.text);
             }
 
             this.adminDiscoveryTab = this.adminDiscoveryTab || 'learners';
@@ -341,7 +361,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         shouldShowConversationPanel() {
-            return window.innerWidth >= 1024 || !this.shouldShowSidebar();
+            return window.innerWidth >= 1024 || !this.shouldShowSidebar() || Boolean(this.pendingConversationDraft);
         },
 
         openSidebar() {
@@ -550,6 +570,87 @@ document.addEventListener('alpine:init', () => {
 
         activeConversation() {
             return this.findConversationById(this.activeConversationId);
+        },
+
+        suggestionContext(context = {}) {
+            const conversationType = String(
+                context.conversation_type || context.conversationType || ''
+            );
+
+            if (conversationType === 'module_chat') {
+                return 'module';
+            }
+
+            if (['lesson_chat', 'lesson_topic_chat'].includes(conversationType)) {
+                return 'lesson';
+            }
+
+            if (conversationType === 'quiz_help') {
+                return 'quiz';
+            }
+
+            if (conversationType === 'direct') {
+                return context.target_role === 'instructor' || context.targetRole === 'instructor'
+                    ? 'instructor'
+                    : 'general';
+            }
+
+            return String(context.context || 'general');
+        },
+
+        suggestionsForContext(context = {}, limit = 3, excludedKeys = []) {
+            const selectedContext = this.suggestionContext(context);
+            const excluded = new Set((excludedKeys || []).map((key) => String(key)));
+
+            return this.suggestions
+                .filter((suggestion) => !excluded.has(suggestion.key))
+                .map((suggestion) => ({
+                    ...suggestion,
+                    contextPriority: suggestion.context.includes(selectedContext)
+                        ? 0
+                        : (suggestion.context.includes('general') ? 1 : 2),
+                }))
+                .sort((first, second) => (
+                    first.contextPriority - second.contextPriority
+                    || first.display_order - second.display_order
+                    || first.key.localeCompare(second.key)
+                ))
+                .filter((suggestion, index, collection) => collection.findIndex(
+                    (candidate) => candidate.key === suggestion.key || candidate.text === suggestion.text
+                ) === index)
+                .slice(0, Math.max(0, Number(limit || 0)))
+                .map(({ contextPriority, ...suggestion }) => suggestion);
+        },
+
+        isSuggestionEligible(targetRole, conversationType) {
+            return this.currentUserRole === 'learner'
+                && String(targetRole || '') === 'instructor'
+                && ['direct', 'module_chat', 'lesson_chat', 'lesson_topic_chat', 'quiz_help']
+                    .includes(String(conversationType || ''));
+        },
+
+        prepareConversationDraft(payload = {}) {
+            const normalizedPayload = buildStartPayload(payload);
+
+            if (!normalizedPayload) {
+                this.pendingConversationDraft = null;
+                return null;
+            }
+
+            this.pendingConversationDraft = {
+                ...normalizedPayload,
+                target_role: payload.target_role || payload.targetRole || null,
+                context_label: payload.context_label || payload.contextLabel || '',
+                fallback_name: payload.name || payload.fallback_name || 'Instructor',
+                fallback_avatar: payload.avatar || payload.fallback_avatar || null,
+                composer: String(payload.composer || ''),
+            };
+
+            return this.pendingConversationDraft;
+        },
+
+        clearConversationDraft() {
+            this.pendingConversationDraft = null;
         },
 
         activeConversationPendingRequest() {
@@ -1036,7 +1137,21 @@ document.addEventListener('alpine:init', () => {
                 return null;
             }
 
-            const response = await window.axios.post('/chat/conversations/start', normalizedPayload);
+            let response;
+
+            try {
+                response = await window.axios.post('/chat/conversations/start', normalizedPayload);
+            } catch (error) {
+                if (Number(error?.response?.status || 0) === 428) {
+                    return {
+                        requires_initial_message: true,
+                        conversation: null,
+                        draft: this.prepareConversationDraft(payload),
+                    };
+                }
+
+                throw error;
+            }
 
             if (response.status === 202) {
                 const pendingConversation = response.data.conversation || null;
@@ -1065,7 +1180,64 @@ document.addEventListener('alpine:init', () => {
                 await this.selectConversation(conversation.id);
             }
 
+            this.clearConversationDraft();
+
             return { requires_request: false, conversation };
+        },
+
+        async sendConversationDraft(draft, messageBody) {
+            const body = String(messageBody || '').trim();
+
+            if (!draft || !body) {
+                return null;
+            }
+
+            const result = await this.startConversation({
+                ...draft,
+                initial_message: body,
+            }, true);
+
+            if (result?.conversation?.id) {
+                this.clearConversationDraft();
+            }
+
+            return result;
+        },
+
+        activeSuggestionContext() {
+            const conversation = this.activeConversation();
+
+            if (!conversation) {
+                return this.pendingConversationDraft || {};
+            }
+
+            return {
+                conversation_type: conversation.conversation_type,
+                target_role: conversation.other_participant?.role || null,
+            };
+        },
+
+        activeSuggestions(limit = 3, excludedKeys = []) {
+            const conversation = this.activeConversation();
+
+            if (!conversation || !this.isSuggestionEligible(
+                conversation.other_participant?.role,
+                conversation.conversation_type,
+            )) {
+                return [];
+            }
+
+            return this.suggestionsForContext(this.activeSuggestionContext(), limit, excludedKeys);
+        },
+
+        draftSuggestions(limit = 4, excludedKeys = []) {
+            const draft = this.pendingConversationDraft;
+
+            if (!draft || !this.isSuggestionEligible(draft.target_role, draft.conversation_type)) {
+                return [];
+            }
+
+            return this.suggestionsForContext(draft, limit, excludedKeys);
         },
 
         async startContactConversation(contact) {
@@ -1079,6 +1251,9 @@ document.addEventListener('alpine:init', () => {
             await this.startConversation({
                 target_user_id: Number(contact.id),
                 conversation_type: conversationType,
+                target_role: isSupport ? 'admin' : contact.role,
+                name: contact.name,
+                avatar: contact.avatar_url,
             }, true);
         },
 
@@ -1269,6 +1444,15 @@ document.addEventListener('alpine:init', () => {
 
         async sendActiveMessage(messageBody, attachments = []) {
             if (!this.activeConversationId) {
+                if (this.pendingConversationDraft) {
+                    if (attachments.length > 0) {
+                        this.composerError = 'Attachments can be added after the conversation starts.';
+                        return null;
+                    }
+
+                    return this.sendConversationDraft(this.pendingConversationDraft, messageBody);
+                }
+
                 return null;
             }
 

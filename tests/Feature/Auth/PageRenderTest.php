@@ -90,4 +90,40 @@ class PageRenderTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('Set up their account');
     }
+
+    public function test_create_child_credentials_page_shows_password_strength_indicator(): void
+    {
+        $parent = User::factory()->create([
+            'role' => 'admin',
+            'birthdate' => now()->subYears(25)->toDateString(),
+            'email_verified_at' => now(),
+            'is_parent_registration' => true,
+            'parent_verification_status' => 'approved',
+        ]);
+        $parent->assignRole('admin');
+
+        $response = $this
+            ->withSession([
+                'child_step1' => [
+                    'first_name' => 'Sample',
+                    'last_name' => 'Learner',
+                    'birthdate' => now()->subYears(10)->toDateString(),
+                    'age' => 10,
+                    'gender' => 'female',
+                    'relationship_type' => 'biological_mother',
+                ],
+                'child_step2' => [
+                    'city_code' => '402101000',
+                    'barangay_code' => '402101001',
+                ],
+            ])
+            ->actingAs($parent)
+            ->get(route('parent.create-child.credentials'));
+
+        $response->assertStatus(200)
+            ->assertSee('Strength:', false)
+            ->assertSee('Weak', false)
+            ->assertSee('Medium', false)
+            ->assertSee('Strong', false);
+    }
 }

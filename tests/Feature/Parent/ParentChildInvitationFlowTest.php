@@ -677,7 +677,53 @@ class ParentChildInvitationFlowTest extends TestCase
         $this->assertTrue((bool) $link?->can_approve_content);
         $this->assertSame('grandmother', $link?->relationship_type);
         $this->assertSame('pending', $link?->relationship_status);
-        $this->assertSame('not_required', $link?->relationship_verified_status);
+        $this->assertSame('under_review', $link?->relationship_verified_status);
+        $this->assertNotNull($link?->relationship_verification_submitted_at);
+    }
+
+    public function test_accepted_existing_learner_invitation_appears_in_admin_relationship_review(): void
+    {
+        $this->seedLocationRows();
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $admin->assignRole('admin');
+        $parent = $this->createApprovedParent();
+        $child = $this->createLearner('adminreviewchild', 14);
+
+        $invitation = ParentChildInvitation::query()->create([
+            'inviter_parent_user_id' => $parent->id,
+            'child_user_id' => $child->id,
+            'invite_token' => (string) \Illuminate\Support\Str::uuid(),
+            'relationship_type' => 'grandmother',
+            'status' => 'pending',
+            'expires_at' => now()->addDays(3),
+        ]);
+
+        $this->actingAs($child)
+            ->post(route('parent.invitations.respond', $invitation), [
+                'decision' => 'accept',
+            ])
+            ->assertRedirect(route('parent.invitations.show', $invitation));
+
+        $relationship = ParentChildAccount::query()
+            ->where('parent_user_id', $parent->id)
+            ->where('child_user_id', $child->id)
+            ->sole();
+
+        $this->assertSame('under_review', $relationship->relationship_verified_status);
+        $this->assertNotNull($relationship->relationship_verification_submitted_at);
+
+        $response = $this->actingAs($admin)
+            ->get(route('admin.parent-verifications.index', [
+                'type' => 'relationships',
+                'status' => 'pending',
+            ]));
+
+        $response->assertOk()
+            ->assertSee($parent->full_name, false)
+            ->assertSee($child->full_name, false)
+            ->assertSee(route('admin.parent-verifications.relationships.show', $relationship), false);
+        $this->assertTrue($response->viewData('relationshipApplications')->contains('id', $relationship->id));
     }
 
     public function test_child_can_reject_invitation(): void
