@@ -51,36 +51,38 @@
                 @enderror
             </div>
 
-            <!-- Duration -->
-            <div class="mb-6">
-                <label for="duration" class="block text-sm font-medium text-gray-700 mb-2">
-                    Duration (minutes) <span class="text-red-500">*</span>
-                </label>
-                <input type="number" name="duration" id="duration" value="{{ old('duration') }}" min="1"
-                    class="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-300 focus:border-purple-400 @error('duration') border-red-500 @enderror"
-                    required>
-                @error('duration')
-                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                @enderror
-            </div>
+            <fieldset data-topic-metadata @if(in_array(old('type'), ['interactive', 'interactive_checkpoint'], true)) hidden disabled @endif>
+                <!-- Duration -->
+                <div class="mb-6">
+                    <label for="duration" class="block text-sm font-medium text-gray-700 mb-2">
+                        Duration (minutes) <span class="text-red-500">*</span>
+                    </label>
+                    <input type="number" name="duration" id="duration" value="{{ old('duration') }}" min="1"
+                        class="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-300 focus:border-purple-400 @error('duration') border-red-500 @enderror"
+                        required>
+                    @error('duration')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
 
-            <!-- Prerequisite Checkbox -->
-            <div class="mb-6">
-                <label class="flex items-start gap-3 cursor-pointer group">
-                    <input type="checkbox" name="is_prerequisite" id="is_prerequisite" value="1"
-                        {{ old('is_prerequisite', true) ? 'checked' : '' }}
-                        class="w-5 h-5 mt-0.5 text-purple-700 border-2 border-gray-200 rounded focus:ring-2 focus:ring-purple-300 focus:ring-offset-0 cursor-pointer transition-all hover:border-purple-300">
-                    <div class="flex-1">
-                        <span class="text-sm font-semibold text-gray-900 group-hover:text-purple-700 transition-colors">
-                            Mark as Prerequisite Topic
-                        </span>
-                        <p class="text-xs text-gray-600 mt-1 leading-relaxed">
-                            If checked, learners must complete this topic before proceeding to the next prerequisite topic
-                            in sequence
-                        </p>
-                    </div>
-                </label>
-            </div>
+                <!-- Prerequisite Checkbox -->
+                <div class="mb-6">
+                    <label class="flex items-start gap-3 cursor-pointer group">
+                        <input type="checkbox" name="is_prerequisite" id="is_prerequisite" value="1"
+                            {{ old('is_prerequisite', true) ? 'checked' : '' }}
+                            class="w-5 h-5 mt-0.5 text-purple-700 border-2 border-gray-200 rounded focus:ring-2 focus:ring-purple-300 focus:ring-offset-0 cursor-pointer transition-all hover:border-purple-300">
+                        <div class="flex-1">
+                            <span class="text-sm font-semibold text-gray-900 group-hover:text-purple-700 transition-colors">
+                                Mark as Prerequisite Topic
+                            </span>
+                            <p class="text-xs text-gray-600 mt-1 leading-relaxed">
+                                If checked, learners must complete this topic before proceeding to the next prerequisite topic
+                                in sequence
+                            </p>
+                        </div>
+                    </label>
+                </div>
+            </fieldset>
 
             <!-- Topic Type Selection -->
             <div>
@@ -125,6 +127,43 @@
                             </path>
                         </svg>
                         <span class="text-sm font-semibold text-gray-900">Worksheet</span>
+                    </label>
+
+                    <!-- Interactive Checkpoint Type -->
+                    <label
+                        class="relative flex flex-col items-center p-6 border-2 border-gray-200 rounded-xl cursor-pointer hover:border-purple-400 hover:shadow-md transition-all topic-type-card">
+                        <input type="radio" name="type" value="interactive_checkpoint" class="sr-only topic-type-radio"
+                            {{ old('type') === 'interactive_checkpoint' ? 'checked' : '' }} required>
+                        <svg class="w-12 h-12 text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12l2 2 4-4m5 2a9 9 0 11-18 0 9 9 0 0118 0z">
+                            </path>
+                        </svg>
+                        <span class="text-sm font-semibold text-gray-900 text-center">Interactive Checkpoint</span>
+                    </label>
+
+                    <!-- Matching Activity Type -->
+                    <label data-activity-type="matching"
+                        class="relative flex flex-col items-center p-6 border-2 border-orange-200 bg-orange-50/40 rounded-xl cursor-pointer hover:border-orange-400 focus-within:ring-2 focus-within:ring-orange-400 focus-within:ring-offset-2 hover:shadow-md transition-all topic-type-card">
+                        <input type="radio" name="type" value="interactive" class="sr-only topic-type-radio"
+                            {{ old('type') === 'interactive' && old('activity_type', 'matching') === 'matching' ? 'checked' : '' }} required>
+                        <svg class="w-12 h-12 text-orange-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h8m-8 5h5m-5 5h8M5 4h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"/>
+                        </svg>
+                        <span class="text-sm font-semibold text-gray-900">Matching</span>
+                        <span class="mt-1 text-xs text-gray-500">Pair concepts</span>
+                    </label>
+
+                    <!-- Sequencing Activity Type -->
+                    <label data-activity-type="sequencing"
+                        class="relative flex flex-col items-center p-6 border-2 border-orange-200 bg-orange-50/40 rounded-xl cursor-pointer hover:border-orange-400 focus-within:ring-2 focus-within:ring-orange-400 focus-within:ring-offset-2 hover:shadow-md transition-all topic-type-card">
+                        <input type="radio" name="type" value="interactive" class="sr-only topic-type-radio"
+                            {{ old('type') === 'interactive' && old('activity_type') === 'sequencing' ? 'checked' : '' }} required>
+                        <svg class="w-12 h-12 text-orange-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h10m-10 6h16"/>
+                        </svg>
+                        <span class="text-sm font-semibold text-gray-900">Sequencing</span>
+                        <span class="mt-1 text-xs text-gray-500">Order the steps</span>
                     </label>
 
                 </div>
@@ -288,6 +327,64 @@
                     class="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-300 focus:border-purple-400"
                     placeholder="Provide instructions for completing this worksheet...">{{ old('worksheet_instructions') }}</textarea>
             </div>
+        </div>
+
+        <!-- Interactive Checkpoint Content -->
+        <div id="interactive_checkpointContent" class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 content-section hidden">
+            <h2 class="text-xl font-semibold text-gray-900 mb-6">Create Interactive Checkpoint</h2>
+            @if($errors->any() && old('type') === 'interactive_checkpoint')
+                <div class="mb-5 rounded-2xl border border-red-200 bg-red-50 px-5 py-4" role="alert">
+                    <p class="text-sm font-semibold text-red-800">Please fix the checkpoint configuration.</p>
+                    <ul class="mt-1 list-inside list-disc text-xs text-red-700">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+                </div>
+            @endif
+            <div x-data="{ placement: @js(old('checkpoint_placement', 'between_topics')) }" class="mb-6 space-y-4">
+                <fieldset>
+                    <legend class="mb-3 text-sm font-semibold text-gray-900">Checkpoint Placement</legend>
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <label class="rounded-xl border border-gray-200 p-4" :class="placement === 'inside_topic' && 'border-purple-300 bg-purple-50'">
+                            <input type="radio" name="checkpoint_placement" value="inside_topic" x-model="placement" class="text-purple-600 focus:ring-purple-500">
+                            <span class="ml-2 font-semibold">Inside Topic</span>
+                            <span class="mt-1 block text-sm text-gray-500">Place this checkpoint within a selected Topic's content.</span>
+                        </label>
+                        <label class="rounded-xl border border-gray-200 p-4" :class="placement === 'between_topics' && 'border-purple-300 bg-purple-50'">
+                            <input type="radio" name="checkpoint_placement" value="between_topics" x-model="placement" class="text-purple-600 focus:ring-purple-500">
+                            <span class="ml-2 font-semibold">Between Topics</span>
+                            <span class="mt-1 block text-sm text-gray-500">Place this checkpoint as a separate step in the Lesson flow.</span>
+                        </label>
+                    </div>
+                </fieldset>
+                <div x-show="placement === 'inside_topic'">
+                    <label for="parent_topic_id" class="mb-2 block text-sm font-medium text-gray-700">Containing Topic</label>
+                    <select id="parent_topic_id" name="parent_topic_id" :disabled="placement !== 'inside_topic'" class="w-full rounded-xl border-gray-200 focus:border-purple-400 focus:ring-purple-300">
+                        @foreach($lesson->topics->where('type', '!=', 'interactive_checkpoint') as $lessonTopic)
+                            <option value="{{ $lessonTopic->id }}" @selected((int) old('parent_topic_id') === $lessonTopic->id)>{{ $lessonTopic->title }}</option>
+                        @endforeach
+                    </select>
+                    @error('parent_topic_id') <p class="mt-1 text-xs text-red-600" role="alert">{{ $message }}</p> @enderror
+                </div>
+            </div>
+            <fieldset id="checkpointQuestionFields" @disabled(old('type') !== 'interactive_checkpoint')>
+                @include('instructor.quizzes.partials.question-fields', [
+                    'selectedType' => old('question_type', 'multiple_choice'),
+                    'allowTypeSwitch' => true,
+                    'showPoints' => false,
+                    'showExplanation' => true,
+                    'editorUploadUrl' => route($contentRoutePrefix . '.upload.image'),
+                ])
+            </fieldset>
+        </div>
+
+        <!-- Interactive Activity Content -->
+        <div id="interactiveContent" class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 content-section hidden">
+            <h2 class="text-xl font-semibold text-gray-900 mb-6">Create Interactive Activity</h2>
+            @if($errors->any() && old('type') === 'interactive')
+                <div class="mb-5 rounded-2xl border border-red-200 bg-red-50 px-5 py-4" role="alert">
+                    <p class="text-sm font-semibold text-red-800">Please fix the activity configuration.</p>
+                    <ul class="mt-1 list-inside list-disc text-xs text-red-700">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+                </div>
+            @endif
+            @include('instructor.topics.partials.interactive-activity-fields')
         </div>
 
         <!-- Form Actions -->
@@ -455,6 +552,7 @@
             typeRadios.forEach(radio => {
                 radio.addEventListener('change', function() {
                     if (this.checked) {
+                        syncActivitySubtype(this);
                         showContentSection(this.value);
                         highlightCard(this);
                     }
@@ -466,10 +564,21 @@
                 card.addEventListener('click', function() {
                     const radio = this.querySelector('input[type="radio"]');
                     radio.checked = true;
+                    syncActivitySubtype(radio);
                     showContentSection(radio.value);
                     highlightCard(radio);
                 });
             });
+
+            function syncActivitySubtype(radio) {
+                const subtype = radio.closest('[data-activity-type]')?.dataset.activityType;
+                const input = document.querySelector('input[name="activity_type"]');
+                if (subtype && input) {
+                    input.value = subtype;
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }
 
             // Function to highlight selected card
             function highlightCard(radio) {
@@ -487,6 +596,13 @@
 
             // Function to show content section based on type
             function showContentSection(type) {
+                const checkpointQuestionFields = document.getElementById('checkpointQuestionFields');
+                const topicMetadata = document.querySelector('[data-topic-metadata]');
+                const showTopicMetadata = !['interactive_checkpoint', 'interactive'].includes(type);
+                checkpointQuestionFields.disabled = type !== 'interactive_checkpoint';
+                topicMetadata.hidden = !showTopicMetadata;
+                topicMetadata.disabled = !showTopicMetadata;
+
                 contentSections.forEach(section => {
                     section.classList.add('hidden');
                 });
@@ -839,5 +955,3 @@
         }
     </script>
 @endsection
-
-

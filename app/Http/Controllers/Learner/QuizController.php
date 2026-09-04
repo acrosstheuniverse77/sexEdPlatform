@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Notifications\Instructor\QuizAttemptActivityNotification;
 use App\Services\GamificationService;
 use App\Services\LearnerModuleCompletionService;
+use App\Services\Learning\QuestionEvaluator;
 use App\Services\SubscriptionService;
 use App\Support\SubscriptionFeatureKeys;
 use Carbon\Carbon;
@@ -26,6 +27,7 @@ class QuizController extends Controller
         private GamificationService $gamificationService,
         private SubscriptionService $subscriptionService,
         private LearnerModuleCompletionService $completionService,
+        private QuestionEvaluator $questionEvaluator,
     ) {}
 
     /**
@@ -160,209 +162,12 @@ class QuizController extends Controller
             $userAnswers = [];
 
             foreach ($quiz->questions as $question) {
-                $isCorrect = false;
                 $selectedAnswer = ($request->input('answers', []))[$question->id] ?? null;
-                $correctOptions = $question->options->where('is_correct', true);
+                $result = $this->questionEvaluator->evaluate($question, $selectedAnswer);
 
-                if ($question->question_type === 'multiple_select') {
-                    // For multiple select, answer should be an array
-                    $selectedIds = is_array($selectedAnswer) ? array_map('intval', $selectedAnswer) : [];
-                    $correctIds = $correctOptions->pluck('id')->toArray();
-                    
-                    // Check if selected answers match exactly
-                    sort($selectedIds);
-                    sort($correctIds);
-                    $isCorrect = $selectedIds === $correctIds;
+                $userAnswers[$question->id] = $result;
 
-                    $userAnswers[$question->id] = [
-                        'selected' => $selectedIds,
-                        'correct' => $correctIds,
-                        'is_correct' => $isCorrect,
-                        'type' => 'multiple_select',
-                    ];
-                } elseif ($question->question_type === 'fill_blank_text') {
-                    // For fill in the blanks (text input)
-                    // New format: semicolons separate different blanks, pipes separate alternatives
-                    // Example: "blue|Blue;sky|Sky" means blank1 accepts "blue" OR "Blue", blank2 accepts "sky" OR "Sky"
-                    
-                    // Check if we have multiple blanks with specific answers (semicolon-separated)
-                    if (strpos($question->acceptable_answers, ';') !== false) {
-                        // Multiple blanks with specific answer sets
-                        $blankAnswerSets = explode(';', $question->acceptable_answers);
-                        $blankAnswerSets = array_map(function($set) {
-                            return array_map('trim', explode('|', $set));
-                        }, $blankAnswerSets);
-                        
-                        $isCorrect = true;
-                        if (is_array($selectedAnswer) && count($selectedAnswer) === count($blankAnswerSets)) {
-                            foreach ($selectedAnswer as $index => $userInput) {
-                                $acceptableForThisBlank = $blankAnswerSets[$index];
-                                $blankCorrect = false;
-                                foreach ($acceptableForThisBlank as $acceptable) {
-                                    if ($question->case_sensitive) {
-                                        if (trim($userInput) === $acceptable) {
-                                            $blankCorrect = true;
-                                            break;
-                                        }
-                                    } else {
-                                        if (strtolower(trim($userInput)) === strtolower($acceptable)) {
-                                            $blankCorrect = true;
-                                            break;
-                                        }
-                                    }
-                                }
-                                if (!$blankCorrect) {
-                                    $isCorrect = false;
-                                    break;
-                                }
-                            }
-                        } else {
-                            $isCorrect = false;
-                        }
-                        
-                        // Flatten for display in results
-                        $allAcceptableAnswers = [];
-                        foreach ($blankAnswerSets as $set) {
-                            $allAcceptableAnswers = array_merge($allAcceptableAnswers, $set);
-                        }
-                        
-                        $userAnswers[$question->id] = [
-                            'selected' => $selectedAnswer,
-                            'correct' => $allAcceptableAnswers,
-                            'is_correct' => $isCorrect,
-                            'type' => 'fill_blank_text',
-                            'case_sensitive' => $question->case_sensitive,
-                        ];
-                    } else {
-                        // Old format or single blank with alternatives (pipe-separated)
-                        $acceptableAnswers = explode('|', $question->acceptable_answers);
-                        $acceptableAnswers = array_map('trim', $acceptableAnswers);
-                        
-                        // Handle single or multiple blanks (old behavior for backwards compatibility)
-                        if (is_array($selectedAnswer)) {
-                            // Multiple blanks - check if any acceptable answer matches each blank
-                            $isCorrect = true;
-                            foreach ($selectedAnswer as $userInput) {
-                                $blankCorrect = false;
-                                foreach ($acceptableAnswers as $acceptable) {
-                                    if ($question->case_sensitive) {
-                                        if (trim($userInput) === $acceptable) {
-                                            $blankCorrect = true;
-                                            break;
-                                        }
-                                    } else {
-                                        if (strtolower(trim($userInput)) === strtolower($acceptable)) {
-                                            $blankCorrect = true;
-                                            break;
-                                        }
-                                    }
-                                }
-                                if (!$blankCorrect) {
-                                    $isCorrect = false;
-                                    break;
-                                }
-                            }
-                        } else {
-                            // Single blank
-                            foreach ($acceptableAnswers as $acceptable) {
-                                if ($question->case_sensitive) {
-                                    if (trim($selectedAnswer) === $acceptable) {
-                                        $isCorrect = true;
-                                        break;
-                                    }
-                                } else {
-                                    if (strtolower(trim($selectedAnswer)) === strtolower($acceptable)) {
-                                        $isCorrect = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-
-                        $userAnswers[$question->id] = [
-                            'selected' => $selectedAnswer,
-                            'correct' => $acceptableAnswers,
-                            'is_correct' => $isCorrect,
-                            'type' => 'fill_blank_text',
-                            'case_sensitive' => $question->case_sensitive,
-                        ];
-                    }
-                } elseif ($question->question_type === 'fill_blank_select') {
-                    // For fill in the blanks (word selection)
-                    // New format: semicolons separate answers for different blanks
-                    // Example: "grass;sky" for 2 blanks where blank1="grass", blank2="sky"
-                    
-                    if (strpos($question->acceptable_answers, ';') !== false) {
-                        // Multiple blanks with semicolon-separated answers
-                        $expectedAnswers = explode(';', $question->acceptable_answers);
-                        $expectedAnswers = array_map('trim', $expectedAnswers);
-                    } else {
-                        // Old format: pipe-separated
-                        $expectedAnswers = explode('|', $question->acceptable_answers);
-                        $expectedAnswers = array_map('trim', $expectedAnswers);
-                    }
-                    
-                    // User answers should be an array of selected words in order
-                    $selectedWords = is_array($selectedAnswer) ? array_values($selectedAnswer) : [];
-                    
-                    // Check if selected words match correct answers exactly (in order)
-                    $isCorrect = count($selectedWords) === count($expectedAnswers);
-                    if ($isCorrect) {
-                        foreach ($selectedWords as $index => $word) {
-                            if (!isset($expectedAnswers[$index]) || trim($word) !== $expectedAnswers[$index]) {
-                                $isCorrect = false;
-                                break;
-                            }
-                        }
-                    }
-
-                    $userAnswers[$question->id] = [
-                        'selected' => $selectedWords,
-                        'correct' => $expectedAnswers,
-                        'is_correct' => $isCorrect,
-                        'type' => 'fill_blank_select',
-                    ];
-                } elseif ($question->question_type === 'identification') {
-                    // For identification (similar to fill_blank_text but with optional image)
-                    $acceptableAnswers = explode('|', $question->acceptable_answers);
-                    $acceptableAnswers = array_map('trim', $acceptableAnswers);
-                    
-                    foreach ($acceptableAnswers as $acceptable) {
-                        if ($question->case_sensitive) {
-                            if (trim($selectedAnswer) === $acceptable) {
-                                $isCorrect = true;
-                                break;
-                            }
-                        } else {
-                            if (strtolower(trim($selectedAnswer)) === strtolower($acceptable)) {
-                                $isCorrect = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    $userAnswers[$question->id] = [
-                        'selected' => $selectedAnswer,
-                        'correct' => $acceptableAnswers,
-                        'is_correct' => $isCorrect,
-                        'type' => 'identification',
-                        'case_sensitive' => $question->case_sensitive,
-                        'image_url' => $question->image_path ? asset('storage/' . $question->image_path) : null,
-                    ];
-                } else {
-                    // For single answer (multiple_choice, true_false)
-                    $correctOption = $correctOptions->first();
-                    $isCorrect = $selectedAnswer && $selectedAnswer == $correctOption->id;
-
-                    $userAnswers[$question->id] = [
-                        'selected' => $selectedAnswer,
-                        'correct' => $correctOption->id,
-                        'is_correct' => $isCorrect,
-                        'type' => $question->question_type,
-                    ];
-                }
-
-                if ($isCorrect) {
+                if ($result['is_correct']) {
                     $correctAnswers++;
                 }
             }

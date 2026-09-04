@@ -1,9 +1,9 @@
 <?php
 
-use App\Http\Controllers\Instructor;
 use App\Http\Controllers\Connector\HomeController as ConnectorHomeController;
-use App\Http\Controllers\SeminarBrowseController;
+use App\Http\Controllers\Instructor;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\SeminarBrowseController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -158,6 +158,10 @@ Route::prefix('instructor')->name('instructor.')->middleware(['auth', 'permissio
         ->name('topics.create');
     Route::post('topics', [Instructor\TopicController::class, 'store'])
         ->name('topics.store');
+    Route::get('topics/{topic}/checkpoints/{question}/edit', [Instructor\TopicController::class, 'editCheckpoint'])
+        ->name('topics.checkpoints.edit');
+    Route::put('topics/{topic}/checkpoints/{question}', [Instructor\TopicController::class, 'updateCheckpoint'])
+        ->name('topics.checkpoints.update');
     Route::get('topics/{topic}/edit', [Instructor\TopicController::class, 'edit'])
         ->name('topics.edit');
     Route::get('topics/{topic}/preview', [Instructor\TopicController::class, 'preview'])
@@ -166,6 +170,15 @@ Route::prefix('instructor')->name('instructor.')->middleware(['auth', 'permissio
         ->name('topics.update');
     Route::delete('topics/{topic}', [Instructor\TopicController::class, 'destroy'])
         ->name('topics.destroy');
+
+    Route::post('interactive-activities/preview', [Instructor\InteractiveActivityController::class, 'preview'])
+        ->name('interactive-activities.preview');
+    Route::get('interactive-activities/{interactiveActivity}/edit', [Instructor\InteractiveActivityController::class, 'edit'])
+        ->name('interactive-activities.edit');
+    Route::put('interactive-activities/{interactiveActivity}', [Instructor\InteractiveActivityController::class, 'update'])
+        ->name('interactive-activities.update');
+    Route::delete('interactive-activities/{interactiveActivity}', [Instructor\InteractiveActivityController::class, 'destroy'])
+        ->name('interactive-activities.destroy');
 
     // Image upload for TinyMCE
     Route::post('upload/image', [Instructor\TopicController::class, 'uploadImage'])

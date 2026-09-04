@@ -35,6 +35,9 @@ class AdminContentReviewWorkspaceDataTest extends DatabaseTestCase
                 && isset($workspace['hierarchy']['final_quizzes'])
                 && isset($workspace['hierarchy']['stepper'])
                 && isset($workspace['hierarchy']['lesson_topic_count'])
+                && isset($workspace['hierarchy']['lessons'][0]['topics'][0]['interactive_activities'])
+                && data_get($workspace, 'hierarchy.lessons.0.topics.0.interactive_activities.0.title') === 'Topic activity'
+                && data_get($workspace, 'hierarchy.lessons.0.topics.0.interactive_activities.0.configuration.pairs.0.left.value') === 'Consent'
                 && isset($workspace['moderation']['warning_count'])
                 && isset($workspace['moderation']['recent_violations'])
                 && isset($workspace['module']['status_label'])
@@ -85,6 +88,30 @@ class AdminContentReviewWorkspaceDataTest extends DatabaseTestCase
                                 'type' => 'text',
                                 'order' => 1,
                                 'text_content' => '<p>Topic body</p>',
+                                'content_blocks' => [[
+                                    'type' => 'interactive_activity',
+                                    'uuid' => '11111111-1111-4111-8111-111111111111',
+                                    'activity_id' => 210,
+                                ]],
+                                'interactive_activities' => [[
+                                    'id' => 210,
+                                    'lesson_topic_id' => 201,
+                                    'placement' => 'inside_topic',
+                                    'block_uuid' => '11111111-1111-4111-8111-111111111111',
+                                    'activity_type' => 'matching',
+                                    'title' => 'Topic activity',
+                                    'instructions' => '<p>Match these.</p>',
+                                    'explanation' => '<p>Good work.</p>',
+                                    'configuration' => [
+                                        'schema_version' => 1,
+                                        'pairs' => [[
+                                            'id' => 'pair-1',
+                                            'left' => ['id' => 'left-1', 'kind' => 'text', 'value' => 'Consent'],
+                                            'right' => ['id' => 'right-1', 'kind' => 'text', 'value' => 'Agreement'],
+                                        ]],
+                                    ],
+                                    'revision' => 2,
+                                ]],
                             ],
                         ],
                     ],

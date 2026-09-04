@@ -30,6 +30,10 @@ class AdminContentReviewWorkspaceUiTest extends DatabaseTestCase
             ->assertSee('Learner Module Progression', false)
             ->assertSee('data-testid="review-tree-lesson-node"', false)
             ->assertSee('Preview Topic', false)
+            ->assertSee('Interactive Activities', false)
+            ->assertSee('Preview Activity', false)
+            ->assertSee('Matching relationships', false)
+            ->assertSee('Canonical sequence', false)
             ->assertSee('Prerequisite: No', false)
             ->assertSee('View Creator Profile', false)
             ->assertSee('Instructor Evaluation', false)
@@ -72,6 +76,25 @@ class AdminContentReviewWorkspaceUiTest extends DatabaseTestCase
                                 'title' => 'Topic 1',
                                 'type' => 'text',
                                 'order' => 1,
+                                'interactive_activities' => [[
+                                    'id' => 211,
+                                    'lesson_topic_id' => 11,
+                                    'placement' => 'inside_topic',
+                                    'block_uuid' => '11111111-1111-4111-8111-111111111111',
+                                    'activity_type' => 'matching',
+                                    'title' => 'Review matching activity',
+                                    'instructions' => '<p>Match the pairs.</p>',
+                                    'explanation' => '<p>Review explanation.</p>',
+                                    'configuration' => [
+                                        'schema_version' => 1,
+                                        'pairs' => [[
+                                            'id' => 'pair-1',
+                                            'left' => ['id' => 'left-1', 'kind' => 'text', 'value' => 'Consent'],
+                                            'right' => ['id' => 'right-1', 'kind' => 'text', 'value' => 'Agreement'],
+                                        ]],
+                                    ],
+                                    'revision' => 1,
+                                ]],
                             ],
                         ],
                     ],

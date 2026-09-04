@@ -11,6 +11,7 @@ use App\Models\QuizOption;
 use App\Models\Module;
 use App\Models\Lesson;
 use App\Services\Content\ContentOwnershipGuard;
+use App\Services\Learning\QuestionAuthoringService;
 use App\Support\ContentPanelContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -19,6 +20,8 @@ use Illuminate\Support\Facades\DB;
 
 class QuizManagementController extends Controller
 {
+    public function __construct(private QuestionAuthoringService $questionAuthoring) {}
+
     public function index(Request $request)
     {
         $this->authorize('viewAny', Quiz::class);
@@ -191,8 +194,9 @@ class QuizManagementController extends Controller
         $this->ensureAdminCanMutateQuiz($quiz);
 
         $preselectedType = request()->query('type');
-        $validTypes = ['multiple_choice', 'true_false', 'multiple_select', 'fill_blank_text', 'fill_blank_select', 'identification'];
-        $selectedType = in_array($preselectedType, $validTypes) ? $preselectedType : null;
+        $selectedType = in_array($preselectedType, QuestionAuthoringService::TYPES, true)
+            ? $preselectedType
+            : null;
         return view('instructor.quizzes.add-question', compact('quiz', 'selectedType'));
     }
 
@@ -201,75 +205,13 @@ class QuizManagementController extends Controller
         $this->authorize('update', $quiz);
         $this->ensureAdminCanMutateQuiz($quiz);
 
-        $validated = $request->validate([
-            'question_text' => 'required|string',
-            'question_type' => 'required|in:multiple_choice,true_false,multiple_select,fill_blank_text,fill_blank_select,identification',
-            'points' => 'required|integer|min:1',
-            
-            // For multiple choice/true_false/multiple_select
-            'options' => 'required_if:question_type,multiple_choice,true_false,multiple_select|array|min:2',
-            'options.*' => 'required_with:options|string',
-            'correct_options' => 'required_if:question_type,multiple_choice,true_false,multiple_select|array|min:1',
-            'correct_options.*' => 'required_with:correct_options|integer',
-            
-            // For fill_blank_text, fill_blank_select, and identification
-            'acceptable_answers' => 'required_if:question_type,fill_blank_text,fill_blank_select,identification|array|min:1',
-            'acceptable_answers.*' => 'required_with:acceptable_answers|string',
-            'case_sensitive' => 'nullable|boolean',
-            
-            // For fill_blank_select (word selection)
-            'word_bank' => 'nullable|required_if:question_type,fill_blank_select|string',
-            
-            // For identification (image upload)
-            'image' => 'nullable|image|mimes:jpeg,jpg,png|max:2048',
-        ]);
+        $validated = $this->questionAuthoring->validate($request);
 
-        // Additional validation for word bank (max 10 words)
-        if ($request->question_type === 'fill_blank_select' && $request->word_bank) {
-            $words = array_map('trim', explode(',', $request->word_bank));
-            if (count($words) > 10) {
-                return back()->withErrors(['word_bank' => 'Word bank cannot exceed 10 words.'])->withInput();
-            }
-        }
-
-        DB::beginTransaction();
         try {
-            // Handle image upload for identification questions
-            $imagePath = null;
-            if ($request->has('image') && $request->file('image')) {
-                $imagePath = $request->file('image')->store($this->imageLibraryDirectory(), 'public');
-            }
-
-            // Create question record
-            // Convert acceptable_answers array to pipe-separated string for storage
-            $acceptableAnswersString = null;
-            if (isset($validated['acceptable_answers']) && is_array($validated['acceptable_answers'])) {
-                $acceptableAnswersString = implode('|', array_map('trim', $validated['acceptable_answers']));
-            }
-            
-            $question = $quiz->questions()->create([
-                'question_text' => $validated['question_text'],
-                'question_type' => $validated['question_type'],
-                'points' => $validated['points'],
+            $this->questionAuthoring->createQuestion($validated, [
+                'quiz_id' => $quiz->id,
                 'order' => $quiz->questions()->max('order') + 1,
-                'acceptable_answers' => $acceptableAnswersString,
-                'case_sensitive' => $request->has('case_sensitive'),
-                'word_bank' => $request->word_bank ? array_map('trim', explode(',', $request->word_bank)) : null,
-                'image_path' => $imagePath,
             ]);
-
-            // Add options for multiple choice/true_false/multiple_select types
-            if (isset($validated['options'])) {
-                foreach ($validated['options'] as $index => $optionText) {
-                    $question->options()->create([
-                        'option_text' => $optionText,
-                        'is_correct' => in_array($index, $validated['correct_options']),
-                        'order' => $index,
-                    ]);
-                }
-            }
-
-            DB::commit();
 
             $afterSave = $request->input('after_save', 'return');
 
@@ -284,7 +226,6 @@ class QuizManagementController extends Controller
                 ->with('success', 'Question added successfully!');
 
         } catch (\Exception $e) {
-            DB::rollBack();
             \Log::error('Failed to add question: ' . $e->getMessage());
             return back()->with('error', 'Failed to add question: ' . $e->getMessage())->withInput();
         }
@@ -319,78 +260,15 @@ class QuizManagementController extends Controller
             abort(404);
         }
 
-        $validated = $request->validate([
-            'question_text' => 'required|string',
-            'question_type' => 'required|in:multiple_choice,true_false,multiple_select,fill_blank_text,fill_blank_select,identification',
-            'points' => 'required|integer|min:1',
-            
-            // For multiple choice/true_false/multiple_select
-            'options' => 'required_if:question_type,multiple_choice,true_false,multiple_select|array|min:2',
-            'options.*' => 'required_with:options|string',
-            'correct_options' => 'required_if:question_type,multiple_choice,true_false,multiple_select|array|min:1',
-            'correct_options.*' => 'required_with:correct_options|integer',
-            
-            // For fill_blank_text, fill_blank_select, and identification
-            'acceptable_answers' => 'required_if:question_type,fill_blank_text,fill_blank_select,identification|array|min:1',
-            'acceptable_answers.*' => 'required_with:acceptable_answers|string',
-            'case_sensitive' => 'nullable|boolean',
-            
-            // For fill_blank_select (word selection)
-            'word_bank' => 'nullable|required_if:question_type,fill_blank_select|string',
-            
-            // For identification (image upload)
-            'image' => 'nullable|image|mimes:jpeg,jpg,png|max:2048',
-        ]);
+        $validated = $this->questionAuthoring->validate($request);
 
-        DB::beginTransaction();
         try {
-            // Handle image upload for identification questions
-            $imagePath = $question->image_path; // Keep existing image
-            if ($request->hasFile('image')) {
-                // Delete old image if exists
-                if ($question->image_path) {
-                    \Storage::disk('public')->delete($question->image_path);
-                }
-                $imagePath = $request->file('image')->store($this->imageLibraryDirectory(), 'public');
-            }
-
-            // Convert acceptable_answers array to pipe-separated string for storage
-            $acceptableAnswersString = null;
-            if (isset($validated['acceptable_answers']) && is_array($validated['acceptable_answers'])) {
-                $acceptableAnswersString = implode('|', array_map('trim', $validated['acceptable_answers']));
-            }
-            
-            // Update question record
-            $question->update([
-                'question_text' => $validated['question_text'],
-                'question_type' => $validated['question_type'],
-                'points' => $validated['points'],
-                'acceptable_answers' => $acceptableAnswersString,
-                'case_sensitive' => $request->has('case_sensitive'),
-                'word_bank' => $request->word_bank ? array_map('trim', explode(',', $request->word_bank)) : null,
-                'image_path' => $imagePath,
-            ]);
-
-            // Delete existing options and recreate for option-based types
-            $question->options()->delete();
-            
-            if (isset($validated['options'])) {
-                foreach ($validated['options'] as $index => $optionText) {
-                    $question->options()->create([
-                        'option_text' => $optionText,
-                        'is_correct' => in_array($index, $validated['correct_options']),
-                        'order' => $index,
-                    ]);
-                }
-            }
-
-            DB::commit();
+            $this->questionAuthoring->updateQuestion($question, $validated);
 
             return redirect()->route($this->routeName('quizzes.show'), $quiz)
                 ->with('success', 'Question updated successfully!');
 
         } catch (\Exception $e) {
-            DB::rollBack();
             \Log::error('Failed to update question: ' . $e->getMessage());
             return back()->with('error', 'Failed to update question: ' . $e->getMessage())->withInput();
         }
@@ -945,5 +823,3 @@ class QuizManagementController extends Controller
         return 'quiz-images/user-' . (int) Auth::id();
     }
 }
-
-

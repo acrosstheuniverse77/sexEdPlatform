@@ -6,6 +6,7 @@
         previewNodeType: null,
         previewTopic: null,
         previewQuiz: null,
+        previewActivity: null,
         async previewNode(nodeType, nodeId) {
             this.previewOpen = true;
             this.previewLoading = true;
@@ -13,6 +14,7 @@
             this.previewNodeType = nodeType;
             this.previewTopic = null;
             this.previewQuiz = null;
+            this.previewActivity = null;
 
             try {
                 const response = await fetch('{{ route('admin.content-reviews.preview', $reviewRequest) }}?node_type=' + encodeURIComponent(nodeType) + '&node_id=' + nodeId, {
@@ -27,8 +29,10 @@
 
                 if (nodeType === 'topic') {
                     this.previewTopic = payload.node;
-                } else {
+                } else if (nodeType === 'quiz') {
                     this.previewQuiz = payload.node;
+                } else {
+                    this.previewActivity = payload.node;
                 }
             } catch (error) {
                 this.previewError = error.message || 'Unable to load preview content.';
@@ -41,6 +45,9 @@
         },
         previewQuizContent(quizId) {
             this.previewNode('quiz', quizId);
+        },
+        previewActivityContent(activityId) {
+            this.previewNode('activity', activityId);
         },
         formatLabel(value) {
             if (!value) {
@@ -204,6 +211,33 @@
                                                     @endif
                                                 </div>
                                             </div>
+
+                                            @if(count((array) data_get($topic, 'interactive_activities', [])))
+                                                <div class="mt-3 rounded-lg border border-violet-100 bg-violet-50/50 px-3 py-2.5">
+                                                    <p class="text-[10px] font-semibold uppercase tracking-wide text-violet-700">Interactive Activities</p>
+                                                    <div class="mt-2 space-y-2">
+                                                        @foreach((array) data_get($topic, 'interactive_activities', []) as $activity)
+                                                            @php
+                                                                $activityId = (int) data_get($activity, 'id', 0);
+                                                                $activityType = \Illuminate\Support\Str::title(str_replace(['_', '-'], ' ', (string) data_get($activity, 'activity_type', 'activity')));
+                                                            @endphp
+                                                            <div data-testid="review-tree-activity-node" class="flex items-center justify-between gap-3 rounded-lg border border-violet-100 bg-white px-2.5 py-2">
+                                                                <div class="min-w-0">
+                                                                    <p class="truncate text-xs font-semibold text-gray-900">{{ data_get($activity, 'title', 'Untitled Activity') }}</p>
+                                                                    <p class="mt-0.5 text-[11px] text-gray-500">{{ $activityType }} · {{ data_get($activity, 'placement') === 'inside_topic' ? 'Inside topic' : 'Between topics' }} · Optional</p>
+                                                                </div>
+                                                                @if($activityId > 0)
+                                                                    <button type="button"
+                                                                        class="inline-flex flex-shrink-0 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 hover:bg-violet-100"
+                                                                        @click="previewActivityContent({{ $activityId }})">
+                                                                        Preview Activity
+                                                                    </button>
+                                                                @endif
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            @endif
                                         </div>
                                     </div>
                                 @endforeach
@@ -294,7 +328,7 @@
          @click.self="previewOpen = false">
         <div class="w-full max-w-5xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
             <div class="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-                <h3 class="text-base font-semibold text-gray-900" x-text="previewNodeType === 'quiz' ? 'Quiz Preview' : 'Lesson Topic Preview'"></h3>
+                <h3 class="text-base font-semibold text-gray-900" x-text="previewNodeType === 'quiz' ? 'Quiz Preview' : (previewNodeType === 'activity' ? 'Interactive Activity Preview' : 'Lesson Topic Preview')"></h3>
                 <button type="button" class="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600" @click="previewOpen = false">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -341,6 +375,57 @@
                                 </template>
                             </div>
                         </template>
+                    </div>
+                </template>
+
+                <template x-if="previewActivity && !previewLoading">
+                    <div class="space-y-4">
+                        <div class="rounded-xl border border-violet-100 bg-violet-50/60 p-4">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-violet-700">Interactive Activity · Optional</p>
+                            <p class="mt-1 text-lg font-bold text-gray-900" x-text="previewActivity.title || 'Untitled Activity'"></p>
+                            <p class="mt-1 text-xs text-gray-500" x-text="previewActivity.activity_type_label"></p>
+                            <div class="prose prose-sm mt-3 max-w-none" x-html="previewActivity.instructions"></div>
+                        </div>
+
+                        <template x-if="previewActivity.activity_type === 'matching'">
+                            <div class="rounded-xl border border-gray-100 bg-white">
+                                <div class="border-b border-gray-100 px-4 py-3">
+                                    <h4 class="text-sm font-semibold text-gray-900">Matching relationships</h4>
+                                    <p class="mt-1 text-xs text-gray-500">Submitted answer relationships shown for review.</p>
+                                </div>
+                                <div class="divide-y divide-gray-100">
+                                    <template x-for="(pair, pairIndex) in (previewActivity.configuration?.pairs || [])" :key="'review-pair-' + pairIndex">
+                                        <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-3 text-sm">
+                                            <span class="font-medium text-gray-800" x-text="pair?.left?.value || 'Left item'"></span>
+                                            <span class="text-gray-400">↔</span>
+                                            <span class="font-medium text-gray-800" x-text="pair?.right?.value || 'Right item'"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+
+                        <template x-if="previewActivity.activity_type === 'sequencing'">
+                            <div class="rounded-xl border border-gray-100 bg-white">
+                                <div class="border-b border-gray-100 px-4 py-3">
+                                    <h4 class="text-sm font-semibold text-gray-900">Canonical sequence</h4>
+                                    <p class="mt-1 text-xs text-gray-500">Submitted answer order shown for review.</p>
+                                </div>
+                                <ol class="space-y-2 px-4 py-4">
+                                    <template x-for="(item, itemIndex) in (previewActivity.configuration?.items || [])" :key="'review-item-' + itemIndex">
+                                        <li class="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm">
+                                            <span class="flex h-6 w-6 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700" x-text="itemIndex + 1"></span>
+                                            <span class="font-medium text-gray-800" x-text="item?.value || 'Sequence item'"></span>
+                                        </li>
+                                    </template>
+                                </ol>
+                            </div>
+                        </template>
+
+                        <div class="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Explanation</p>
+                            <div class="prose prose-sm mt-2 max-w-none" x-html="previewActivity.explanation"></div>
+                        </div>
                     </div>
                 </template>
 

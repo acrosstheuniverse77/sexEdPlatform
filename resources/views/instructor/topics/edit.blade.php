@@ -111,7 +111,7 @@
                 <label class="block text-sm font-medium text-gray-700 mb-4">
                     Topic Type <span class="text-red-500">*</span>
                 </label>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <!-- Video Type -->
                     <label class="relative flex flex-col items-center p-6 border-2 border-gray-200 rounded-xl cursor-pointer hover:border-purple-400 hover:shadow-md transition-all topic-type-card">
                         <input 
@@ -608,6 +608,3 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 </div>
 @endsection
-
-
-

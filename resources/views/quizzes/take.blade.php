@@ -247,29 +247,7 @@
             $blankCount      = max(1, count($parts) - 1);
             $shuffledWords   = collect($question->word_bank)->shuffle()->values()->all();
           @endphp
-          <div
-            x-data="{
-              wordBank: {{ json_encode($shuffledWords) }},
-              selectedWords: Array({{ $blankCount }}).fill(null),
-              selectWord(wordIndex) {
-                let blank = this.selectedWords.findIndex(v => v === null);
-                if (blank === -1) return;
-                this.selectedWords[blank] = wordIndex;
-                this.reportStatus();
-              },
-              removeWord(blankIndex) {
-                this.selectedWords[blankIndex] = null;
-                this.reportStatus();
-              },
-              isUsed(wordIndex) { return this.selectedWords.includes(wordIndex); },
-              reportStatus() {
-                this.$dispatch('quiz-blank-change', {
-                  questionId: {{ $question->id }},
-                  filled: this.selectedWords.every(w => w !== null)
-                });
-              }
-            }"
-            class="space-y-3">
+          <div x-data="wordBankQuestion(@js($shuffledWords), {{ $blankCount }}, (answers) => $dispatch('quiz-blank-change', { questionId: {{ $question->id }}, filled: answers.every(Boolean) }))" class="space-y-3">
 
             <div class="p-4 bg-gray-50 dark:bg-gray-700/40 rounded-xl border border-gray-200 dark:border-gray-600">
               <p class="text-sm font-medium text-gray-800 dark:text-gray-200 leading-relaxed flex flex-wrap items-center gap-1.5">

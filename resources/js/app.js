@@ -2,6 +2,13 @@ import './bootstrap';
 import Alpine from 'alpinejs';
 import collapse from '@alpinejs/collapse';
 import persist from '@alpinejs/persist';
+import { createQuestionAuthoring, questionTextForEditor } from './question-authoring';
+import { createCheckpointCoordinator, createInteractiveCheckpoint, createOptionalInteractionCoordinator } from './interactive-checkpoint';
+import { createWordBank } from './word-bank';
+import { createInteractiveActivityAuthoring } from './interactive-activity-authoring';
+import { createInteractiveActivity } from './interactive-activity';
+import { createMatchingActivity } from './matching-activity';
+import { createSequencingActivity } from './sequencing-activity';
 import './toast'; // Toast notification system
 import './admin-community';
 import './chat/store';
@@ -71,6 +78,15 @@ const createInstructorSearch = () => ({
 
 // Keep this on window for Blade usage: x-data="instructorSearch()"
 window.instructorSearch = createInstructorSearch;
+window.questionTextForEditor = questionTextForEditor;
+window.interactiveCheckpoint = createInteractiveCheckpoint;
+window.checkpointCoordinator = createCheckpointCoordinator;
+window.optionalInteractionCoordinator = createOptionalInteractionCoordinator;
+window.wordBankQuestion = createWordBank;
+window.interactiveActivityAuthoring = createInteractiveActivityAuthoring;
+window.interactiveActivity = createInteractiveActivity;
+window.matchingActivity = createMatchingActivity;
+window.sequencingActivity = createSequencingActivity;
 
 // Heavy libraries are loaded on-demand to keep the main bundle small.
 let cachedPdfJsLib = null;
@@ -124,6 +140,7 @@ window.Alpine = Alpine;
 Alpine.plugin(collapse);
 Alpine.plugin(persist);
 Alpine.data('instructorSearch', createInstructorSearch);
+Alpine.data('questionAuthoring', createQuestionAuthoring);
 
 // Theme store — dark / light mode, persisted in localStorage
 Alpine.store('theme', {

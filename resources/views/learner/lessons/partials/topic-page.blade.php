@@ -25,9 +25,13 @@
             <div class="flex-1 min-w-0">
                 <h3 class="text-sm font-semibold text-white leading-snug">{{ $currentTopic->title }}</h3>
                 <p class="text-white/70 text-xs">
-                    Topic {{ $currentTopicIndex + 1 }} of {{ $lessonTopics->count() }}
-                    <span class="mx-1">·</span>{{ $currentTopic->duration }}m
-                    <span class="mx-1">·</span>{{ ucfirst($currentTopic->type) }}
+                    @if($currentTopic->isOptionalInteraction())
+                        INTERACTIVE ACTIVITY · Optional
+                    @else
+                        Topic {{ $currentTopicIndex + 1 }} of {{ $lessonTopics->count() }}
+                        <span class="mx-1">·</span>{{ $currentTopic->duration }}m
+                        <span class="mx-1">·</span>{{ ucfirst($currentTopic->type) }}
+                    @endif
                 </p>
                 @if(($module->created_by ?? null) && ($module->created_by ?? null) !== auth()->id())
                     <button
@@ -53,9 +57,27 @@
 
     <!-- Topic Content -->
     <div class="p-6 bg-white dark:bg-transparent">
-        @if($currentTopic->type === 'video')
+        @php
+            $richTextBlocks = $currentTopic->type === 'text' && is_array($currentTopic->content_blocks)
+                ? collect($currentTopic->content_blocks)->where('type', 'rich_text')->pluck('html')->filter()->all()
+                : [];
+            $topicTextContent = $richTextBlocks !== []
+                ? implode('', $richTextBlocks)
+                : $currentTopic->text_content;
+        @endphp
+        @if($currentTopic->type === 'interactive_checkpoint')
+            @if($currentTopic->checkpointQuestion)
+                @include('learner.lessons.partials.interactive-checkpoint', ['question' => $currentTopic->checkpointQuestion])
+            @endif
+        @elseif($currentTopic->type === 'video')
             <!-- Video Content -->
             <div class="space-y-4">
+                @if($currentTopic->text_content)
+                    <div class="prose max-w-none">
+                        {!! $currentTopic->text_content !!}
+                    </div>
+                @endif
+
                 @if($currentTopic->video_file_url)
                     {{-- Plyr.js Video Player (bundled via npm) --}}
                     <div class="rounded-2xl overflow-hidden bg-black" style="aspect-ratio: 16/9;">
@@ -93,11 +115,6 @@
                     </div>
                 @endif
 
-                @if($currentTopic->text_content)
-                    <div class="prose max-w-none mt-6">
-                        {!! $currentTopic->text_content !!}
-                    </div>
-                @endif
             </div>
 
         @elseif($currentTopic->type === 'text')
@@ -300,7 +317,7 @@
                     </div>
                 @endif
 
-                @if($currentTopic->text_content)
+                @if($topicTextContent)
                     <div class="mt-6 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/40 p-4"
                          x-data="{
                             isPreparingAudio: false,
@@ -503,7 +520,7 @@
                         <div x-show="ttsError" class="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" x-text="ttsError"></div>
 
                         <div x-ref="lessonContent" class="prose dark:prose-invert max-w-none mt-4">
-                            {!! $currentTopic->text_content !!}
+                            {!! $topicTextContent !!}
                         </div>
                     </div>
                 @endif
@@ -696,21 +713,43 @@
             </div>
 
         @elseif($currentTopic->type === 'interactive')
-            <!-- Interactive Content -->
-            <div class="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-12 text-center">
-                <svg class="mx-auto h-20 w-20 text-purple-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-                <h3 class="text-xl font-bold text-purple-900 mb-2">Interactive Activity</h3>
-                <p class="text-purple-700 mb-6">This interactive content is coming soon!</p>
-                @if($currentTopic->text_content)
-                    <div class="bg-white bg-opacity-60 rounded-lg p-4 max-w-2xl mx-auto">
-                        <div class="prose prose-sm max-w-none">
-                            {!! $currentTopic->text_content !!}
-                        </div>
-                    </div>
+            @php
+                $standaloneActivity = $currentTopic->interactiveActivities->firstWhere('placement', 'between_topics');
+                $standalonePresentation = $standaloneActivity ? ($interactiveActivityPresentations[$standaloneActivity->id] ?? null) : null;
+            @endphp
+            @if($standalonePresentation)
+                @include('learner.lessons.partials.interactive-activities.shell', ['activity' => $standalonePresentation, 'continueUrl' => $standalonePresentation['continue_url'] ?? null, 'inside' => false])
+            @else
+                @include('learner.lessons.partials.interactive-activities.unavailable', ['activity' => ['title' => $currentTopic->title, 'message' => 'This activity is temporarily unavailable.'], 'continueUrl' => $currentTopicIndex < $lessonTopics->count() - 1 ? route('learner.lessons.show', ['lesson' => $lesson->id, 'topic' => $currentTopicIndex + 1]) : null])
+            @endif
+        @endif
+
+        @if($currentTopic->type !== 'interactive_checkpoint' && is_array($currentTopic->content_blocks))
+            @foreach($currentTopic->content_blocks as $block)
+                @if(($block['type'] ?? null) === 'checkpoint')
+                    @php
+                        $question = $currentTopic->checkpointQuestions->firstWhere('id', (int) ($block['question_id'] ?? 0));
+                        $validBlock = $question && $question->checkpoint_block_uuid === ($block['uuid'] ?? null);
+                    @endphp
+                    @if($validBlock)
+                        @include('learner.lessons.partials.interactive-checkpoint', ['question' => $question])
+                    @endif
+                @elseif(($block['type'] ?? null) === 'interactive_activity')
+                    @php
+                        $activity = $currentTopic->interactiveActivities->firstWhere('id', (int) ($block['activity_id'] ?? 0));
+                        $presentation = $activity ? ($interactiveActivityPresentations[$activity->id] ?? null) : null;
+                        $validActivityBlock = $activity
+                            && $activity->placement === 'inside_topic'
+                            && $activity->lesson_topic_id === $currentTopic->id
+                            && $activity->block_uuid === ($block['uuid'] ?? null)
+                            && $presentation
+                            && ($presentation['available'] ?? false);
+                    @endphp
+                    @if($validActivityBlock)
+                        @include('learner.lessons.partials.interactive-activities.shell', ['activity' => $presentation, 'inside' => true])
+                    @endif
                 @endif
-            </div>
+            @endforeach
         @endif
     </div>
 
@@ -737,6 +776,7 @@
             </div>
 
             {{-- Navigation buttons moved to the persistent bottom action bar in show.blade.php --}}
+            @if(! $currentTopic->isOptionalInteraction())
             <div class="hidden">
                 <div>
                     @if($currentTopicIndex > 0)
@@ -849,6 +889,7 @@
                         @endif
                     @endif
                 </div>
+            @endif
         </div>
     </div>
 </div>

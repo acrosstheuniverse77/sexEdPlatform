@@ -1,40 +1,39 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\PaymentController;
-use App\Http\Controllers\SeminarBrowseController;
-use App\Http\Controllers\SeminarAttendanceController;
-use App\Http\Controllers\SeminarInteractionController;
 use App\Http\Controllers\CertificateController;
-use App\Http\Controllers\Learner\ProfileCompletionController;
-use App\Http\Controllers\Learner\SubscriptionController;
-use App\Http\Controllers\Learner\QuizController;
-use App\Http\Controllers\Learner\ModuleController as LearnerModuleController;
-use App\Http\Controllers\Learner\ModuleFeedbackController as LearnerModuleFeedbackController;
-use App\Http\Controllers\Learner\ModuleReviewPageController as LearnerModuleReviewPageController;
-use App\Http\Controllers\Learner\ContentReportController as LearnerContentReportController;
-use App\Http\Controllers\Learner\LessonController as LearnerLessonController;
-use App\Http\Controllers\Learner\TopicTranslationController;
-use App\Http\Controllers\Learner\ParentVisibilityController;
-use App\Http\Controllers\Learner\InstructorApplicationController as LearnerInstructorApplicationController;
-use App\Http\Controllers\Learner\InstructorProfileController as LearnerInstructorProfileController;
-use App\Http\Controllers\Learner\AdminCreatorProfileController as LearnerAdminCreatorProfileController;
 use App\Http\Controllers\Chat\ConversationController as ChatConversationController;
 use App\Http\Controllers\Chat\MessageController as ChatMessageController;
 use App\Http\Controllers\Chat\MessageRequestController as ChatMessageRequestController;
 use App\Http\Controllers\Chat\StatusController as ChatStatusController;
 use App\Http\Controllers\GuardianRelationshipVerificationController;
+use App\Http\Controllers\Learner\AdminCreatorProfileController as LearnerAdminCreatorProfileController;
+use App\Http\Controllers\Learner\ContentReportController as LearnerContentReportController;
+use App\Http\Controllers\Learner\InstructorApplicationController as LearnerInstructorApplicationController;
+use App\Http\Controllers\Learner\InstructorProfileController as LearnerInstructorProfileController;
+use App\Http\Controllers\Learner\InteractiveActivityController as LearnerInteractiveActivityController;
+use App\Http\Controllers\Learner\LessonController as LearnerLessonController;
+use App\Http\Controllers\Learner\ModuleController as LearnerModuleController;
+use App\Http\Controllers\Learner\ModuleFeedbackController as LearnerModuleFeedbackController;
+use App\Http\Controllers\Learner\ModuleReviewPageController as LearnerModuleReviewPageController;
+use App\Http\Controllers\Learner\ParentVisibilityController;
+use App\Http\Controllers\Learner\ProfileCompletionController;
+use App\Http\Controllers\Learner\QuizController;
+use App\Http\Controllers\Learner\SubscriptionController;
+use App\Http\Controllers\Learner\TopicTranslationController;
 use App\Http\Controllers\ParentInvitationController;
-use App\Http\Controllers\Api\LocationController;
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SeminarAttendanceController;
+use App\Http\Controllers\SeminarBrowseController;
+use App\Http\Controllers\SeminarInteractionController;
 use App\Models\Conversation;
 use Illuminate\Http\Client\Response as HttpClientResponse;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
+use Symfony\Component\HttpFoundation\Response;
 
 $resolveLocalApkFile = static function (): ?array {
     $configuredPath = trim((string) config('apk.local_file', ''));
@@ -129,6 +128,7 @@ Route::get('/', function () {
     if (Auth::check()) {
         return redirect('/learn/dashboard');
     }
+
     return view('landing.index');
 })->name('home');
 
@@ -341,6 +341,24 @@ Route::middleware('auth')->group(function () {
         Route::post('/topics/{topic}/complete', [LearnerLessonController::class, 'completeTopic'])->name('topics.complete');
         Route::post('/topics/{topic}/uncomplete', [LearnerLessonController::class, 'uncompleteTopic'])->name('topics.uncomplete');
         Route::post('/lessons/topics/{topic}/complete', [LearnerLessonController::class, 'completeTopic'])->name('lessons.topics.complete');
+        Route::post('/checkpoints/{question}/submit', [\App\Http\Controllers\Learner\InteractiveCheckpointController::class, 'submit'])
+            ->name('checkpoints.submit');
+        Route::post('/checkpoints/{question}/skip', [\App\Http\Controllers\Learner\InteractiveCheckpointController::class, 'skip'])
+            ->name('checkpoints.skip');
+        Route::get('/interactive-activities/{interactiveActivity}', [LearnerInteractiveActivityController::class, 'show'])
+            ->name('interactive-activities.show');
+        Route::post('/interactive-activities/{interactiveActivity}/match', [LearnerInteractiveActivityController::class, 'match'])
+            ->name('interactive-activities.match');
+        Route::post('/interactive-activities/{interactiveActivity}/check-sequence', [LearnerInteractiveActivityController::class, 'checkSequence'])
+            ->name('interactive-activities.check-sequence');
+        Route::put('/interactive-activities/{interactiveActivity}/state', [LearnerInteractiveActivityController::class, 'saveState'])
+            ->name('interactive-activities.state');
+        Route::post('/interactive-activities/{interactiveActivity}/skip', [LearnerInteractiveActivityController::class, 'skip'])
+            ->name('interactive-activities.skip');
+        Route::post('/interactive-activities/{interactiveActivity}/resume', [LearnerInteractiveActivityController::class, 'resume'])
+            ->name('interactive-activities.resume');
+        Route::post('/interactive-activities/{interactiveActivity}/practice', [LearnerInteractiveActivityController::class, 'practice'])
+            ->name('interactive-activities.practice');
         Route::post('/topics/{topic}/translate', [TopicTranslationController::class, 'translate'])
             ->middleware('throttle:30,1')
             ->name('topics.translate');

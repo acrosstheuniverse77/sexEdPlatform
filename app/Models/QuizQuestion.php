@@ -10,6 +10,8 @@ class QuizQuestion extends Model
 {
     protected $fillable = [
         'quiz_id',
+        'checkpoint_topic_id',
+        'checkpoint_block_uuid',
         'question_text',
         'question_type',
         'points',
@@ -18,6 +20,7 @@ class QuizQuestion extends Model
         'case_sensitive',
         'word_bank',
         'image_path',
+        'explanation',
     ];
 
     protected function casts(): array
@@ -37,6 +40,11 @@ class QuizQuestion extends Model
         return $this->belongsTo(Quiz::class);
     }
 
+    public function checkpointTopic()
+    {
+        return $this->belongsTo(LessonTopic::class, 'checkpoint_topic_id');
+    }
+
     public function options()
     {
         return $this->hasMany(QuizOption::class)->orderBy('order');
@@ -45,6 +53,21 @@ class QuizQuestion extends Model
     public function correctOptions()
     {
         return $this->hasMany(QuizOption::class)->where('is_correct', true);
+    }
+
+    public function checkpointProgress()
+    {
+        return $this->hasMany(InteractiveCheckpointProgress::class);
+    }
+
+    public function scopeFormalQuiz($query)
+    {
+        return $query->whereNotNull('quiz_id')->whereNull('checkpoint_topic_id');
+    }
+
+    public function scopeCheckpoint($query)
+    {
+        return $query->whereNotNull('checkpoint_topic_id');
     }
 
     public function getImageUrlAttribute(): ?string

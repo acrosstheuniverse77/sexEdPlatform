@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -22,6 +23,7 @@ class LessonTopic extends Model
         'video_file_path',
         'caption_file_path',
         'text_content',
+        'content_blocks',
         'file_path',
         'worksheet_files',
         'quiz_id',
@@ -41,6 +43,7 @@ class LessonTopic extends Model
         'image_attachments' => 'array',
         'slideshow_data' => 'array',
         'worksheet_files' => 'array',
+        'content_blocks' => 'array',
     ];
 
     /**
@@ -65,6 +68,28 @@ class LessonTopic extends Model
     public function progress(): HasMany
     {
         return $this->hasMany(LessonTopicProgress::class);
+    }
+
+    public function interactiveActivities(): HasMany
+    {
+        return $this->hasMany(InteractiveActivity::class);
+    }
+
+    public function standaloneInteractiveActivity(): HasOne
+    {
+        return $this->hasOne(InteractiveActivity::class)
+            ->where('placement', 'between_topics');
+    }
+
+    public function checkpointQuestion()
+    {
+        return $this->hasOne(QuizQuestion::class, 'checkpoint_topic_id')
+            ->whereNull('checkpoint_block_uuid');
+    }
+
+    public function checkpointQuestions(): HasMany
+    {
+        return $this->hasMany(QuizQuestion::class, 'checkpoint_topic_id');
     }
 
     /**
@@ -100,12 +125,22 @@ class LessonTopic extends Model
         return $query->orderBy('order');
     }
 
+    public function scopeInstructional($query)
+    {
+        return $query->whereNotIn('type', ['interactive', 'interactive_checkpoint']);
+    }
+
+    public function isOptionalInteraction(): bool
+    {
+        return in_array($this->type, ['interactive', 'interactive_checkpoint'], true);
+    }
+
     /**
      * Get the video embed URL for video topics.
      */
     public function getVideoEmbedUrlAttribute(): ?string
     {
-        if ($this->type !== 'video' || !$this->video_provider || !$this->video_id) {
+        if ($this->type !== 'video' || ! $this->video_provider || ! $this->video_id) {
             return null;
         }
 
@@ -117,7 +152,7 @@ class LessonTopic extends Model
      */
     public function getVideoThumbnailAttribute(): ?string
     {
-        if ($this->type !== 'video' || !$this->video_provider || !$this->video_id) {
+        if ($this->type !== 'video' || ! $this->video_provider || ! $this->video_id) {
             return null;
         }
 
@@ -141,7 +176,7 @@ class LessonTopic extends Model
 
     private function resolvePublicMediaUrl(?string $path, string $defaultDirectory = ''): ?string
     {
-        if (!$path) {
+        if (! $path) {
             return null;
         }
 
@@ -155,8 +190,8 @@ class LessonTopic extends Model
             $normalized = substr($normalized, 8);
         }
 
-        if (!str_contains($normalized, '/') && $defaultDirectory !== '') {
-            $normalized = trim($defaultDirectory, '/') . '/' . $normalized;
+        if (! str_contains($normalized, '/') && $defaultDirectory !== '') {
+            $normalized = trim($defaultDirectory, '/').'/'.$normalized;
         }
 
         return Storage::url($normalized);

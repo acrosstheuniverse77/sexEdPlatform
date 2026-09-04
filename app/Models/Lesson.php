@@ -60,13 +60,14 @@ class Lesson extends Model
      */
     public function getTopicCompletionPercentage($userId): int
     {
-        $totalTopics = $this->topics()->count();
+        $totalTopics = $this->topics()->instructional()->count();
         
         if ($totalTopics === 0) {
             return 0;
         }
 
         $completedTopics = $this->topics()
+            ->instructional()
             ->whereHas('progress', function ($query) use ($userId) {
                 $query->where('user_id', $userId)
                       ->where('completed', true);
@@ -81,7 +82,7 @@ class Lesson extends Model
      */
     public function allTopicsCompletedBy($userId): bool
     {
-        $totalTopics = $this->topics()->count();
+        $totalTopics = $this->topics()->instructional()->count();
         
         if ($totalTopics === 0) {
             return true; // No topics means lesson is accessible

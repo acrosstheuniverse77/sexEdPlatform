@@ -2,17 +2,13 @@
 
 namespace App\Http\Controllers\Instructor;
 
-use App\Helpers\VideoEmbedHelper;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\LessonRequest;
 use App\Models\Lesson;
 use App\Models\Module;
-use App\Models\Quiz;
 use App\Services\Content\ContentOwnershipGuard;
 use App\Support\ContentPanelContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
 
 class LessonController extends Controller
 {
@@ -35,8 +31,8 @@ class LessonController extends Controller
 
             if ($search !== '') {
                 $query->where(function ($inner) use ($search) {
-                    $inner->where('title', 'like', '%' . $search . '%')
-                        ->orWhere('description', 'like', '%' . $search . '%');
+                    $inner->where('title', 'like', '%'.$search.'%')
+                        ->orWhere('description', 'like', '%'.$search.'%');
                 });
             }
         };
@@ -76,6 +72,7 @@ class LessonController extends Controller
             ->when($this->panelContext()->isInstructor(), fn ($query) => $query->where('created_by', Auth::id()))
             ->orderBy('title')
             ->get();
+
         return view('instructor.lessons.create', compact('modules'));
     }
 
@@ -94,15 +91,15 @@ class LessonController extends Controller
 
         // Auto-increment order
         $validated['order'] = Lesson::where('module_id', $validated['module_id'])->max('order') + 1;
-        
+
         // Duration will be auto-calculated from topics (start with 0)
         $validated['duration'] = 0;
-        
+
         // Default create flow to active unless explicitly set.
         $validated['is_published'] = $request->has('is_published')
             ? $request->boolean('is_published')
             : true;
-        
+
         // Default content type (container lesson)
         $validated['content_type'] = 'text';
 
@@ -110,7 +107,6 @@ class LessonController extends Controller
 
         return redirect()->route($this->routeName('lessons.show'), $lesson)
 
-        
             ->with('success', 'Lesson created successfully! Now add topics to this lesson.');
     }
 
@@ -118,7 +114,11 @@ class LessonController extends Controller
     {
         $this->authorize('view', $lesson);
 
-        $lesson->load(['module.creator', 'topics' => fn($q) => $q->orderBy('order'), 'quizzes.questions']);
+        $lesson->load([
+            'module.creator',
+            'topics' => fn ($query) => $query->orderBy('order')->with(['checkpointQuestions', 'interactiveActivities']),
+            'quizzes.questions',
+        ]);
 
         $modules = Module::query()
             ->when($this->panelContext()->isInstructor(), fn ($query) => $query->where('created_by', Auth::id()))
@@ -172,8 +172,8 @@ class LessonController extends Controller
         }
 
         // Duration is auto-calculated from topics (recalculate it)
-        $lesson->duration = $lesson->topics()->sum('duration');
-        
+        $lesson->duration = $lesson->topics()->instructional()->sum('duration');
+
         $lesson->update($validated);
 
         // Update module duration as well
@@ -279,7 +279,7 @@ class LessonController extends Controller
 
     private function ensureAdminCanMutateLesson(Lesson $lesson): void
     {
-        if (!$this->panelContext()->isAdmin()) {
+        if (! $this->panelContext()->isAdmin()) {
             return;
         }
 

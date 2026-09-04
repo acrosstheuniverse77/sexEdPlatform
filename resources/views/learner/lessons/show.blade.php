@@ -7,8 +7,9 @@
 
 @section('progress-bar')
     @php
-        $topicCount  = $lessonTopics->count();
-        $doneCount   = count($completedTopicIds);
+        $requiredTopics = $lessonTopics->filter(fn ($topic) => ! $topic->isOptionalInteraction());
+        $topicCount  = $requiredTopics->count();
+        $doneCount   = $requiredTopics->whereIn('id', $completedTopicIds)->count();
         $progressPct = $topicCount > 0 ? round(($doneCount / $topicCount) * 100) : 0;
     @endphp
     <div class="flex items-center gap-2 w-full">
@@ -24,7 +25,11 @@
 
 @section('content')
 <div class="flex h-full min-h-0 overflow-hidden"
-     x-data="{ sidebarOpen: JSON.parse(localStorage.getItem('lessonSidebarOpen') ?? 'true') }"
+     x-data="{ ...checkpointCoordinator(), sidebarOpen: JSON.parse(localStorage.getItem('lessonSidebarOpen') ?? 'true'), focusNextOptional(token) { const items = [...$el.querySelectorAll('[data-optional-interaction]')]; const current = items.findIndex((item) => item.dataset.optionalInteraction === token); this.release(token); const next = items[current + 1]?.querySelector('button, input, select, textarea, a'); next?.focus(); } }"
+     @checkpoint-active.window="activate($event.detail.token || ('checkpoint:' + $event.detail.questionId))"
+     @checkpoint-continued.window="focusNextOptional($event.detail.token || ('checkpoint:' + $event.detail.questionId))"
+     @optional-interaction-active.window="activate($event.detail.token)"
+     @interactive-activity-continued.window="focusNextOptional('activity:' + $event.detail.activityId)"
      x-effect="localStorage.setItem('lessonSidebarOpen', JSON.stringify(sidebarOpen))">
 
     {{-- ═══════════════════════════════════════════
@@ -101,8 +106,9 @@
                     $__lIsCurrent   = $__l->id === $lesson->id;
                     $__lIsLocked    = in_array($__l->id, $sidebarLockedIds);
                     $__lTopics      = $__l->topics;
-                    $__lTopicCount  = $__lTopics->count();
-                    $__lDoneCount   = $__lTopics->filter(fn($t) => in_array($t->id, $allCompletedTopicIds))->count();
+                    $__lRequiredTopics = $__lTopics->filter(fn ($topic) => ! $topic->isOptionalInteraction());
+                    $__lTopicCount  = $__lRequiredTopics->count();
+                    $__lDoneCount   = $__lRequiredTopics->filter(fn($t) => in_array($t->id, $allCompletedTopicIds))->count();
                     $__lQuiz        = $__l->quiz;
                     $__lTotalItems  = $__lTopicCount + ($__lQuiz ? 1 : 0);
                     $__lDoneItems   = $__lDoneCount + (($__lIsCurrent && ($quizAttempt?->passed ?? false)) ? 1 : 0);
@@ -175,10 +181,12 @@
                         @foreach($__lTopics as $__tIdx => $__t)
                             @php
                                 $__tIsLast  = $loop->last && !$__lQuiz;
-                                $__tDone    = in_array($__t->id, $allCompletedTopicIds);
+                        $__tDone    = in_array($__t->id, $allCompletedTopicIds)
+                            || ($__lIsCurrent && in_array($__t->id, $resolvedActivityTopicIds ?? []));
                                 $__tCurrent = $__lIsCurrent && $currentTopicIndex === $__tIdx && !request()->has('quiz');
                                 $__tLocked  = $__lIsCurrent && in_array($__t->id, $lockedTopicIds);
                                 $__tLabel   = match($__t->type) {
+                                    'interactive_checkpoint' => 'QUICK CHECK',
                                     'video'       => 'VIDEO',
                                     'text'        => 'TEXT',
                                     'worksheet'   => 'FILE',
@@ -215,7 +223,13 @@
                                     @if($__tLocked)
                                         <div class="py-0.5 cursor-not-allowed">
                                             <p class="text-sm font-medium text-gray-500 dark:text-gray-400 leading-snug">{{ $__t->title }}</p>
+                                            @if($__t->type === 'interactive_checkpoint')
+                                                <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">QUICK CHECK · Optional</p>
+                                            @elseif($__t->type === 'interactive')
+                                                <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">INTERACTIVE ACTIVITY · Optional</p>
+                                            @else
                                             <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{{ $__t->duration }}m · {{ $__tLabel }}{{ $__t->is_prerequisite ? ' · Required' : '' }}</p>
+                                            @endif
                                         </div>
                                     @else
                                         <a href="{{ $__tUrl }}"
@@ -225,9 +239,15 @@
                                                        {{ $__tCurrent ? 'text-violet-700 dark:text-violet-300' : 'text-gray-700 dark:text-gray-200' }}">
                                                 {{ $__t->title }}
                                             </p>
+                                            @if($__t->type === 'interactive_checkpoint')
+                                                <p class="text-xs mt-0.5 {{ $__tCurrent ? 'text-violet-500' : 'text-gray-400 dark:text-gray-500' }}">QUICK CHECK · Optional</p>
+                                            @elseif($__t->type === 'interactive')
+                                                <p class="text-xs mt-0.5 {{ $__tCurrent ? 'text-violet-500' : 'text-gray-400 dark:text-gray-500' }}">INTERACTIVE ACTIVITY · Optional</p>
+                                            @else
                                             <p class="text-xs mt-0.5 {{ $__tCurrent ? 'text-violet-500' : 'text-gray-400 dark:text-gray-500' }}">
                                                 {{ $__t->duration }}m · {{ $__tLabel }}{{ $__t->is_prerequisite ? ' · Required' : '' }}
                                             </p>
+                                            @endif
                                         </a>
                                     @endif
                                 </div>
@@ -362,6 +382,23 @@
                 </button>
             @endif
         </div>
+        @if($currentTopic && !request()->has('quiz') && $lessonTopics->count() > 1)
+            <div class="flex-shrink-0 flex items-center justify-center gap-1.5 px-4 pb-2">
+                @foreach($lessonTopics as $__dot)
+                    @php
+                        $__dotDone = in_array($__dot->id, $completedTopicIds)
+                            || in_array($__dot->id, $resolvedCheckpointTopicIds)
+                            || in_array($__dot->id, $resolvedActivityTopicIds ?? []);
+                        $__dotCurrent = $__dot->id === $currentTopic->id;
+                    @endphp
+                    <div class="rounded-full transition-all duration-300 {{ $__dotCurrent ? 'h-3 w-3 ring-2 ring-offset-1' : 'h-2 w-2' }}"
+                         style="{{ $__dotDone || $__dotCurrent
+                             ? 'background: linear-gradient(135deg, #A30EB2, #3B0CB1);' . ($__dotCurrent ? ' --tw-ring-color: #A30EB2;' : '')
+                             : 'background-color: #e5e7eb;' }}"
+                         title="{{ $__dot->title }}"></div>
+                @endforeach
+            </div>
+        @endif
         {{-- Scrollable content --}}
         <div class="flex-1 min-h-0 overflow-y-auto">
             <div class="max-w-4xl mx-auto px-4 py-6">
@@ -384,147 +421,34 @@
 
         {{-- ── Bottom Action Bar — sticky, always visible ── --}}
         @if($currentTopic && !request()->has('quiz'))
-        @php
-            $__barDone     = in_array($currentTopic->id, $completedTopicIds);
-            $__isLastTopic = $currentTopicIndex >= $lessonTopics->count() - 1;
-        @endphp
-        <div class="flex-shrink-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
-
-            {{-- Topic progress dot strip --}}
-            @if($lessonTopics->count() > 1)
-            <div class="flex items-center justify-center gap-1.5 px-4 pt-2.5 pb-1">
-                @foreach($lessonTopics as $__dot)
-                @php
-                    $__dotDone    = in_array($__dot->id, $completedTopicIds);
-                    $__dotCurrent = $__dot->id === $currentTopic->id;
-                @endphp
-                <div class="rounded-full transition-all duration-300 {{ $__dotCurrent ? 'w-3 h-3 ring-2 ring-offset-1' : 'w-2 h-2' }}"
-                     style="{{ $__dotDone || $__dotCurrent
-                         ? 'background: linear-gradient(135deg, #A30EB2, #3B0CB1);' . ($__dotCurrent ? ' --tw-ring-color: #A30EB2;' : '')
-                         : 'background-color: #e5e7eb;' }}"
-                     title="{{ $__dot->title }}"></div>
-                @endforeach
+            @php
+                $__barDone = ! $currentTopic->isOptionalInteraction()
+                    && in_array($currentTopic->id, $completedTopicIds);
+            @endphp
+            <div data-lesson-footer
+                 class="flex-shrink-0 border-t border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+                 style="height: calc(4.5rem + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);">
+                <div class="flex h-[4.5rem] items-center justify-between gap-3 px-3 sm:px-6">
+                    <div class="flex items-center gap-3">
+                        @if($currentTopicIndex > 0)
+                            <a href="{{ route('learner.lessons.show', ['lesson' => $lesson->id, 'topic' => $currentTopicIndex - 1]) }}"
+                               class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
+                                <span class="hidden sm:inline">Previous</span>
+                                <span class="sm:hidden">Back</span>
+                            </a>
+                        @endif
+                        @if($__barDone)
+                            <form action="{{ route('learner.topics.uncomplete', $currentTopic) }}" method="POST">
+                                @csrf
+                                <button type="submit" class="whitespace-nowrap text-xs text-gray-400 underline underline-offset-2 transition-colors hover:text-red-400 dark:text-gray-500">Mark as Incomplete</button>
+                            </form>
+                        @endif
+                    </div>
+                    <div x-show="footerForwardVisible()" x-cloak class="flex-shrink-0">
+                        @include('learner.lessons.partials.lesson-forward-action')
+                    </div>
+                </div>
             </div>
-            @endif
-
-            {{-- Button row --}}
-            <div class="px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
-
-            {{-- Left: Previous + Mark as Incomplete --}}
-            <div class="flex items-center gap-3">
-                @if($currentTopicIndex > 0)
-                    <a href="{{ route('learner.lessons.show', ['lesson' => $lesson->id, 'topic' => $currentTopicIndex - 1]) }}"
-                       class="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
-                        </svg>
-                        <span class="hidden sm:inline">Previous</span>
-                    </a>
-                @endif
-
-                @if($__barDone)
-                    <form action="{{ route('learner.topics.uncomplete', $currentTopic) }}" method="POST">
-                        @csrf
-                        <button type="submit"
-                                class="text-xs text-gray-400 hover:text-red-400 dark:text-gray-500 dark:hover:text-red-400 transition-colors whitespace-nowrap underline underline-offset-2">
-                            Mark as Incomplete
-                        </button>
-                    </form>
-                @endif
-            </div>
-
-            {{-- Right: Primary CTA --}}
-            <div class="flex-shrink-0">
-                @if($__barDone)
-                    {{-- Topic is done — navigate forward --}}
-                    @if(!$__isLastTopic)
-                        <a href="{{ route('learner.lessons.show', ['lesson' => $lesson->id, 'topic' => $currentTopicIndex + 1]) }}"
-                           class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl hover:opacity-90 active:scale-[0.98] transition-all"
-                           style="background: linear-gradient(135deg, #A30EB2, #730DB1, #3B0CB1);">
-                            Continue
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-                            </svg>
-                        </a>
-                    @elseif($lessonQuiz)
-                        <a href="{{ route('learner.lessons.show', ['lesson' => $lesson->id, 'quiz' => 1]) }}"
-                           class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl hover:opacity-90 active:scale-[0.98] transition-all"
-                           style="background: linear-gradient(135deg, #A30EB2, #730DB1, #3B0CB1);">
-                            Take Lesson Quiz
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-                            </svg>
-                        </a>
-                    @elseif($nextLesson)
-                        <a href="{{ route('learner.lessons.show', $nextLesson) }}"
-                           class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl hover:opacity-90 active:scale-[0.98] transition-all"
-                           style="background: linear-gradient(135deg, #A30EB2, #730DB1, #3B0CB1);">
-                            Next Lesson
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-                            </svg>
-                        </a>
-                    @else
-                        <a href="{{ route('learner.modules.show', $module) }}"
-                           class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl hover:opacity-90 active:scale-[0.98] transition-all"
-                           style="background: linear-gradient(135deg, #A30EB2, #730DB1, #3B0CB1);">
-                            Back to Module
-                        </a>
-                    @endif
-                @else
-                    {{-- Topic not done — show Complete & Continue CTA --}}
-                    @if(!$__isLastTopic)
-                        <form action="{{ route('learner.topics.complete', $currentTopic) }}" method="POST" class="inline">
-                            @csrf
-                            <input type="hidden" name="next_topic_index" value="{{ $currentTopicIndex + 1 }}">
-                            <button type="submit"
-                                    class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl hover:opacity-90 active:scale-[0.98] transition-all"
-                                    style="background: linear-gradient(135deg, #A30EB2, #730DB1, #3B0CB1);">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                                </svg>
-                                Mark Complete & Continue
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-                                </svg>
-                            </button>
-                        </form>
-                    @elseif($lessonQuiz)
-                        <form action="{{ route('learner.topics.complete', $currentTopic) }}" method="POST" class="inline">
-                            @csrf
-                            <button type="submit"
-                                    class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl hover:opacity-90 active:scale-[0.98] transition-all"
-                                    style="background: linear-gradient(135deg, #A30EB2, #730DB1, #3B0CB1);"
-                                    onclick="event.preventDefault();
-                                             fetch(this.form.action, { method: 'POST', body: new FormData(this.form), headers: {'X-CSRF-TOKEN': '{{ csrf_token() }}'} })
-                                             .then(() => window.location.href = '{{ route('learner.lessons.show', ['lesson' => $lesson->id, 'quiz' => 1]) }}');">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                                </svg>
-                                Complete & Take Quiz
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-                                </svg>
-                            </button>
-                        </form>
-                    @else
-                        <form action="{{ route('learner.topics.complete', $currentTopic) }}" method="POST" class="inline">
-                            @csrf
-                            <button type="submit"
-                                    class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl hover:opacity-90 active:scale-[0.98] transition-all"
-                                    style="background: linear-gradient(135deg, #A30EB2, #730DB1, #3B0CB1);">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                                </svg>
-                                Mark Complete
-                            </button>
-                        </form>
-                    @endif
-                @endif
-            </div>
-
-            </div>{{-- end button row --}}
-        </div>{{-- end bottom action bar --}}
         @endif
     </main>
 </div>

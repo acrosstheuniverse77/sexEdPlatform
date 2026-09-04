@@ -109,6 +109,10 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
         ->name('topics.create');
     Route::post('topics', [Instructor\TopicController::class, 'store'])
         ->name('topics.store');
+    Route::get('topics/{topic}/checkpoints/{question}/edit', [Instructor\TopicController::class, 'editCheckpoint'])
+        ->name('topics.checkpoints.edit');
+    Route::put('topics/{topic}/checkpoints/{question}', [Instructor\TopicController::class, 'updateCheckpoint'])
+        ->name('topics.checkpoints.update');
     Route::get('topics/{topic}/edit', [Instructor\TopicController::class, 'edit'])
         ->name('topics.edit');
     Route::get('topics/{topic}/preview', [Instructor\TopicController::class, 'preview'])
@@ -117,6 +121,15 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
         ->name('topics.update');
     Route::delete('topics/{topic}', [Instructor\TopicController::class, 'destroy'])
         ->name('topics.destroy');
+
+    Route::post('interactive-activities/preview', [Instructor\InteractiveActivityController::class, 'preview'])
+        ->name('interactive-activities.preview');
+    Route::get('interactive-activities/{interactiveActivity}/edit', [Instructor\InteractiveActivityController::class, 'edit'])
+        ->name('interactive-activities.edit');
+    Route::put('interactive-activities/{interactiveActivity}', [Instructor\InteractiveActivityController::class, 'update'])
+        ->name('interactive-activities.update');
+    Route::delete('interactive-activities/{interactiveActivity}', [Instructor\InteractiveActivityController::class, 'destroy'])
+        ->name('interactive-activities.destroy');
 
     Route::post('upload/image', [Instructor\TopicController::class, 'uploadImage'])
         ->name('upload.image');
@@ -346,9 +359,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     Route::delete('/subscribers/{subscription}', [Admin\SubscriberAdminController::class, 'destroy'])
         ->name('subscribers.destroy');
 
-
     // Calendar
-    Route::get('/calendar', fn() => view('admin.calendar.index'))->name('calendar.index');
+    Route::get('/calendar', fn () => view('admin.calendar.index'))->name('calendar.index');
 
     // Seminars
     Route::prefix('seminars')->name('seminars.')->group(function () {
@@ -363,6 +375,6 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'role:admin'])->grou
     });
 
     // Messages
-    Route::get('/messages', fn() => view('admin.messages.index'))->name('messages.index');
+    Route::get('/messages', fn () => view('admin.messages.index'))->name('messages.index');
 
 });
